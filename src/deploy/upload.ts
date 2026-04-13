@@ -1,7 +1,6 @@
-import { readFileSync } from "node:fs";
-import { extname, basename } from "node:path";
+import { readdirSync, readFileSync } from "node:fs";
+import { extname, basename, join, relative } from "node:path";
 import { S3Client } from "@aws-sdk/client-s3";
-import { glob } from "tinyglobby";
 import { lookup } from "mrmime";
 import pLimit from "p-limit";
 import { putObject } from "../storage/operations.js";
@@ -48,12 +47,16 @@ export async function uploadDirectory(
   const concurrency = options?.concurrency ?? 10;
   const limit = pLimit(concurrency);
 
-  const files = await glob(["**/*"], {
-    cwd: outputDir,
-    onlyFiles: true,
-    absolute: false,
-    followSymbolicLinks: false,
+  const entries = readdirSync(outputDir, {
+    recursive: true,
+    withFileTypes: true,
   });
+  const files = entries
+    .filter((entry) => entry.isFile() && !entry.isSymbolicLink())
+    .map((entry) => {
+      const full = join(entry.parentPath ?? entry.path, entry.name);
+      return relative(outputDir, full);
+    });
 
   const errors: string[] = [];
   let totalSize = 0;
