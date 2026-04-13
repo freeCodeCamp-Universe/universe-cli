@@ -1,6 +1,7 @@
 node_modules/
 dist/
 coverage/
+*.bun-build
 
 # Beads / Dolt files (added by bd init)
 .dolt/

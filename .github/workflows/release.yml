@@ -1,0 +1,71 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm ci
+      - run: npx vitest run
+      - run: npx tsc --noEmit
+
+  build:
+    needs: test
+    strategy:
+      matrix:
+        include:
+          - target: bun-darwin-arm64
+            os: macos-latest
+            artifact: universe-darwin-arm64
+          - target: bun-darwin-x64
+            os: macos-latest
+            artifact: universe-darwin-amd64
+          - target: bun-linux-x64
+            os: ubuntu-latest
+            artifact: universe-linux-amd64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun build --compile --target=${{ matrix.target }} src/index.ts --outfile ${{ matrix.artifact }}
+      - name: Sign macOS binary
+        if: runner.os == 'macOS'
+        run: codesign --sign - --force --entitlements entitlements.plist ${{ matrix.artifact }}
+      - name: Generate checksum
+        run: shasum -a 256 ${{ matrix.artifact }} > ${{ matrix.artifact }}.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: |
+            ${{ matrix.artifact }}
+            ${{ matrix.artifact }}.sha256
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            universe-darwin-arm64
+            universe-darwin-arm64.sha256
+            universe-darwin-amd64
+            universe-darwin-amd64.sha256
+            universe-linux-amd64
+            universe-linux-amd64.sha256
+          generate_release_notes: true
