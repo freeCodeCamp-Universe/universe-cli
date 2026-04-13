@@ -1,18 +1,22 @@
 # Releasing
 
-Releases are automated via [release-please](https://github.com/googleapis/release-please).
+Releases are manual — you decide when to cut one.
 
-## How It Works
+## How to Release
 
-1. Push commits to `main` using conventional commit format (`feat:`, `fix:`, `chore:`)
-2. release-please opens (or updates) a **Release PR** with version bump and changelog
-3. Review and merge the Release PR when ready to cut a release
-4. On merge, release-please creates a git tag (`v0.2.0`) and GitHub Release
-5. The tag triggers the build workflow, which produces standalone binaries
+1. Go to **Actions** > **Release** > **Run workflow**
+2. Enter the version (e.g., `0.2.0`)
+3. Click **Run workflow**
+
+That's it. The workflow:
+
+- Runs tests (180/180) and typecheck
+- Builds Node SEA binaries for 3 platforms
+- Signs macOS binaries
+- Creates a git tag `v0.2.0`
+- Publishes a GitHub Release with binaries + SHA256 checksums
 
 ## Binaries
-
-The build workflow (`.github/workflows/release.yml`) produces:
 
 | Platform            | Binary                  |
 | ------------------- | ----------------------- |
@@ -22,33 +26,13 @@ The build workflow (`.github/workflows/release.yml`) produces:
 
 Each binary is a Node SEA (Single Executable Application) — no Node.js install required.
 
-SHA256 checksums are attached to every release.
+## Local Tag (escape hatch)
 
-## Setup (one-time, for repo admins)
-
-1. Create a fine-grained PAT at https://github.com/settings/personal-access-tokens
-   - Repository access: this repo only
-   - Permissions: Contents (read/write), Pull requests (read/write)
-2. Add the PAT as a repo secret named `RELEASE_TOKEN`
-   - Settings > Secrets and variables > Actions > New repository secret
-
-The PAT is needed because `GITHUB_TOKEN` events do not trigger downstream workflows (GitHub platform constraint).
-
-## Commit Format
-
-| Prefix                         | Version bump  | Example                          |
-| ------------------------------ | ------------- | -------------------------------- |
-| `feat:`                        | Minor (0.x.0) | `feat: add list command`         |
-| `fix:`                         | Patch (0.0.x) | `fix: handle empty alias file`   |
-| `chore:`                       | No bump       | `chore: update deps`             |
-| `feat!:` or `BREAKING CHANGE:` | Major (x.0.0) | `feat!: change deploy ID format` |
-
-## Manual Release (escape hatch)
-
-If release-please is unavailable:
+If GitHub Actions is unavailable:
 
 ```sh
-# Bump version in package.json manually
 git tag v0.2.0
-git push origin main --tags
+git push origin v0.2.0
 ```
+
+Then manually build and attach binaries to the GitHub Release.
