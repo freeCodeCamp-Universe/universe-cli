@@ -9,6 +9,7 @@ export default defineConfig({
   target: "node20",
   clean: true,
   splitting: false,
+  noExternal: [/.*/],
   define: {
     __VERSION__: JSON.stringify(pkg.version),
   },

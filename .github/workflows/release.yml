@@ -50,11 +50,14 @@ jobs:
         run: node --experimental-sea-config sea-config.json
       - name: Create executable
         run: cp "$(which node)" "${{ matrix.artifact }}"
+      - name: Remove existing signature (macOS)
+        if: runner.os == 'macOS'
+        run: codesign --remove-signature "${{ matrix.artifact }}"
       - name: Inject SEA blob
-        run: pnpm exec postject ${{ matrix.artifact }} NODE_SEA_BLOB dist/sea.blob --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2
+        run: pnpm exec postject ${{ matrix.artifact }} NODE_SEA_BLOB dist/sea.blob --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2 --macho-segment-name NODE_SEA
       - name: Sign macOS binary
         if: runner.os == 'macOS'
-        run: codesign --sign - --entitlements entitlements.plist ${{ matrix.artifact }}
+        run: codesign --sign - --entitlements entitlements.plist "${{ matrix.artifact }}"
       - name: Generate checksum
         run: shasum -a 256 ${{ matrix.artifact }} > ${{ matrix.artifact }}.sha256
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
