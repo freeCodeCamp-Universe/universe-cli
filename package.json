@@ -27,6 +27,7 @@
     "@types/node": "^20.19.39",
     "aws-sdk-client-mock": "^4.1.0",
     "aws-sdk-client-mock-vitest": "^7.0.1",
+    "postject": "1.0.0-alpha.6",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4"

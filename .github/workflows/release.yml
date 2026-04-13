@@ -52,7 +52,7 @@ jobs:
       - name: Create executable
         run: cp "$(which node)" "${{ matrix.artifact }}"
       - name: Inject SEA blob
-        run: npx postject ${{ matrix.artifact }} NODE_SEA_BLOB dist/sea.blob --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2
+        run: pnpm exec postject ${{ matrix.artifact }} NODE_SEA_BLOB dist/sea.blob --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2
       - name: Sign macOS binary
         if: runner.os == 'macOS'
         run: codesign --sign - --entitlements entitlements.plist ${{ matrix.artifact }}
