@@ -75,10 +75,21 @@ export async function rollback(options: RollbackOptions): Promise<void> {
   // S3 PutObject is atomic for single writes but concurrent writes have undefined ordering.
   await writeAlias(client, bucket, site, "production", previousDeploy);
 
-  outputSuccess(ctx, `Rolled back production to ${previousDeploy}`, {
+  const productionDomain = config.domain?.production ?? site;
+  const humanMsg = [
+    `Rolled back production`,
+    ``,
+    `  Site:        ${site}`,
+    `  Was:         ${currentDeployId}`,
+    `  Now:         ${previousDeploy}`,
+    `  Production:  https://${productionDomain}`,
+  ].join("\n");
+
+  outputSuccess(ctx, humanMsg, {
     previousDeployId: currentDeployId,
     rolledBackTo: previousDeploy,
     site,
     alias: "production",
+    productionDomain,
   });
 }

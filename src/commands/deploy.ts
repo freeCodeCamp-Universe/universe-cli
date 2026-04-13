@@ -143,11 +143,26 @@ export async function deploy(options: DeployOptions): Promise<void> {
 
   await writeAlias(client, bucket, site, "preview", deployId);
 
-  outputSuccess(ctx, `Deployed ${deployId} to ${site}`, {
+  const sizeKB = (uploadResult.totalSize / 1024).toFixed(1);
+  const previewDomain = config.domain?.preview ?? `preview.${site}`;
+  const humanMsg = [
+    `Deployed ${deployId}`,
+    ``,
+    `  Site:     ${site}`,
+    `  Files:    ${uploadResult.fileCount}`,
+    `  Size:     ${sizeKB} KB`,
+    `  Alias:    preview`,
+    `  Preview:  https://${previewDomain}`,
+    ``,
+    `Next: universe static promote`,
+  ].join("\n");
+
+  outputSuccess(ctx, humanMsg, {
     deployId,
     site,
     fileCount: uploadResult.fileCount,
     totalSize: uploadResult.totalSize,
     alias: "preview",
+    previewDomain,
   });
 }

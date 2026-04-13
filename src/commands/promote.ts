@@ -68,9 +68,19 @@ export async function promote(options: PromoteOptions): Promise<void> {
   // S3 PutObject is atomic for single writes but concurrent writes have undefined ordering.
   await writeAlias(client, bucket, site, "production", deployId);
 
-  outputSuccess(ctx, `Promoted ${deployId} to production`, {
+  const productionDomain = config.domain?.production ?? site;
+  const humanMsg = [
+    `Promoted ${deployId} to production`,
+    ``,
+    `  Site:        ${site}`,
+    `  Deploy:      ${deployId}`,
+    `  Production:  https://${productionDomain}`,
+  ].join("\n");
+
+  outputSuccess(ctx, humanMsg, {
     deployId,
     site,
     alias: "production",
+    productionDomain,
   });
 }

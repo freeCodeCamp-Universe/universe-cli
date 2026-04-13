@@ -6,8 +6,8 @@ import { EXIT_USAGE, exitWithCode } from "./output/exit-codes.js";
 const require = createRequire(import.meta.url);
 const { version } = require("../package.json") as { version: string };
 
-function handleActionError(command: string, err: unknown): void {
-  const ctx: OutputContext = { json: false, command };
+function handleActionError(command: string, json: boolean, err: unknown): void {
+  const ctx: OutputContext = { json, command };
   const message = err instanceof Error ? err.message : "unknown error";
   outputError(ctx, EXIT_USAGE, message);
   exitWithCode(EXIT_USAGE, message);
@@ -38,7 +38,7 @@ export function run(argv = process.argv) {
               outputDir: flags.outputDir,
             });
           } catch (err: unknown) {
-            handleActionError("deploy", err);
+            handleActionError("deploy", flags.json ?? false, err);
           }
         },
       );
@@ -52,7 +52,7 @@ export function run(argv = process.argv) {
             const { promote } = await import("./commands/promote.js");
             await promote({ json: flags.json ?? false, deployId });
           } catch (err: unknown) {
-            handleActionError("promote", err);
+            handleActionError("promote", flags.json ?? false, err);
           }
         },
       );
@@ -69,7 +69,7 @@ export function run(argv = process.argv) {
             confirm: flags.confirm ?? false,
           });
         } catch (err: unknown) {
-          handleActionError("rollback", err);
+          handleActionError("rollback", flags.json ?? false, err);
         }
       });
 
