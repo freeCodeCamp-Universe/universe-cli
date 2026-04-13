@@ -14,7 +14,6 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1029.0",
-    "@aws-sdk/lib-storage": "^3.1029.0",
     "@clack/prompts": "^1.2.0",
     "cac": "^6.7.14",
     "mrmime": "^2.0.1",

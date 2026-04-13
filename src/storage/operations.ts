@@ -71,7 +71,7 @@ function isTransientError(error: unknown): boolean {
   if (statusCode !== undefined && statusCode >= 500) return true;
   if (statusCode === 429) return true;
 
-  const name = (error as Error).name;
+  const name = error.name;
   if (
     name === "ThrottlingException" ||
     name === "TooManyRequestsException" ||
@@ -91,12 +91,10 @@ function isTransientError(error: unknown): boolean {
 }
 
 async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
-  let lastError: unknown;
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
       return await fn();
     } catch (error: unknown) {
-      lastError = error;
       if (!isTransientError(error) || attempt === MAX_RETRIES) {
         throw error;
       }
@@ -105,7 +103,7 @@ async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
       await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }
-  throw lastError;
+  throw new Error("withRetry: unreachable");
 }
 
 export async function putObject(

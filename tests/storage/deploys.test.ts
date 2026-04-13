@@ -1,10 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { mockClient } from "aws-sdk-client-mock";
-import {
-  S3Client,
-  ListObjectsV2Command,
-  HeadObjectCommand,
-} from "@aws-sdk/client-s3";
+import { S3Client, ListObjectsV2Command } from "@aws-sdk/client-s3";
 import { listDeploys, deployExists } from "../../src/storage/deploys.js";
 
 const s3Mock = mockClient(S3Client);
