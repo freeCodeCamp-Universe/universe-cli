@@ -59,7 +59,7 @@ export function loadConfig(options: LoadConfigOptions = {}): ResolvedConfig {
       (err as NodeJS.ErrnoException).code === "ENOENT"
     ) {
       throw new Error(
-        `platform.yaml not found at ${configPath}. Run 'universe static init' to create one.`,
+        `platform.yaml not found at ${configPath}. See STAFF-GUIDE.md for the required format.`,
       );
     }
     throw err;

@@ -4,7 +4,7 @@ This guide covers deploying a static site (HTML/CSS/JS) to `*.freecode.camp`.
 
 ## Prerequisites
 
-- Node 20+
+- `universe` CLI binary ([Install](README.md#install))
 - R2 credentials from the platform team
 
 ## 1. Project Setup

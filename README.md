@@ -46,7 +46,7 @@ All commands support `--json` for CI integration.
 
 ## Credentials
 
-The CLI needs S3 credentials for the R2 bucket. See the [Flight Manual](docs/FLIGHT-MANUAL.md#credential-setup) for setup.
+The CLI needs R2 credentials. See the [Staff Guide](STAFF-GUIDE.md#2-credentials) for setup.
 
 ## Development
 

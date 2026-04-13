@@ -1,89 +1,72 @@
 # Universe CLI Flight Manual
 
-Rebuild and recovery runbook for the universe-cli static deploy CLI.
+Platform team ops runbook for building, testing, and maintaining the CLI.
 
 ## Prerequisites
 
-- Node 20+
-- npm
-- rclone (optional, for local dev credential fallback)
+- Node 22+
+- pnpm 10+
+- rclone (for platform team credential fallback)
 
 ## Build
 
 ```sh
-npm install
-npx tsup
+pnpm install
+pnpm tsup
 ```
 
-Output: `dist/index.js` (ESM bundle, bin entry point).
+Output: `dist/index.js` (ESM) and `dist/index.cjs` (CJS for SEA).
 
 ## Test
 
 ```sh
-npx vitest run
+pnpm vitest run
+pnpm tsc --noEmit
 ```
 
 ## Release
 
-_Release process not yet defined. Will be documented after CI pipeline is set up._
+See [RELEASING.md](../RELEASING.md).
 
-## Credential Setup
+## Credential Setup (Platform Team)
 
-The CLI needs S3 credentials for the R2 bucket `gxy-static-1`.
-
-### Create R2 API Token
+### R2 API Token
 
 1. Open [Cloudflare Dashboard](https://dash.cloudflare.com)
 2. Select the account that owns `gxy-static-1`
 3. Go to **R2 Object Storage** > **API Tokens**
 4. Click **Create API token**
-5. Set:
-   - Name: `universe-cli-dev`
-   - Permissions: **Object Read & Write**
-   - Scope: **Specific bucket** > `gxy-static-1`
-6. Click **Create API Token**
-7. Save the three values (secret shown only once):
-   - Access Key ID
-   - Secret Access Key
-   - Endpoint URL (`https://<account-id>.r2.cloudflarestorage.com`)
+5. Set: Name `universe-cli-dev`, Permissions **Object Read & Write**, Scope **Specific bucket** > `gxy-static-1`
+6. Save the Access Key ID, Secret Access Key, and Endpoint URL
 
 ### Credential Resolution Order
 
-1. **Environment variables** (CI pipelines, manual testing):
-   - `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_ENDPOINT` — all three required together
-   - Optional: `S3_REGION` (defaults to `auto`)
-2. **rclone remote** (local dev, persistent):
-   - Named remote `gxy-static` (or override via `static.rclone_remote` in platform.yaml)
-   - CLI runs `rclone config dump` and parses the remote's JSON entry
+1. **Environment variables**: `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_ENDPOINT` (all three required together)
+2. **rclone remote** (fallback): named remote matching `static.rclone_remote` in platform.yaml (default `gxy-static`)
 
-Partial env sets (e.g., key without secret) are rejected.
+Staff developers use env vars only. The rclone fallback exists for platform team workflows and CI pipelines.
 
-### rclone Remote Setup
+### rclone Remote (ops only)
 
 ```sh
 rclone config
-# n → gxy-static → s3 → Cloudflare → paste keys → paste endpoint → defaults
+# n > gxy-static > s3 > Cloudflare > paste keys > paste endpoint > defaults
 ```
 
 Verify: `rclone ls gxy-static:gxy-static-1 --max-depth 1`
 
 ## Troubleshooting
 
-### npm install fails
-
-- Verify Node 20+ with `node --version`
-- Delete `node_modules/` and `package-lock.json`, then retry
-
-### tsup build fails
-
-- Verify TypeScript compiles: `npx tsc --noEmit`
-- Check tsup.config.ts entry point matches `src/index.ts`
-
 ### Credential resolution fails
 
 - For env vars: all three required together — `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_ENDPOINT`
-- For rclone fallback: verify `rclone config dump` shows the `gxy-static` remote with `access_key_id`, `secret_access_key`, `endpoint`
+- For rclone fallback: verify `rclone config dump` shows the remote with `access_key_id`, `secret_access_key`, `endpoint`
 
 ### Deploy fails with "not a git repository"
 
 - Run from a git-initialized directory, or use `--force` to skip git hash requirement
+
+### tsup build fails
+
+- Verify TypeScript compiles: `pnpm tsc --noEmit`
+- Check tsup.config.ts entry point matches `src/index.ts`
