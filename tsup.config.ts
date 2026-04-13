@@ -3,14 +3,25 @@ import { defineConfig } from "tsup";
 
 const pkg = JSON.parse(readFileSync("package.json", "utf-8"));
 
-export default defineConfig({
+const shared = {
   entry: ["src/index.ts"],
-  format: ["esm", "cjs"],
   target: "node20",
-  clean: true,
   splitting: false,
-  noExternal: [/.*/],
   define: {
     __VERSION__: JSON.stringify(pkg.version),
   },
-});
+} as const;
+
+export default defineConfig([
+  {
+    ...shared,
+    format: ["esm"],
+    clean: true,
+  },
+  {
+    ...shared,
+    format: ["cjs"],
+    clean: false,
+    noExternal: [/.*/],
+  },
+]);
