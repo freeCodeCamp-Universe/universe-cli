@@ -1,10 +1,9 @@
 import { cac } from "cac";
-import { createRequire } from "node:module";
 import { type OutputContext, outputError } from "./output/format.js";
 import { EXIT_USAGE, exitWithCode } from "./output/exit-codes.js";
 
-const require = createRequire(import.meta.url);
-const { version } = require("../package.json") as { version: string };
+declare const __VERSION__: string;
+const version = typeof __VERSION__ !== "undefined" ? __VERSION__ : "0.0.0";
 
 function handleActionError(command: string, json: boolean, err: unknown): void {
   const ctx: OutputContext = { json, command };

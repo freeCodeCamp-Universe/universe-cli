@@ -12,39 +12,53 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2
         with:
-          node-version: "20"
-      - run: npm ci
-      - run: npx vitest run
-      - run: npx tsc --noEmit
+          version: 10
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "22"
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm vitest run
+      - run: pnpm tsc --noEmit
 
   build:
     needs: test
     strategy:
       matrix:
         include:
-          - target: bun-darwin-arm64
-            os: macos-latest
+          - os: macos-latest
             artifact: universe-darwin-arm64
-          - target: bun-darwin-x64
-            os: macos-latest
+          - os: macos-15-intel
             artifact: universe-darwin-amd64
-          - target: bun-linux-x64
-            os: ubuntu-latest
+          - os: ubuntu-latest
             artifact: universe-linux-amd64
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
-      - run: bun build --compile --target=${{ matrix.target }} src/index.ts --outfile ${{ matrix.artifact }}
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2
+        with:
+          version: 10
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "22"
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm tsup
+      - name: Generate SEA blob
+        run: node --experimental-sea-config sea-config.json
+      - name: Create executable
+        run: cp "$(which node)" "${{ matrix.artifact }}"
+      - name: Inject SEA blob
+        run: npx postject ${{ matrix.artifact }} NODE_SEA_BLOB dist/sea.blob --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2
       - name: Sign macOS binary
         if: runner.os == 'macOS'
-        run: codesign --sign - --force --entitlements entitlements.plist ${{ matrix.artifact }}
+        run: codesign --sign - --entitlements entitlements.plist ${{ matrix.artifact }}
       - name: Generate checksum
         run: shasum -a 256 ${{ matrix.artifact }} > ${{ matrix.artifact }}.sha256
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: ${{ matrix.artifact }}
           path: |
@@ -55,11 +69,11 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           merge-multiple: true
       - name: Create release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@da05d552573ad5aba039eaac05058a918a7bf631
         with:
           files: |
             universe-darwin-arm64
