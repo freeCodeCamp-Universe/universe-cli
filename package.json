@@ -8,6 +8,14 @@
   },
   "author": "Mrugesh Mohapatra <noreply@mrugesh.dev> (https://mrugesh.dev/)",
   "license": "ISC",
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE"
+  ],
   "type": "module",
   "bin": {
     "universe": "dist/index.js"

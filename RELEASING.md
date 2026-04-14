@@ -2,6 +2,11 @@
 
 Releases are manual — you decide when to cut one.
 
+## Prerequisites
+
+- **NPM_TOKEN** — repository secret with publish access to the `universe-cli` package on npm
+- **npm OIDC trust** — the npm package must have GitHub Actions OIDC provenance trust configured under the `freeCodeCamp-Universe` organization
+
 ## How to Release
 
 1. Go to **Actions** > **Release** > **Run workflow**
@@ -15,6 +20,7 @@ That's it. The workflow:
 - Signs macOS binaries
 - Creates a git tag `v0.2.0`
 - Publishes a GitHub Release with binaries + SHA256 checksums
+- Publishes to npm with OIDC provenance attestation
 
 ## Binaries
 

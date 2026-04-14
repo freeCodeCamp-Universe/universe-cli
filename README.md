@@ -4,6 +4,19 @@ Static site deployment for the freeCodeCamp Universe platform.
 
 ## Install
 
+### npm
+
+```sh
+# Run directly
+npx universe-cli <command>
+
+# Or install globally
+npm install -g universe-cli
+universe <command>
+```
+
+### Binary
+
 Download the latest binary from [Releases](../../releases):
 
 ```sh
