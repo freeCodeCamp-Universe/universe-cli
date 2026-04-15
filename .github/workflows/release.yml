@@ -14,17 +14,7 @@ permissions:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      - uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        with:
-          node-version: "22"
-          cache: "pnpm"
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm vitest run
-      - run: pnpm tsc --noEmit
+    uses: ./.github/workflows/test.yml
 
   build:
     needs: test
@@ -37,6 +27,8 @@ jobs:
             artifact: universe-darwin-amd64
           - os: ubuntu-latest
             artifact: universe-linux-amd64
+          - os: ubuntu-24.04-arm
+            artifact: universe-linux-arm64
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
@@ -96,10 +88,18 @@ jobs:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           merge-multiple: true
+      - name: Extract changelog section
+        run: |
+          awk '/^## \[${{ inputs.version }}\]/{flag=1; next} /^## \[/{flag=0} flag' CHANGELOG.md > RELEASE_NOTES.md
+          if [ ! -s RELEASE_NOTES.md ]; then
+            echo "ERROR: No CHANGELOG.md section found for version ${{ inputs.version }}" >&2
+            exit 1
+          fi
       - name: Create release
         uses: softprops/action-gh-release@da05d552573ad5aba039eaac05058a918a7bf631
         with:
           tag_name: "v${{ inputs.version }}"
+          body_path: RELEASE_NOTES.md
           files: |
             universe-darwin-arm64
             universe-darwin-arm64.sha256
@@ -107,4 +107,5 @@ jobs:
             universe-darwin-amd64.sha256
             universe-linux-amd64
             universe-linux-amd64.sha256
-          generate_release_notes: true
+            universe-linux-arm64
+            universe-linux-arm64.sha256

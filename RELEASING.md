@@ -10,18 +10,19 @@ No npm token is required — the workflow authenticates via OIDC token exchange.
 
 ## How to Release
 
-1. Go to **Actions** > **Release** > **Run workflow**
-2. Enter the version (e.g., `0.2.0`)
-3. Click **Run workflow**
+1. Add a `## [X.Y.Z] - YYYY-MM-DD` section to `CHANGELOG.md` describing the release. The workflow extracts this section verbatim as the GitHub Release body and fails if the section is missing.
+2. Commit and push the CHANGELOG change to `main`.
+3. Go to **Actions** > **Release** > **Run workflow**
+4. Enter the version (e.g., `0.2.0`) — must match the CHANGELOG heading
+5. Click **Run workflow**
 
-That's it. The workflow:
+The workflow:
 
-- Runs tests (180/180) and typecheck
-- Builds Node SEA binaries for 3 platforms
+- Runs tests and typecheck (via reusable `test.yml`)
+- Builds Node SEA binaries for 4 platforms
 - Signs macOS binaries
-- Creates a git tag `v0.2.0`
-- Publishes a GitHub Release with binaries + SHA256 checksums
-- Publishes to npm with OIDC provenance attestation
+- Publishes to npm with OIDC provenance (via Trusted Publisher)
+- Creates a git tag `v0.2.0` and a GitHub Release with binaries + SHA256 checksums
 
 ## Binaries
 
@@ -30,6 +31,7 @@ That's it. The workflow:
 | macOS Apple Silicon | `universe-darwin-arm64` |
 | macOS Intel         | `universe-darwin-amd64` |
 | Linux x64           | `universe-linux-amd64`  |
+| Linux ARM64         | `universe-linux-arm64`  |
 
 Each binary is a Node SEA (Single Executable Application) — no Node.js install required.
 

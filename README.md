@@ -30,10 +30,15 @@ gh release download --repo freeCodeCamp-Universe/universe-cli --pattern "univers
 chmod +x universe-darwin-amd64
 sudo mv universe-darwin-amd64 /usr/local/bin/universe
 
-# Linux
+# Linux x64
 gh release download --repo freeCodeCamp-Universe/universe-cli --pattern "universe-linux-amd64"
 chmod +x universe-linux-amd64
 sudo mv universe-linux-amd64 /usr/local/bin/universe
+
+# Linux ARM64
+gh release download --repo freeCodeCamp-Universe/universe-cli --pattern "universe-linux-arm64"
+chmod +x universe-linux-arm64
+sudo mv universe-linux-arm64 /usr/local/bin/universe
 ```
 
 Verify:
