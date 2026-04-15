@@ -1,7 +1,9 @@
+import { GitError } from "../errors.js";
+
 export function generateDeployId(gitHash?: string, force = false): string {
   if (gitHash === undefined) {
     if (!force) {
-      throw new Error("git hash is required unless --force is set");
+      throw new GitError("git hash is required unless --force is set");
     }
     return formatId("nogit");
   }

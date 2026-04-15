@@ -46,6 +46,58 @@ describe("loadConfig", () => {
     expect(config.static.output_dir).toBe("dist");
   });
 
+  describe("output_dir path traversal guard", () => {
+    it("rejects absolute output_dir in platform.yaml", async () => {
+      const { ConfigError } = await import("../../src/errors.js");
+      const badYaml = {
+        ...fullYaml,
+        static: { ...fullYaml.static, output_dir: "/etc" },
+      };
+      vi.mocked(fs.readFileSync).mockReturnValue(yaml.stringify(badYaml));
+
+      expect(() => loadConfig({ cwd: "/fake/project" })).toThrow(ConfigError);
+    });
+
+    it("rejects output_dir that escapes cwd via ..", async () => {
+      const { ConfigError } = await import("../../src/errors.js");
+      const badYaml = {
+        ...fullYaml,
+        static: { ...fullYaml.static, output_dir: "../../../etc" },
+      };
+      vi.mocked(fs.readFileSync).mockReturnValue(yaml.stringify(badYaml));
+
+      expect(() => loadConfig({ cwd: "/fake/project" })).toThrow(ConfigError);
+    });
+
+    it("rejects absolute output_dir supplied via --output-dir flag", async () => {
+      const { ConfigError } = await import("../../src/errors.js");
+      vi.mocked(fs.readFileSync).mockReturnValue(yaml.stringify(fullYaml));
+
+      expect(() =>
+        loadConfig({
+          cwd: "/fake/project",
+          flags: { outputDir: "/etc" },
+        }),
+      ).toThrow(ConfigError);
+    });
+
+    it("accepts relative output_dir", () => {
+      vi.mocked(fs.readFileSync).mockReturnValue(yaml.stringify(fullYaml));
+      const config = loadConfig({ cwd: "/fake/project" });
+      expect(config.static.output_dir).toBe("dist");
+    });
+
+    it("accepts ./-prefixed relative output_dir", () => {
+      const yml = {
+        ...fullYaml,
+        static: { ...fullYaml.static, output_dir: "./build" },
+      };
+      vi.mocked(fs.readFileSync).mockReturnValue(yaml.stringify(yml));
+      const config = loadConfig({ cwd: "/fake/project" });
+      expect(config.static.output_dir).toBe("./build");
+    });
+  });
+
   it("returns fully typed ResolvedConfig with no optional fields", () => {
     const minimalYaml = {
       name: "my-site",

@@ -191,6 +191,28 @@ describe("deploy", () => {
     );
   });
 
+  it("throws StorageError when collision retries exhaust", async () => {
+    const { StorageError } = await import("../../src/errors.js");
+    const collision = [
+      {
+        key: "my-site/deploys/20260413-120000-abc1234/index.html",
+        size: 100,
+        lastModified: new Date(),
+      },
+    ];
+    mockListObjects
+      .mockResolvedValueOnce(collision)
+      .mockResolvedValueOnce(collision)
+      .mockResolvedValueOnce(collision);
+    mockGenerateDeployId
+      .mockReturnValueOnce("20260413-120000-abc1234")
+      .mockReturnValueOnce("20260413-120001-abc1234")
+      .mockReturnValueOnce("20260413-120002-abc1234");
+
+    await expect(deploy({ json: false })).rejects.toThrow(StorageError);
+    expect(mockUploadDirectory).not.toHaveBeenCalled();
+  });
+
   it("retries with new deploy ID on collision", async () => {
     mockListObjects
       .mockResolvedValueOnce([

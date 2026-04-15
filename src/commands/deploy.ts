@@ -1,3 +1,4 @@
+import { StorageError } from "../errors.js";
 import { loadConfig } from "../config/loader.js";
 import { resolveCredentials } from "../credentials/resolver.js";
 import { createS3Client } from "../storage/client.js";
@@ -36,8 +37,10 @@ async function resolveDeployId(
   gitHash: string | undefined,
   force: boolean,
 ): Promise<string> {
+  let lastDeployId = "";
   for (let attempt = 0; attempt < MAX_COLLISION_RETRIES; attempt++) {
     const deployId = generateDeployId(gitHash, force);
+    lastDeployId = deployId;
     const prefix = `${site}/deploys/${deployId}/`;
     const existing = await listObjects(client, { bucket, prefix });
 
@@ -50,7 +53,9 @@ async function resolveDeployId(
     }
   }
 
-  return generateDeployId(gitHash, force);
+  throw new StorageError(
+    `Deploy ID collision could not be resolved after ${MAX_COLLISION_RETRIES} attempts (last attempted: ${lastDeployId}). Commit a new change and retry, or wait for the timestamp to advance.`,
+  );
 }
 
 export async function deploy(options: DeployOptions): Promise<void> {

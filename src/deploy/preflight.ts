@@ -1,5 +1,6 @@
-import { existsSync, statSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, statSync } from "node:fs";
+import { StorageError } from "../errors.js";
+import { walkFiles } from "./walk.js";
 
 export interface PreflightResult {
   valid: boolean;
@@ -16,22 +17,19 @@ export function validateOutputDir(dir: string): PreflightResult {
     return { valid: false, fileCount: 0, error: "not a directory" };
   }
 
-  const fileCount = countFiles(dir);
+  let fileCount: number;
+  try {
+    fileCount = walkFiles(dir).length;
+  } catch (err: unknown) {
+    if (err instanceof StorageError) {
+      return { valid: false, fileCount: 0, error: err.message };
+    }
+    throw err;
+  }
+
   if (fileCount === 0) {
     return { valid: false, fileCount: 0, error: "directory is empty" };
   }
 
   return { valid: true, fileCount };
-}
-
-function countFiles(dir: string): number {
-  let count = 0;
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    if (entry.isFile()) {
-      count++;
-    } else if (entry.isDirectory()) {
-      count += countFiles(join(dir, entry.name));
-    }
-  }
-  return count;
 }

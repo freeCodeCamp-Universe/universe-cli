@@ -1,4 +1,5 @@
 import { execSync } from "node:child_process";
+import { CredentialError } from "../errors.js";
 import { redact } from "../output/redact.js";
 
 export interface S3Credentials {
@@ -41,11 +42,11 @@ function fromRclone(remoteName: string): S3Credentials {
       err instanceof Error &&
       (err as NodeJS.ErrnoException).code === "ENOENT"
     ) {
-      throw new Error(
+      throw new CredentialError(
         "rclone not found — install rclone or provide S3 credentials via environment variables",
       );
     }
-    throw new Error(
+    throw new CredentialError(
       `Failed to run rclone config dump: ${redact(err instanceof Error ? err.message : "unknown error")}`,
     );
   }
@@ -57,13 +58,15 @@ function fromRclone(remoteName: string): S3Credentials {
       Record<string, string>
     >;
   } catch {
-    throw new Error(`Failed to parse rclone config for remote ${remoteName}`);
+    throw new CredentialError(
+      `Failed to parse rclone config for remote ${remoteName}`,
+    );
   }
   output = null as unknown as Buffer;
 
   const remote = parsed[remoteName];
   if (!remote) {
-    throw new Error(
+    throw new CredentialError(
       `Remote "${remoteName}" not found in rclone config. Available remotes: ${Object.keys(parsed).join(", ") || "(none)"}`,
     );
   }
@@ -74,7 +77,7 @@ function fromRclone(remoteName: string): S3Credentials {
   if (!remote.endpoint) missing.push("endpoint");
 
   if (missing.length > 0) {
-    throw new Error(
+    throw new CredentialError(
       `Rclone remote "${remoteName}" is missing required fields: ${missing.join(", ")}`,
     );
   }
@@ -94,7 +97,7 @@ export function resolveCredentials(
   const envResult = tryEnvCredentials();
 
   if (envResult === "partial") {
-    throw new Error(
+    throw new CredentialError(
       "Partial S3 credentials in environment. Set all three: S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY, S3_ENDPOINT — or remove all to use rclone fallback.",
     );
   }

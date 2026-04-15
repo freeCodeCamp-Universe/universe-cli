@@ -1,7 +1,28 @@
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { isAbsolute, relative, resolve, sep } from "node:path";
 import { parse as parseYaml } from "yaml";
+import { ConfigError } from "../errors.js";
 import { platformSchema, type PlatformConfig } from "./schema.js";
+
+function assertSafeOutputDir(outputDir: string, cwd: string): void {
+  if (isAbsolute(outputDir)) {
+    throw new ConfigError(
+      `output_dir must be relative to the project root; absolute paths are rejected: ${outputDir}`,
+    );
+  }
+  const resolved = resolve(cwd, outputDir);
+  const rel = relative(cwd, resolved);
+  if (rel === "..") {
+    throw new ConfigError(
+      `output_dir resolves outside the project root: ${outputDir}`,
+    );
+  }
+  if (rel.startsWith(`..${sep}`)) {
+    throw new ConfigError(
+      `output_dir resolves outside the project root: ${outputDir}`,
+    );
+  }
+}
 
 export type ResolvedConfig = PlatformConfig;
 
@@ -58,7 +79,7 @@ export function loadConfig(options: LoadConfigOptions = {}): ResolvedConfig {
       err instanceof Error &&
       (err as NodeJS.ErrnoException).code === "ENOENT"
     ) {
-      throw new Error(
+      throw new ConfigError(
         `platform.yaml not found at ${configPath}. See STAFF-GUIDE.md for the required format.`,
       );
     }
@@ -80,6 +101,8 @@ export function loadConfig(options: LoadConfigOptions = {}): ResolvedConfig {
       ...flagOverrides,
     },
   };
+
+  assertSafeOutputDir(merged.static.output_dir, cwd);
 
   return merged;
 }

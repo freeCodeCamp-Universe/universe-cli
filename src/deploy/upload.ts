@@ -1,9 +1,10 @@
-import { readdirSync, readFileSync } from "node:fs";
-import { extname, basename, join, relative } from "node:path";
+import { readFileSync } from "node:fs";
+import { extname, basename } from "node:path";
 import { S3Client } from "@aws-sdk/client-s3";
 import { lookup } from "mrmime";
 import pLimit from "p-limit";
 import { putObject } from "../storage/operations.js";
+import { walkFiles } from "./walk.js";
 
 const FINGERPRINT_RE = /[.-][a-zA-Z0-9_-]{8,}\./;
 
@@ -47,30 +48,20 @@ export async function uploadDirectory(
   const concurrency = options?.concurrency ?? 10;
   const limit = pLimit(concurrency);
 
-  const entries = readdirSync(outputDir, {
-    recursive: true,
-    withFileTypes: true,
-  });
-  const files = entries
-    .filter((entry) => entry.isFile() && !entry.isSymbolicLink())
-    .map((entry) => {
-      const full = join(entry.parentPath, entry.name);
-      return relative(outputDir, full);
-    });
+  const files = walkFiles(outputDir);
 
   const errors: string[] = [];
   let totalSize = 0;
   let fileCount = 0;
 
-  const tasks = files.map((filePath) =>
+  const tasks = files.map((file) =>
     limit(async () => {
-      const fullPath = `${outputDir}/${filePath}`;
-      const key = `${site}/deploys/${deployId}/${filePath}`;
-      const contentType = getContentType(filePath);
-      const cacheControl = getCacheControl(filePath);
+      const key = `${site}/deploys/${deployId}/${file.relPath}`;
+      const contentType = getContentType(file.relPath);
+      const cacheControl = getCacheControl(file.relPath);
 
       try {
-        const body = readFileSync(fullPath);
+        const body = readFileSync(file.absPath);
         totalSize += body.byteLength;
         fileCount++;
 
@@ -84,7 +75,7 @@ export async function uploadDirectory(
       } catch (err: unknown) {
         const message =
           err instanceof Error ? err.message : "unknown upload error";
-        errors.push(`${filePath}: ${message}`);
+        errors.push(`${file.relPath}: ${message}`);
       }
     }),
   );
