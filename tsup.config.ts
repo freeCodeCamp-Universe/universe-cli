@@ -5,7 +5,7 @@ const pkg = JSON.parse(readFileSync("package.json", "utf-8"));
 
 const shared = {
   entry: ["src/index.ts"],
-  target: "node20",
+  target: "node22",
   splitting: false,
   define: {
     __VERSION__: JSON.stringify(pkg.version),

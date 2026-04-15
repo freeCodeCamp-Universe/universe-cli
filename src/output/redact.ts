@@ -1,9 +1,13 @@
-const AKIA_PATTERN = /AKIA[A-Z0-9]{12,}/g;
+const AWS_KEY_PREFIX_PATTERN =
+  /(?:AKIA|ASIA|AROA|AIDA|ACCA|ANPA|ABIA|AGPA)[A-Z0-9]{12,}/g;
 const URL_CREDS_PATTERN = /https?:\/\/[^@\s]+@/g;
 const CREDENTIAL_CONTEXT_PATTERN =
-  /(?:secret|password|token|key|credential|auth)[=:]\s*([A-Za-z0-9/+=]{21,})/gi;
+  /(?:access_key_id|secret_access_key|accessKeyId|secretAccessKey|secret|password|token|key|credential|auth)\s*[=:]\s*([A-Za-z0-9/+=]{21,})/gi;
 const HEX_CREDENTIAL_CONTEXT_PATTERN =
-  /(?:secret|password|token|key|credential|auth|access_key_id|secret_access_key)[=:]\s*([a-f0-9]{32,})/gi;
+  /(?:secret|password|token|key|credential|auth|access_key_id|secret_access_key)\s*[=:]\s*([a-f0-9]{32,})/gi;
+const JSON_CREDENTIAL_PATTERN =
+  /"(?:secret|password|token|key|credential|auth|access_key_id|secret_access_key|accessKeyId|secretAccessKey)"\s*:\s*"[^"]+"/gi;
+const BEARER_PATTERN = /\bBearer\s+[A-Za-z0-9._~+/=-]+/gi;
 const CREDENTIAL_KEY_PATTERN = /(?:secret|password|token|key|credential|auth)/i;
 const EXACT_CREDENTIAL_KEYS = new Set([
   "accesskeyid",
@@ -13,7 +17,7 @@ const EXACT_CREDENTIAL_KEYS = new Set([
 ]);
 const STANDALONE_LONG_SECRET = /^[A-Za-z0-9/+=]{21,}$/;
 
-function maskAkia(match: string): string {
+function maskAwsKey(match: string): string {
   return match.slice(0, 4) + "****" + match.slice(-4);
 }
 
@@ -26,7 +30,12 @@ function maskUrlCreds(match: string): string {
 export function redact(value: string): string {
   let result = value;
   result = result.replace(URL_CREDS_PATTERN, maskUrlCreds);
-  result = result.replace(AKIA_PATTERN, maskAkia);
+  result = result.replace(AWS_KEY_PREFIX_PATTERN, maskAwsKey);
+  result = result.replace(BEARER_PATTERN, "Bearer ****");
+  result = result.replace(JSON_CREDENTIAL_PATTERN, (match) => {
+    const colonIndex = match.indexOf(":");
+    return match.slice(0, colonIndex + 1) + '"****"';
+  });
   result = result.replace(
     CREDENTIAL_CONTEXT_PATTERN,
     (_match, _secret, _offset, _full) => {

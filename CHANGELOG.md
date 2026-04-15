@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-04-15
+
+Tier 2 hygiene release. Focuses on runtime alignment, workflow hygiene, and dependency updates. All Tier 2 findings from the adversarial review landed.
+
+### Security
+
+- Redaction regex extended to catch whitespace-before-separator, JSON-quoted credential values, Bearer authorization tokens, and additional AWS prefixes (ASIA, AROA, AIDA, ACCA, ANPA, ABIA, AGPA) (T2.6).
+- S3 endpoint validated at credential resolution time: rejects malformed URLs, plaintext `http://` for non-localhost hosts, and URLs containing `user:pass@` userinfo (T2.5).
+- Workflow permissions scoped per job: `test`/`build` get `contents: read`, `publish` adds only `id-token: write`, `release` is the only job with `contents: write` (T2.3).
+- New preflight job verifies `inputs.version`, `package.json.version`, and a matching `CHANGELOG.md ## [X.Y.Z]` heading all agree before test/build/publish run. Prevents silent version drift (T2.8).
+
+### Added
+
+- `engines.node >= 22.11.0` in `package.json` so installs on older Node fail with a clear message.
+- `description`, `keywords`, `bugs`, `homepage` fields in `package.json` for npm search visibility (T2.7).
+- `.github/actions/check-version-consistency` composite action.
+
+### Changed
+
+- CI and SEA build matrix run on Node 24 (Active LTS since 2025-10-28). tsup target bumped to `node22` (T2.1).
+- All six GitHub Actions SHAs updated: `actions/checkout` v5, `actions/setup-node` v5, `pnpm/action-setup` v5, `actions/upload-artifact` v5, `actions/download-artifact` v5, `softprops/action-gh-release` v2.4.1. Closes the Node 20 runtime deprecation warnings (T2.2).
+- `pnpm` packageManager bumped to 10.33.0 (T2.4a).
+- `p-limit` upgraded to v7 (T2.4b).
+- `cac` upgraded to v7. Output channel changed to `console.info`, test spies updated (T2.4c).
+- `zod` upgraded to v4. `.default({})` replaced with `.prefault({})` to match v4 default semantics (T2.4d).
+- Zod validation errors now surface human-readable issue lists via `safeParse` instead of the raw JSON stringification that v3 `parse()` produced (T2.5).
+
 ## [0.2.0] - 2026-04-15
 
 Tier 1 hardening release. Addresses security-critical and correctness findings from the adversarial review of 0.1.1.

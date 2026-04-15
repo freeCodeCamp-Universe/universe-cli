@@ -2,6 +2,32 @@ import { execSync } from "node:child_process";
 import { CredentialError } from "../errors.js";
 import { redact } from "../output/redact.js";
 
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]", "::1"]);
+
+function validateEndpoint(endpoint: string): void {
+  let url: URL;
+  try {
+    url = new URL(endpoint);
+  } catch {
+    throw new CredentialError(`S3_ENDPOINT is not a valid URL: ${endpoint}`);
+  }
+  if (url.username !== "" || url.password !== "") {
+    throw new CredentialError(
+      "S3_ENDPOINT must not contain credentials in the URL (user:pass@host). Use S3_ACCESS_KEY_ID / S3_SECRET_ACCESS_KEY instead.",
+    );
+  }
+  if (url.protocol !== "https:" && url.protocol !== "http:") {
+    throw new CredentialError(
+      `S3_ENDPOINT must use http or https, got: ${url.protocol}`,
+    );
+  }
+  if (url.protocol === "http:" && !LOCAL_HOSTS.has(url.hostname)) {
+    throw new CredentialError(
+      `S3_ENDPOINT must use https for non-localhost hosts. Plaintext http is only allowed for localhost/127.0.0.1. Got: ${endpoint}`,
+    );
+  }
+}
+
 export interface S3Credentials {
   accessKeyId: string;
   secretAccessKey: string;
@@ -23,6 +49,8 @@ function tryEnvCredentials(): S3Credentials | "none" | "partial" {
 
   if (present.length === 0) return "none";
   if (present.length < 3) return "partial";
+
+  validateEndpoint(endpoint!);
 
   const creds: S3Credentials = {
     accessKeyId: key!,

@@ -7,7 +7,7 @@ const staticSchema = z
     rclone_remote: z.string().min(1).default("gxy-static"),
     region: z.string().min(1).default("auto"),
   })
-  .default({});
+  .prefault({});
 
 const domainSchema = z.object({
   production: z.string().min(1),

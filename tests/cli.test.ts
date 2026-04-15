@@ -47,10 +47,23 @@ describe("CLI module", () => {
 });
 
 describe("top-level CLI", () => {
-  let logSpy: ReturnType<typeof vi.spyOn>;
+  let stdoutSpy: ReturnType<typeof vi.spyOn>;
+  let output: string;
 
   beforeEach(() => {
-    logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    output = "";
+    stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(((
+      chunk: unknown,
+    ) => {
+      output += String(chunk);
+      return true;
+    }) as never);
+    vi.spyOn(console, "log").mockImplementation(((...args: unknown[]) => {
+      output += args.map(String).join(" ") + "\n";
+    }) as never);
+    vi.spyOn(console, "info").mockImplementation(((...args: unknown[]) => {
+      output += args.map(String).join(" ") + "\n";
+    }) as never);
     vi.spyOn(process, "exit").mockImplementation((() => {}) as never);
   });
 
@@ -60,16 +73,19 @@ describe("top-level CLI", () => {
 
   it('--help shows "static" as a command', () => {
     run(["node", "universe", "--help"]);
-
-    const output = logSpy.mock.calls.map((c) => c.join(" ")).join("\n");
     expect(output).toContain("static");
+    expect(stdoutSpy).toBeDefined();
   });
 
-  it("--version outputs package version", () => {
+  it("--version outputs package version", async () => {
+    const pkg = JSON.parse(
+      readFileSync(
+        join(dirname(fileURLToPath(import.meta.url)), "..", "package.json"),
+        "utf8",
+      ),
+    );
     run(["node", "universe", "--version"]);
-
-    const output = logSpy.mock.calls.map((c) => c.join(" ")).join("\n");
-    expect(output).toContain("0.1.0");
+    expect(output).toContain(pkg.version);
   });
 });
 
@@ -145,10 +161,20 @@ describe("top-level error handling", () => {
 });
 
 describe("universe static namespace", () => {
-  let logSpy: ReturnType<typeof vi.spyOn>;
+  let output: string;
 
   beforeEach(() => {
-    logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    output = "";
+    vi.spyOn(process.stdout, "write").mockImplementation(((chunk: unknown) => {
+      output += String(chunk);
+      return true;
+    }) as never);
+    vi.spyOn(console, "log").mockImplementation(((...args: unknown[]) => {
+      output += args.map(String).join(" ") + "\n";
+    }) as never);
+    vi.spyOn(console, "info").mockImplementation(((...args: unknown[]) => {
+      output += args.map(String).join(" ") + "\n";
+    }) as never);
     vi.spyOn(process, "exit").mockImplementation((() => {}) as never);
   });
 
@@ -158,8 +184,6 @@ describe("universe static namespace", () => {
 
   it("static --help lists subcommands (deploy, promote, rollback)", () => {
     run(["node", "universe", "static", "--help"]);
-
-    const output = logSpy.mock.calls.map((c) => c.join(" ")).join("\n");
     expect(output).toContain("deploy");
     expect(output).toContain("promote");
     expect(output).toContain("rollback");
@@ -167,8 +191,6 @@ describe("universe static namespace", () => {
 
   it("static deploy --help shows deploy-specific options", () => {
     run(["node", "universe", "static", "deploy", "--help"]);
-
-    const output = logSpy.mock.calls.map((c) => c.join(" ")).join("\n");
     expect(output).toContain("--json");
     expect(output).toContain("--force");
     expect(output).toContain("--output-dir");

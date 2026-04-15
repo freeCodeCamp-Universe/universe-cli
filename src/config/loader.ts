@@ -88,7 +88,19 @@ export function loadConfig(options: LoadConfigOptions = {}): ResolvedConfig {
 
   const parsed: unknown = parseYaml(raw);
 
-  const yamlValidated = platformSchema.parse(parsed);
+  const parseResult = platformSchema.safeParse(parsed);
+  if (!parseResult.success) {
+    const issues = parseResult.error.issues
+      .map((issue) => {
+        const path = issue.path.length > 0 ? issue.path.join(".") : "(root)";
+        return `  - ${path}: ${issue.message}`;
+      })
+      .join("\n");
+    throw new ConfigError(
+      `platform.yaml is invalid:\n${issues}\nSee STAFF-GUIDE.md for the required format.`,
+    );
+  }
+  const yamlValidated = parseResult.data;
 
   const envOverrides = readEnvOverrides();
   const flagOverrides = readFlagOverrides(options.flags);

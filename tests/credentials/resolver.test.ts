@@ -29,6 +29,52 @@ describe("resolveCredentials", () => {
   });
 
   describe("env var source", () => {
+    it("rejects plaintext http S3_ENDPOINT for non-localhost hosts", async () => {
+      const { CredentialError } = await import("../../src/errors.js");
+      vi.stubEnv("S3_ACCESS_KEY_ID", "env-key");
+      vi.stubEnv("S3_SECRET_ACCESS_KEY", "env-secret");
+      vi.stubEnv("S3_ENDPOINT", "http://evil.example.com");
+      expect(() => resolveCredentials({ remoteName: "gxy-static" })).toThrow(
+        CredentialError,
+      );
+    });
+
+    it("rejects S3_ENDPOINT containing userinfo", async () => {
+      const { CredentialError } = await import("../../src/errors.js");
+      vi.stubEnv("S3_ACCESS_KEY_ID", "env-key");
+      vi.stubEnv("S3_SECRET_ACCESS_KEY", "env-secret");
+      vi.stubEnv("S3_ENDPOINT", "https://user:pass@host.example.com");
+      expect(() => resolveCredentials({ remoteName: "gxy-static" })).toThrow(
+        CredentialError,
+      );
+    });
+
+    it("allows http S3_ENDPOINT for localhost (integration tests)", () => {
+      vi.stubEnv("S3_ACCESS_KEY_ID", "env-key");
+      vi.stubEnv("S3_SECRET_ACCESS_KEY", "env-secret");
+      vi.stubEnv("S3_ENDPOINT", "http://localhost:9000");
+      const creds = resolveCredentials({ remoteName: "gxy-static" });
+      expect(creds.endpoint).toBe("http://localhost:9000");
+    });
+
+    it("allows http S3_ENDPOINT for 127.0.0.1", () => {
+      vi.stubEnv("S3_ACCESS_KEY_ID", "env-key");
+      vi.stubEnv("S3_SECRET_ACCESS_KEY", "env-secret");
+      vi.stubEnv("S3_ENDPOINT", "http://127.0.0.1:9000");
+      const creds = resolveCredentials({ remoteName: "gxy-static" });
+      expect(creds.endpoint).toBe("http://127.0.0.1:9000");
+    });
+
+    it("rejects malformed S3_ENDPOINT", async () => {
+      const { CredentialError } = await import("../../src/errors.js");
+      vi.stubEnv("S3_ACCESS_KEY_ID", "env-key");
+      vi.stubEnv("S3_SECRET_ACCESS_KEY", "env-secret");
+      vi.stubEnv("S3_ENDPOINT", "not a url");
+      expect(() => resolveCredentials({ remoteName: "gxy-static" })).toThrow(
+        CredentialError,
+      );
+    });
+
     it("returns credentials from env when all three required vars are set", () => {
       vi.stubEnv("S3_ACCESS_KEY_ID", "env-key");
       vi.stubEnv("S3_SECRET_ACCESS_KEY", "env-secret");

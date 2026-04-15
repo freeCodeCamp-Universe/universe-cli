@@ -49,6 +49,39 @@ describe("redact", () => {
   it("handles empty string", () => {
     expect(redact("")).toBe("");
   });
+
+  it("masks AWS STS session keys (ASIA prefix)", () => {
+    const result = redact("session ASIAIOSFODNN7EXAMPLE ends");
+    expect(result).not.toContain("IOSFODNN7EXA");
+    expect(result).toContain("ASIA****");
+  });
+
+  it("masks AWS IAM role unique IDs (AROA prefix)", () => {
+    const result = redact("role AROAIOSFODNN7EXAMPLE");
+    expect(result).not.toContain("IOSFODNN7EXA");
+  });
+
+  it("masks credentials with whitespace before separator", () => {
+    const result = redact(
+      "access_key_id = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+    );
+    expect(result).not.toContain("wJalrXUtnFEMI");
+    expect(result).toContain("****");
+  });
+
+  it("masks JSON-quoted credential values", () => {
+    const result = redact('{"token":"abcdef0123456789abcdef0123456789"}');
+    expect(result).not.toContain("abcdef0123456789abcdef0123456789");
+    expect(result).toContain("****");
+  });
+
+  it("masks Bearer authorization tokens", () => {
+    const result = redact(
+      "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.payload.signature",
+    );
+    expect(result).not.toContain("eyJhbGciOiJIUzI1NiJ9.payload.signature");
+    expect(result).toContain("****");
+  });
 });
 
 describe("redactObject", () => {

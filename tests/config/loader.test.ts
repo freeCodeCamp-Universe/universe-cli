@@ -46,6 +46,24 @@ describe("loadConfig", () => {
     expect(config.static.output_dir).toBe("dist");
   });
 
+  it("formats Zod validation errors into human-readable ConfigError message", async () => {
+    const { ConfigError } = await import("../../src/errors.js");
+    const badYaml = { stack: "static" };
+    vi.mocked(fs.readFileSync).mockReturnValue(yaml.stringify(badYaml));
+
+    let captured: unknown;
+    try {
+      loadConfig({ cwd: "/fake/project" });
+    } catch (err) {
+      captured = err;
+    }
+    expect(captured).toBeInstanceOf(ConfigError);
+    const msg = (captured as Error).message;
+    expect(msg).toContain("platform.yaml is invalid");
+    expect(msg).toMatch(/name/);
+    expect(msg).not.toMatch(/\[\s*{/);
+  });
+
   describe("output_dir path traversal guard", () => {
     it("rejects absolute output_dir in platform.yaml", async () => {
       const { ConfigError } = await import("../../src/errors.js");

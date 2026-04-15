@@ -1,6 +1,6 @@
 {
   "name": "@freecodecamp/universe-cli",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "main": "dist/index.js",
   "scripts": {
     "test": "vitest run",
@@ -27,11 +27,11 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1029.0",
     "@clack/prompts": "^1.2.0",
-    "cac": "^6.7.14",
+    "cac": "^7.0.0",
     "mrmime": "^2.0.1",
-    "p-limit": "^6.2.0",
+    "p-limit": "^7.3.0",
     "yaml": "^2.8.3",
-    "zod": "^3.25.76"
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@smithy/util-stream": "^4.5.22",
@@ -43,5 +43,21 @@
     "typescript": "^5.9.3",
     "vitest": "^3.2.4"
   },
-  "packageManager": "pnpm@10.28.0"
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=22.11.0"
+  },
+  "description": "Static site deployment CLI for the freeCodeCamp Universe platform",
+  "homepage": "https://github.com/freeCodeCamp-Universe/universe-cli#readme",
+  "bugs": {
+    "url": "https://github.com/freeCodeCamp-Universe/universe-cli/issues"
+  },
+  "keywords": [
+    "cli",
+    "s3",
+    "cloudflare-r2",
+    "static-site",
+    "deployment",
+    "freecodecamp"
+  ]
 }
