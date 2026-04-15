@@ -13,6 +13,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `universe static promote` — promote a preview deployment to production
 - `universe static rollback` — rollback production to the previous deployment
 - Node SEA binaries for macOS (Apple Silicon, Intel) and Linux x64
-- npm distribution via `universe-cli` package with OIDC provenance
+- npm distribution via `@freecodecamp/universe-cli` package with OIDC provenance
 - `--json` flag on all commands for CI integration
 - `platform.yaml` based site configuration

@@ -4,7 +4,7 @@ Releases are manual — you decide when to cut one.
 
 ## Prerequisites
 
-- **npm Trusted Publisher** — the `universe-cli` package on npm must have GitHub Actions configured as a trusted publisher (Owner: `freeCodeCamp-Universe`, Repository: `universe-cli`, Workflow: `release.yml`). Configure at https://www.npmjs.com/package/universe-cli/access.
+- **npm Trusted Publisher** — the `@freecodecamp/universe-cli` package on npm must have GitHub Actions configured as a trusted publisher (Owner: `freeCodeCamp-Universe`, Repository: `universe-cli`, Workflow: `release.yml`). Configure at https://www.npmjs.com/package/@freecodecamp/universe-cli/access.
 
 No npm token is required — the workflow authenticates via OIDC token exchange.
 

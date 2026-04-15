@@ -8,10 +8,10 @@ Static site deployment for the freeCodeCamp Universe platform.
 
 ```sh
 # Run directly
-npx universe-cli <command>
+npx @freecodecamp/universe-cli <command>
 
 # Or install globally
-npm install -g universe-cli
+npm install -g @freecodecamp/universe-cli
 universe <command>
 ```
 
