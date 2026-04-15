@@ -8,6 +8,10 @@
   },
   "author": "Mrugesh Mohapatra <noreply@mrugesh.dev> (https://mrugesh.dev/)",
   "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/freeCodeCamp-Universe/universe-cli.git"
+  },
   "publishConfig": {
     "access": "public"
   },
