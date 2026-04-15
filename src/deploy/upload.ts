@@ -54,7 +54,7 @@ export async function uploadDirectory(
   const files = entries
     .filter((entry) => entry.isFile() && !entry.isSymbolicLink())
     .map((entry) => {
-      const full = join(entry.parentPath ?? entry.path, entry.name);
+      const full = join(entry.parentPath, entry.name);
       return relative(outputDir, full);
     });
 

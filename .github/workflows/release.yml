@@ -63,8 +63,13 @@ jobs:
   publish:
     needs: test
     runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ inputs.version }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: ./.github/actions/validate-version
+        with:
+          version: ${{ inputs.version }}
       - uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
@@ -73,26 +78,37 @@ jobs:
           registry-url: "https://registry.npmjs.org"
       - run: pnpm install --frozen-lockfile
       - run: pnpm tsup
-      - run: npm version ${{ inputs.version }} --no-git-tag-version --allow-same-version
+      - run: npm version "$VERSION" --no-git-tag-version --allow-same-version
       - run: npm publish --provenance --access public
 
   release:
     needs: [build, publish]
     runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ inputs.version }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: ./.github/actions/validate-version
+        with:
+          version: ${{ inputs.version }}
       - name: Tag release
         run: |
-          git tag "v${{ inputs.version }}"
-          git push origin "v${{ inputs.version }}"
+          git tag "v$VERSION"
+          git push origin "v$VERSION"
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           merge-multiple: true
       - name: Extract changelog section
+        env:
+          VERSION_PATTERN: ${{ inputs.version }}
         run: |
-          awk '/^## \[${{ inputs.version }}\]/{flag=1; next} /^## \[/{flag=0} flag' CHANGELOG.md > RELEASE_NOTES.md
+          awk -v version="$VERSION_PATTERN" '
+            $0 == "## [" version "]" || index($0, "## [" version "]") == 1 { flag=1; next }
+            /^## \[/ { flag=0 }
+            flag
+          ' CHANGELOG.md > RELEASE_NOTES.md
           if [ ! -s RELEASE_NOTES.md ]; then
-            echo "ERROR: No CHANGELOG.md section found for version ${{ inputs.version }}" >&2
+            echo "ERROR: No CHANGELOG.md section found for version $VERSION_PATTERN" >&2
             exit 1
           fi
       - name: Create release

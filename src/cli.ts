@@ -1,6 +1,10 @@
 import { cac } from "cac";
+import { deploy } from "./commands/deploy.js";
+import { promote } from "./commands/promote.js";
+import { rollback } from "./commands/rollback.js";
 import { type OutputContext, outputError } from "./output/format.js";
 import { EXIT_USAGE, exitWithCode } from "./output/exit-codes.js";
+import { CliError } from "./errors.js";
 
 declare const __VERSION__: string;
 const version = typeof __VERSION__ !== "undefined" ? __VERSION__ : "0.0.0";
@@ -8,8 +12,9 @@ const version = typeof __VERSION__ !== "undefined" ? __VERSION__ : "0.0.0";
 function handleActionError(command: string, json: boolean, err: unknown): void {
   const ctx: OutputContext = { json, command };
   const message = err instanceof Error ? err.message : "unknown error";
-  outputError(ctx, EXIT_USAGE, message);
-  exitWithCode(EXIT_USAGE, message);
+  const code = err instanceof CliError ? err.exitCode : EXIT_USAGE;
+  outputError(ctx, code, message);
+  exitWithCode(code, message);
 }
 
 export function run(argv = process.argv) {
@@ -30,7 +35,6 @@ export function run(argv = process.argv) {
           outputDir?: string;
         }) => {
           try {
-            const { deploy } = await import("./commands/deploy.js");
             await deploy({
               json: flags.json ?? false,
               force: flags.force ?? false,
@@ -48,7 +52,6 @@ export function run(argv = process.argv) {
       .action(
         async (deployId: string | undefined, flags: { json?: boolean }) => {
           try {
-            const { promote } = await import("./commands/promote.js");
             await promote({ json: flags.json ?? false, deployId });
           } catch (err: unknown) {
             handleActionError("promote", flags.json ?? false, err);
@@ -62,7 +65,6 @@ export function run(argv = process.argv) {
       .option("--confirm", "Confirm rollback")
       .action(async (flags: { json?: boolean; confirm?: boolean }) => {
         try {
-          const { rollback } = await import("./commands/rollback.js");
           await rollback({
             json: flags.json ?? false,
             confirm: flags.confirm ?? false,

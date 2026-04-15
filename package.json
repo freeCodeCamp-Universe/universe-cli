@@ -35,7 +35,7 @@
   },
   "devDependencies": {
     "@smithy/util-stream": "^4.5.22",
-    "@types/node": "^20.19.39",
+    "@types/node": "^24.12.2",
     "aws-sdk-client-mock": "^4.1.0",
     "aws-sdk-client-mock-vitest": "^7.0.1",
     "postject": "1.0.0-alpha.6",
