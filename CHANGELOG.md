@@ -5,7 +5,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.0] - 2026-04-15
+## [0.1.1] - 2026-04-15
+
+Canary release verifying the Node 24 + Trusted Publisher OIDC end-to-end publish path.
 
 ### Added
 
@@ -16,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Release notes now extracted from `CHANGELOG.md` at release time — this file is the single source of truth for release content
 - CI restructured: reusable `test.yml` workflow, new `ci.yml` running on push/PR, `release.yml` calls the shared test workflow
 - npm publish authenticates via Trusted Publisher OIDC — no stored token, provenance attestation on every release
+- Publish job runs on Node 24 to access npm 11+ (required for Trusted Publisher OIDC credential exchange)
 
 ## [0.1.0] - 2026-04-13
 
