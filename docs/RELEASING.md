@@ -35,6 +35,23 @@ The workflow:
 
 Each binary is a Node SEA (Single Executable Application) — no Node.js install required.
 
+## Idempotency
+
+Re-running `release.yml` for the same version is safe. Each side effect has a guard so partial-failure runs converge without manual cleanup:
+
+- **Bump commit** — skipped when `git diff --quiet` reports no pending version/CHANGELOG change.
+- **Git tag** — skipped when `v$VERSION` already exists on `origin` (`git ls-remote --exit-code --tags`).
+- **npm publish** — skipped when `@freecodecamp/universe-cli@$VERSION` is already on the registry (`npm view ... version`).
+- **GitHub Release** — `softprops/action-gh-release` updates an existing release with the same tag instead of failing.
+
+Example recoveries:
+
+- Publish succeeds, build fails → re-run: publish is skipped, build retries, release is created.
+- Build succeeds, publish fails → re-run: artifacts rebuild, publish retries, release completes.
+- Tag pushed, GH release step fails → re-run: tag step skipped, softprops creates the release against the existing tag.
+
+Destructive cleanup (delete the tag, yank from npm) is not required for normal failures — re-trigger the workflow first.
+
 ## Local Tag (escape hatch)
 
 If GitHub Actions is unavailable:

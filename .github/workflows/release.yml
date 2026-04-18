@@ -155,7 +155,13 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm tsup
       - run: npm version "$VERSION" --no-git-tag-version --allow-same-version
-      - run: npm publish --provenance --access public
+      - name: Publish to npm (skip if version already published)
+        run: |
+          if npm view "@freecodecamp/universe-cli@$VERSION" version >/dev/null 2>&1; then
+            echo "::notice::@freecodecamp/universe-cli@$VERSION already published; skipping npm publish"
+          else
+            npm publish --provenance --access public
+          fi
 
   release:
     needs: [bump, build, publish]
@@ -171,10 +177,14 @@ jobs:
       - uses: ./.github/actions/validate-version
         with:
           version: ${{ inputs.version }}
-      - name: Tag release
+      - name: Tag release (skip if tag exists)
         run: |
-          git tag "v$VERSION"
-          git push origin "v$VERSION"
+          if git ls-remote --exit-code --tags origin "refs/tags/v$VERSION" >/dev/null 2>&1; then
+            echo "::notice::Tag v$VERSION already exists on origin; skipping git tag"
+          else
+            git tag "v$VERSION"
+            git push origin "v$VERSION"
+          fi
       - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0
         with:
           merge-multiple: true
