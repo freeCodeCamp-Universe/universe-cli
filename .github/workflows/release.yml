@@ -29,6 +29,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    outputs:
+      sha: ${{ steps.commit.outputs.sha }}
     env:
       VERSION: ${{ inputs.version }}
       NOTES: ${{ inputs.notes }}
@@ -63,16 +65,19 @@ jobs:
             mv CHANGELOG.md.new CHANGELOG.md
           fi
       - name: Commit and push
+        id: commit
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           if git diff --quiet; then
             echo "No version/CHANGELOG changes; release commit not needed."
+            echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           git add package.json CHANGELOG.md
           git commit -m "chore: release v$VERSION"
           git push origin main
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
   test:
     needs: bump
@@ -96,6 +101,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          ref: ${{ needs.bump.outputs.sha }}
       - uses: pnpm/action-setup@b307475762933b98ed359c036b0e51f26b63b74b
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
@@ -134,6 +141,8 @@ jobs:
       VERSION: ${{ inputs.version }}
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          ref: ${{ needs.bump.outputs.sha }}
       - uses: ./.github/actions/validate-version
         with:
           version: ${{ inputs.version }}
@@ -149,7 +158,7 @@ jobs:
       - run: npm publish --provenance --access public
 
   release:
-    needs: [build, publish]
+    needs: [bump, build, publish]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -157,6 +166,8 @@ jobs:
       VERSION: ${{ inputs.version }}
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          ref: ${{ needs.bump.outputs.sha }}
       - uses: ./.github/actions/validate-version
         with:
           version: ${{ inputs.version }}
