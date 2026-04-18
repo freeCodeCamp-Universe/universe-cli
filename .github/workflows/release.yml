@@ -7,6 +7,11 @@ on:
         description: "Version to release (e.g., 0.2.0)"
         required: true
         type: string
+      notes:
+        description: "CHANGELOG body for this release (markdown). Only used if ## [X.Y.Z] does not already exist."
+        required: false
+        type: string
+        default: ""
 
 jobs:
   preflight:
@@ -15,16 +20,66 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
-      - uses: ./.github/actions/check-version-consistency
+      - uses: ./.github/actions/validate-version
         with:
           version: ${{ inputs.version }}
 
-  test:
+  bump:
     needs: preflight
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ inputs.version }}
+      NOTES: ${{ inputs.notes }}
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          ref: main
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: pnpm/action-setup@b307475762933b98ed359c036b0e51f26b63b74b
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: "24"
+          cache: "pnpm"
+      - name: Bump package.json if needed
+        run: |
+          CURRENT=$(node -p "require('./package.json').version")
+          if [ "$CURRENT" != "$VERSION" ]; then
+            pnpm version "$VERSION" --no-git-tag-version
+          fi
+      - name: Ensure CHANGELOG section
+        run: |
+          if ! grep -qE "^## \[${VERSION//./\\.}\]" CHANGELOG.md; then
+            DATE=$(date -u +%Y-%m-%d)
+            BODY="${NOTES:-Release $VERSION}"
+            awk -v v="$VERSION" -v d="$DATE" -v b="$BODY" '
+              !inserted && /^## \[/ {
+                printf "## [%s] - %s\n\n%s\n\n", v, d, b
+                inserted=1
+              }
+              { print }
+            ' CHANGELOG.md > CHANGELOG.md.new
+            mv CHANGELOG.md.new CHANGELOG.md
+          fi
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet; then
+            echo "No version/CHANGELOG changes; release commit not needed."
+            exit 0
+          fi
+          git add package.json CHANGELOG.md
+          git commit -m "chore: release v$VERSION"
+          git push origin main
+
+  test:
+    needs: bump
     uses: ./.github/workflows/test.yml
 
   build:
-    needs: [preflight, test]
+    needs: [bump, test]
     permissions:
       contents: read
     strategy:
@@ -70,7 +125,7 @@ jobs:
             ${{ matrix.artifact }}.sha256
 
   publish:
-    needs: [preflight, test]
+    needs: [bump, test]
     runs-on: ubuntu-latest
     permissions:
       contents: read
