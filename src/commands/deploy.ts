@@ -59,9 +59,9 @@ async function resolveDeployId(
 }
 
 export async function deploy(options: DeployOptions): Promise<void> {
-  const config = loadConfig({
-    flags: options.outputDir ? { outputDir: options.outputDir } : undefined,
-  });
+  const config = loadConfig(
+    options.outputDir ? { flags: { outputDir: options.outputDir } } : {},
+  );
   const credentials = resolveCredentials({
     remoteName: config.static.rclone_remote,
   });

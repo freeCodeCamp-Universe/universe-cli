@@ -99,21 +99,25 @@ function fromRclone(remoteName: string): S3Credentials {
     );
   }
 
-  const missing: string[] = [];
-  if (!remote.access_key_id) missing.push("access_key_id");
-  if (!remote.secret_access_key) missing.push("secret_access_key");
-  if (!remote.endpoint) missing.push("endpoint");
+  const accessKeyId = remote.access_key_id;
+  const secretAccessKey = remote.secret_access_key;
+  const endpoint = remote.endpoint;
 
-  if (missing.length > 0) {
+  const missing: string[] = [];
+  if (!accessKeyId) missing.push("access_key_id");
+  if (!secretAccessKey) missing.push("secret_access_key");
+  if (!endpoint) missing.push("endpoint");
+
+  if (!accessKeyId || !secretAccessKey || !endpoint) {
     throw new CredentialError(
       `Rclone remote "${remoteName}" is missing required fields: ${missing.join(", ")}`,
     );
   }
 
   const creds: S3Credentials = {
-    accessKeyId: remote.access_key_id,
-    secretAccessKey: remote.secret_access_key,
-    endpoint: remote.endpoint,
+    accessKeyId,
+    secretAccessKey,
+    endpoint,
   };
   if (remote.region) creds.region = remote.region;
   return creds;

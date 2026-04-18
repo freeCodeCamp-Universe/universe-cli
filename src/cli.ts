@@ -38,7 +38,9 @@ export function run(argv = process.argv) {
             await deploy({
               json: flags.json ?? false,
               force: flags.force ?? false,
-              outputDir: flags.outputDir,
+              ...(flags.outputDir !== undefined
+                ? { outputDir: flags.outputDir }
+                : {}),
             });
           } catch (err: unknown) {
             handleActionError("deploy", flags.json ?? false, err);
@@ -52,7 +54,10 @@ export function run(argv = process.argv) {
       .action(
         async (deployId: string | undefined, flags: { json?: boolean }) => {
           try {
-            await promote({ json: flags.json ?? false, deployId });
+            await promote({
+              json: flags.json ?? false,
+              ...(deployId !== undefined ? { deployId } : {}),
+            });
           } catch (err: unknown) {
             handleActionError("promote", flags.json ?? false, err);
           }
