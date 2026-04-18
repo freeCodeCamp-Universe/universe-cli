@@ -1,0 +1,17 @@
+# CODEOWNERS for universe-cli
+# Syntax: https://docs.github.com/articles/about-code-owners
+# Each matched file requires review from the listed owner(s).
+
+# Default reviewer for anything not matched below.
+*                       @freeCodeCamp-Universe/platform
+
+# Release, CI, and supply-chain configuration.
+/.github/               @freeCodeCamp-Universe/platform
+/package.json           @freeCodeCamp-Universe/platform
+/pnpm-lock.yaml         @freeCodeCamp-Universe/platform
+/sea-config.json        @freeCodeCamp-Universe/platform
+/entitlements.plist     @freeCodeCamp-Universe/platform
+
+# Credential and storage code paths.
+/src/credentials/       @freeCodeCamp-Universe/platform
+/src/storage/           @freeCodeCamp-Universe/platform
