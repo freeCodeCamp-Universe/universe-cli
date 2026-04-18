@@ -186,7 +186,7 @@ describe("loadConfig", () => {
     });
 
     expect(() => loadConfig({ cwd: "/fake/project" })).toThrow(
-      /platform\.yaml/,
+      /docs\/STAFF-GUIDE\.md/,
     );
   });
 

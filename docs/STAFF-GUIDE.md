@@ -4,7 +4,7 @@ This guide covers deploying a static site (HTML/CSS/JS) to `*.freecode.camp`.
 
 ## Prerequisites
 
-- `universe` CLI binary ([Install](README.md#install))
+- `universe` CLI binary ([Install](../README.md#install))
 - R2 credentials from the platform team
 
 ## 1. Project Setup
@@ -43,6 +43,11 @@ Add `.env` to `.gitignore`. Load credentials before running CLI commands:
 source .env
 ```
 
+Credential resolution order:
+
+1. `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_ENDPOINT`, optional `S3_REGION`
+2. `rclone config dump` using `static.rclone_remote` from `platform.yaml`
+
 ## 3. Build
 
 ```sh
@@ -56,6 +61,12 @@ universe static deploy
 ```
 
 This uploads `dist/` to storage and sets the preview alias. The deploy ID is printed on success.
+
+To deploy a different build directory:
+
+```sh
+universe static deploy --output-dir build
+```
 
 If you're not in a git repo or have no commits yet, use `--force`:
 
@@ -78,6 +89,22 @@ universe static rollback --confirm
 ```
 
 Reverts production to the previous deploy.
+
+## Command Notes
+
+- `universe static deploy` warns if the git working tree is dirty, but still deploys.
+- `universe static deploy` fails when no git hash is available unless `--force` is set.
+- All commands support `--json` for CI output.
+- In JSON mode, `universe static rollback` requires `--confirm`.
+
+## Config Overrides
+
+These environment variables override `platform.yaml` when set:
+
+- `UNIVERSE_STATIC_OUTPUT_DIR`
+- `UNIVERSE_STATIC_BUCKET`
+- `UNIVERSE_STATIC_RCLONE_REMOTE`
+- `UNIVERSE_STATIC_REGION`
 
 ## How It Works
 

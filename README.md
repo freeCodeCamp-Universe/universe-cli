@@ -53,18 +53,27 @@ universe --version
 # Deploy a static site (from a directory with platform.yaml and a built dist/)
 universe static deploy
 
+# Deploy without git metadata
+universe static deploy --force
+
+# Deploy a non-default build output directory
+universe static deploy --output-dir build
+
 # Promote preview to production
 universe static promote
+
+# Promote a specific deploy
+universe static promote 20260413-120000-abc1234
 
 # Rollback production to previous deploy
 universe static rollback --confirm
 ```
 
-All commands support `--json` for CI integration.
+All commands support `--json` for CI integration. In JSON mode, `rollback` also requires `--confirm`.
 
 ## Credentials
 
-The CLI needs R2 credentials. See the [Staff Guide](STAFF-GUIDE.md#2-credentials) for setup.
+The CLI needs R2 credentials. See the [Staff Guide](docs/STAFF-GUIDE.md#2-credentials) for setup.
 
 ## Development
 
@@ -77,4 +86,4 @@ pnpm tsc --noEmit  # typecheck
 
 ## Releasing
 
-See [RELEASING.md](RELEASING.md).
+See [RELEASING.md](docs/RELEASING.md).

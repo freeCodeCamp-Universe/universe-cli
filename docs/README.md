@@ -24,3 +24,8 @@ Canonical workflow moving forward:
 - Read `docs/04-static-cli-spec-v0.3.md` first.
 - Treat `docs/02-static-cli-spec-v0.2.md` as immutable baseline archive.
 - Use `docs/03-engineering-backlog.md` as implementation task map.
+
+Current implementation status:
+
+- The shipped CLI currently implements `universe static deploy`, `universe static promote`, and `universe static rollback`.
+- `docs/04-static-cli-spec-v0.3.md` also describes planned commands that are not shipped yet.

@@ -80,7 +80,7 @@ export function loadConfig(options: LoadConfigOptions = {}): ResolvedConfig {
       (err as NodeJS.ErrnoException).code === "ENOENT"
     ) {
       throw new ConfigError(
-        `platform.yaml not found at ${configPath}. See STAFF-GUIDE.md for the required format.`,
+        `platform.yaml not found at ${configPath}. See docs/STAFF-GUIDE.md for the required format.`,
       );
     }
     throw err;
@@ -97,7 +97,7 @@ export function loadConfig(options: LoadConfigOptions = {}): ResolvedConfig {
       })
       .join("\n");
     throw new ConfigError(
-      `platform.yaml is invalid:\n${issues}\nSee STAFF-GUIDE.md for the required format.`,
+      `platform.yaml is invalid:\n${issues}\nSee docs/STAFF-GUIDE.md for the required format.`,
     );
   }
   const yamlValidated = parseResult.data;
