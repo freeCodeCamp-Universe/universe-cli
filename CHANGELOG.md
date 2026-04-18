@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.3] - 2026-04-18
+
+Tier 3 polish release. Surviving subset of the original Tier 3 scope: items that conflicted with the upcoming gxy-cassiopeia rewrite (direct S3 → Woodpecker pipeline) were deferred into that work.
+
+### Added
+
+- TypeScript strictness: `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `verbatimModuleSyntax`, and `isolatedModules` enabled in `tsconfig.json`. Narrowing added in `src/cli.ts`, `src/commands/deploy.ts`, and `src/credentials/resolver.ts` to satisfy the new rules. Type-assertion test in `tests/tsconfig-strict.test.ts` guards regression (T3.1).
+- Repo hygiene: `.nvmrc`, `.editorconfig`, `SECURITY.md`, `CONTRIBUTING.md`, `.github/CODEOWNERS`, `.github/dependabot.yml` (T3.2).
+- Vitest coverage: v8 provider with thresholds (lines/statements 90, functions 95, branches 80). CI uploads `coverage/` as a 7-day artifact (T3.13).
+- `docs/RELEASING.md` grows an Idempotency section covering the four guards (bump diff, tag existence, registry existence, GH release auto-update) with recovery examples (T3.10).
+
+### Changed
+
+- npm tarball ships only `dist/index.js` (+ map) — the 1.9MB CJS bundle is SEA-only and no longer included in the package (T3.3).
+- `release.yml` is idempotent across partial-failure re-runs: git tag skipped when `v$VERSION` already on `origin`, registry push skipped when the version is already on the registry. `softprops/action-gh-release` continues to update existing releases in place (T3.10).
+
+### Deferred
+
+- `postject` → `node --build-sea` migration (T3.4) is blocked: Node 24.13 does not ship `--build-sea`. Revisit when Node 26 LTS lands.
+- All deploy/promote/rollback rewrites, `@aws-sdk/client-s3` removal, and the v0.4.0-beta.1 CHANGELOG move into the gxy-cassiopeia epic (`gxy-static-k7d`).
+
 ## [0.3.2] - 2026-04-18
 
 Release 0.3.2
