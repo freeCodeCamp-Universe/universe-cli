@@ -1,5 +1,10 @@
 # Universe CLI Flight Manual
 
+> **Note (2026-04-20):** This runbook documents the pre-pivot direct-R2
+> deploy flow. T16-T20 (gxy-cassiopeia RFC §4.8) replace this with a
+> Woodpecker CI API integration. Do not rely on this document for new
+> deploys after v0.4.0-beta.1 ships.
+
 Platform team ops runbook for building, testing, and maintaining the CLI.
 
 ## Prerequisites
