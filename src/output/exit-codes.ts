@@ -1,7 +1,7 @@
 export const EXIT_SUCCESS = 0;
 export const EXIT_USAGE = 10;
 export const EXIT_CONFIG = 11;
-export const EXIT_CREDENTIAL = 12;
+export const EXIT_CREDENTIALS = 12;
 export const EXIT_STORAGE = 13;
 export const EXIT_OUTPUT_DIR = 14;
 export const EXIT_GIT = 15;

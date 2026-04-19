@@ -1,6 +1,6 @@
 import {
   EXIT_CONFIG,
-  EXIT_CREDENTIAL,
+  EXIT_CREDENTIALS,
   EXIT_STORAGE,
   EXIT_OUTPUT_DIR,
   EXIT_GIT,
@@ -23,7 +23,7 @@ export class ConfigError extends CliError {
 }
 
 export class CredentialError extends CliError {
-  readonly exitCode = EXIT_CREDENTIAL;
+  readonly exitCode = EXIT_CREDENTIALS;
 }
 
 export class StorageError extends CliError {

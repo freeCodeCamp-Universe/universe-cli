@@ -3,7 +3,7 @@ import {
   EXIT_SUCCESS,
   EXIT_USAGE,
   EXIT_CONFIG,
-  EXIT_CREDENTIAL,
+  EXIT_CREDENTIALS,
   EXIT_STORAGE,
   EXIT_OUTPUT_DIR,
   EXIT_GIT,
@@ -27,8 +27,8 @@ describe("exit code constants", () => {
     expect(EXIT_CONFIG).toBe(11);
   });
 
-  it("EXIT_CREDENTIAL is 12", () => {
-    expect(EXIT_CREDENTIAL).toBe(12);
+  it("EXIT_CREDENTIALS is 12", () => {
+    expect(EXIT_CREDENTIALS).toBe(12);
   });
 
   it("EXIT_STORAGE is 13", () => {
