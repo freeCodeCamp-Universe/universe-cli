@@ -12,7 +12,7 @@ import {
 } from "../src/errors.js";
 import {
   EXIT_CONFIG,
-  EXIT_CREDENTIAL,
+  EXIT_CREDENTIALS,
   EXIT_STORAGE,
   EXIT_OUTPUT_DIR,
   EXIT_GIT,
@@ -30,8 +30,8 @@ describe("CliError hierarchy", () => {
     expect(err.message).toBe("bad config");
   });
 
-  it("CredentialError carries EXIT_CREDENTIAL", () => {
-    expect(new CredentialError("x").exitCode).toBe(EXIT_CREDENTIAL);
+  it("CredentialError carries EXIT_CREDENTIALS", () => {
+    expect(new CredentialError("x").exitCode).toBe(EXIT_CREDENTIALS);
   });
 
   it("StorageError carries EXIT_STORAGE", () => {
