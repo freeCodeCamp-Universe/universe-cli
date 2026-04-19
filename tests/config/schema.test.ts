@@ -90,4 +90,20 @@ describe("platformSchema", () => {
     expect(result.static.rclone_remote).toBe("gxy-static");
     expect(result.static.region).toBe("auto");
   });
+
+  it("accepts a single hyphen in the site name", () => {
+    const result = platformSchema.safeParse({
+      ...validConfig,
+      name: "foo-bar",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects consecutive hyphens in the site name (D19)", () => {
+    const result = platformSchema.safeParse({
+      ...validConfig,
+      name: "foo--bar",
+    });
+    expect(result.success).toBe(false);
+  });
 });

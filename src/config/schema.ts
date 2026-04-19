@@ -18,7 +18,7 @@ export const platformSchema = z.object({
   name: z
     .string()
     .min(1)
-    .regex(/^[a-z0-9]([a-z0-9._-]*[a-z0-9])?$/i),
+    .regex(/^(?!.*--)[a-z0-9]([a-z0-9._-]*[a-z0-9])?$/i),
   stack: z.literal("static"),
   domain: domainSchema,
   static: staticSchema,
