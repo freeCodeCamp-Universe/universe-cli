@@ -1,8 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import {
-  resolveCredentials,
-  type S3Credentials,
-} from "../../src/credentials/resolver.js";
+import { resolveCredentials } from "../../src/credentials/resolver.js";
 import * as childProcess from "node:child_process";
 
 vi.mock("node:child_process");

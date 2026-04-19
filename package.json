@@ -4,7 +4,9 @@
   "main": "dist/index.js",
   "scripts": {
     "test": "vitest run",
-    "build": "tsup"
+    "build": "tsup",
+    "lint": "oxlint src tests",
+    "prepare": "husky"
   },
   "author": "Mrugesh Mohapatra <noreply@mrugesh.dev> (https://mrugesh.dev/)",
   "license": "ISC",
@@ -38,6 +40,8 @@
     "@types/node": "^24.12.2",
     "aws-sdk-client-mock": "^4.1.0",
     "aws-sdk-client-mock-vitest": "^7.0.1",
+    "husky": "^9.1.7",
+    "oxlint": "^1.60.0",
     "postject": "1.0.0-alpha.6",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",

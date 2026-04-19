@@ -24,7 +24,7 @@ vi.mock("../src/output/exit-codes.js", async () => {
 });
 
 import { outputError } from "../src/output/format.js";
-import { exitWithCode, EXIT_USAGE } from "../src/output/exit-codes.js";
+import { exitWithCode } from "../src/output/exit-codes.js";
 
 const mockOutputError = vi.mocked(outputError);
 const mockExitWithCode = vi.mocked(exitWithCode);

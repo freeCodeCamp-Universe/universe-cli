@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { loadConfig, type ResolvedConfig } from "../../src/config/loader.js";
+import { loadConfig } from "../../src/config/loader.js";
 import * as fs from "node:fs";
 import * as yaml from "yaml";
 

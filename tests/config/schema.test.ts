@@ -39,7 +39,7 @@ describe("platformSchema", () => {
   });
 
   it("rejects config with missing name", () => {
-    const { name, ...noName } = validConfig;
+    const { name: _name, ...noName } = validConfig;
     const result = platformSchema.safeParse(noName);
     expect(result.success).toBe(false);
   });
@@ -58,7 +58,7 @@ describe("platformSchema", () => {
   });
 
   it("rejects config with missing domain", () => {
-    const { domain, ...noDomain } = validConfig;
+    const { domain: _domain, ...noDomain } = validConfig;
     const result = platformSchema.safeParse(noDomain);
     expect(result.success).toBe(false);
   });
