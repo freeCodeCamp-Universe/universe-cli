@@ -39,7 +39,7 @@ import { resolveCredentials } from "../../src/credentials/resolver.js";
 import { createS3Client } from "../../src/storage/client.js";
 import { readAlias, writeAlias } from "../../src/storage/aliases.js";
 import { listDeploys } from "../../src/storage/deploys.js";
-import { outputSuccess, outputError } from "../../src/output/format.js";
+import { outputSuccess } from "../../src/output/format.js";
 import {
   exitWithCode,
   EXIT_ALIAS,
@@ -55,7 +55,6 @@ const mockReadAlias = vi.mocked(readAlias);
 const mockWriteAlias = vi.mocked(writeAlias);
 const mockListDeploys = vi.mocked(listDeploys);
 const mockOutputSuccess = vi.mocked(outputSuccess);
-const mockOutputError = vi.mocked(outputError);
 const mockExitWithCode = vi.mocked(exitWithCode);
 const mockConfirm = vi.mocked(confirm);
 
