@@ -11,6 +11,7 @@ import {
   EXIT_DEPLOY_NOT_FOUND,
   EXIT_CONFIRM,
   EXIT_PARTIAL,
+  EXIT_PIPELINE,
   exitWithCode,
 } from "../../src/output/exit-codes.js";
 
@@ -57,6 +58,10 @@ describe("exit code constants", () => {
 
   it("EXIT_PARTIAL is 19", () => {
     expect(EXIT_PARTIAL).toBe(19);
+  });
+
+  it("EXIT_PIPELINE is 20", () => {
+    expect(EXIT_PIPELINE).toBe(20);
   });
 });
 

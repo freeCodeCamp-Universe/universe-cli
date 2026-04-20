@@ -7,6 +7,8 @@ import {
   EXIT_ALIAS,
   EXIT_DEPLOY_NOT_FOUND,
   EXIT_CONFIRM,
+  EXIT_PIPELINE,
+  EXIT_USAGE,
 } from "./output/exit-codes.js";
 
 export abstract class CliError extends Error {
@@ -48,4 +50,12 @@ export class DeployNotFoundError extends CliError {
 
 export class ConfirmError extends CliError {
   readonly exitCode = EXIT_CONFIRM;
+}
+
+export class PipelineError extends CliError {
+  readonly exitCode = EXIT_PIPELINE;
+}
+
+export class UsageError extends CliError {
+  readonly exitCode = EXIT_USAGE;
 }

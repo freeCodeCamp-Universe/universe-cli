@@ -9,6 +9,8 @@ import {
   AliasError,
   DeployNotFoundError,
   ConfirmError,
+  PipelineError,
+  UsageError,
 } from "../src/errors.js";
 import {
   EXIT_CONFIG,
@@ -19,6 +21,8 @@ import {
   EXIT_ALIAS,
   EXIT_DEPLOY_NOT_FOUND,
   EXIT_CONFIRM,
+  EXIT_PIPELINE,
+  EXIT_USAGE,
 } from "../src/output/exit-codes.js";
 
 describe("CliError hierarchy", () => {
@@ -56,6 +60,14 @@ describe("CliError hierarchy", () => {
 
   it("ConfirmError carries EXIT_CONFIRM", () => {
     expect(new ConfirmError("x").exitCode).toBe(EXIT_CONFIRM);
+  });
+
+  it("PipelineError carries EXIT_PIPELINE", () => {
+    expect(new PipelineError("x").exitCode).toBe(EXIT_PIPELINE);
+  });
+
+  it("UsageError carries EXIT_USAGE", () => {
+    expect(new UsageError("x").exitCode).toBe(EXIT_USAGE);
   });
 
   it("preserves the error name for instanceof-style checks", () => {

@@ -13,29 +13,39 @@ describe("getGitState", () => {
     vi.restoreAllMocks();
   });
 
-  it("returns hash and dirty: false for clean repo", () => {
+  it("returns hash, branch, and dirty: false for clean repo", () => {
     mockedExecSync.mockImplementation((cmd: string) => {
       if (cmd === "git rev-parse HEAD") return "abc1234def5678\n";
       if (cmd === "git status --porcelain") return "";
+      if (cmd === "git rev-parse --abbrev-ref HEAD") return "main\n";
       return "";
     });
 
     const state = getGitState();
-    expect(state).toEqual({ hash: "abc1234def5678", dirty: false });
+    expect(state).toEqual({
+      hash: "abc1234def5678",
+      branch: "main",
+      dirty: false,
+    });
   });
 
-  it("returns hash and dirty: true when working tree has uncommitted changes", () => {
+  it("returns hash, branch, and dirty: true when working tree has uncommitted changes", () => {
     mockedExecSync.mockImplementation((cmd: string) => {
       if (cmd === "git rev-parse HEAD") return "abc1234def5678\n";
       if (cmd === "git status --porcelain") return " M src/file.ts\n";
+      if (cmd === "git rev-parse --abbrev-ref HEAD") return "feature-x\n";
       return "";
     });
 
     const state = getGitState();
-    expect(state).toEqual({ hash: "abc1234def5678", dirty: true });
+    expect(state).toEqual({
+      hash: "abc1234def5678",
+      branch: "feature-x",
+      dirty: true,
+    });
   });
 
-  it("returns null hash with error when not in a git repo", () => {
+  it("returns null hash and null branch with error when not in a git repo", () => {
     mockedExecSync.mockImplementation(() => {
       throw new Error("fatal: not a git repository");
     });
@@ -43,19 +53,22 @@ describe("getGitState", () => {
     const state = getGitState();
     expect(state).toEqual({
       hash: null,
+      branch: null,
       dirty: false,
       error: "not a git repository",
     });
   });
 
-  it("trims whitespace from git hash", () => {
+  it("trims whitespace from git hash and branch", () => {
     mockedExecSync.mockImplementation((cmd: string) => {
       if (cmd === "git rev-parse HEAD") return "  fedcba9876543  \n";
       if (cmd === "git status --porcelain") return "";
+      if (cmd === "git rev-parse --abbrev-ref HEAD") return "  main  \n";
       return "";
     });
 
     const state = getGitState();
     expect(state.hash).toBe("fedcba9876543");
+    expect(state.branch).toBe("main");
   });
 });

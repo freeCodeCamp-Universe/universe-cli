@@ -9,6 +9,7 @@ export const EXIT_ALIAS = 16;
 export const EXIT_DEPLOY_NOT_FOUND = 17;
 export const EXIT_CONFIRM = 18;
 export const EXIT_PARTIAL = 19;
+export const EXIT_PIPELINE = 20;
 
 export function exitWithCode(code: number, message?: string): never {
   if (message !== undefined) {
