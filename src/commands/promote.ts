@@ -1,86 +1,61 @@
 import { loadConfig } from "../config/loader.js";
-import { resolveCredentials } from "../credentials/resolver.js";
-import { createS3Client } from "../storage/client.js";
-import { readAlias, writeAlias } from "../storage/aliases.js";
-import { deployExists } from "../storage/deploys.js";
-import {
-  type OutputContext,
-  outputSuccess,
-  outputError,
-} from "../output/format.js";
-import {
-  EXIT_ALIAS,
-  EXIT_DEPLOY_NOT_FOUND,
-  exitWithCode,
-} from "../output/exit-codes.js";
+import { resolveWoodpeckerToken } from "../credentials/woodpecker.js";
+import { getGitState } from "../deploy/git.js";
+import { WoodpeckerClient } from "../woodpecker/client.js";
+import { WoodpeckerError } from "../woodpecker/errors.js";
+import { streamFirstStepLogs } from "../woodpecker/stream.js";
+import { type OutputContext, outputSuccess } from "../output/format.js";
+import { PipelineError } from "../errors.js";
 
 export interface PromoteOptions {
   json: boolean;
-  deployId?: string;
+  follow?: boolean;
 }
 
 export async function promote(options: PromoteOptions): Promise<void> {
   const config = loadConfig();
-  const credentials = resolveCredentials({
-    remoteName: config.static.rclone_remote,
-  });
-  const client = createS3Client(credentials);
-
-  const bucket = config.static.bucket;
-  const site = config.name;
   const ctx: OutputContext = { json: options.json, command: "promote" };
 
-  let deployId: string;
+  const token = resolveWoodpeckerToken();
+  const git = getGitState();
+  const client = new WoodpeckerClient(config.woodpecker.endpoint, token);
+  const branch = git.branch ?? "main";
 
-  if (options.deployId) {
-    const exists = await deployExists(client, bucket, site, options.deployId);
-    if (!exists) {
-      outputError(
-        ctx,
-        EXIT_DEPLOY_NOT_FOUND,
-        `Deploy ${options.deployId} not found`,
+  let pipeline;
+  try {
+    pipeline = await client.createPipeline(config.woodpecker.repo_id, {
+      branch,
+      variables: { OP: "promote" },
+    });
+  } catch (err) {
+    if (err instanceof WoodpeckerError) {
+      throw new PipelineError(
+        `Failed to trigger promote pipeline: ${err.message}`,
       );
-      exitWithCode(
-        EXIT_DEPLOY_NOT_FOUND,
-        `Deploy ${options.deployId} not found`,
-      );
-      return;
     }
-    deployId = options.deployId;
-  } else {
-    const preview = await readAlias(client, bucket, site, "preview");
-    if (!preview) {
-      outputError(
-        ctx,
-        EXIT_ALIAS,
-        "No preview alias set — deploy first or specify a deploy ID",
-      );
-      exitWithCode(
-        EXIT_ALIAS,
-        "No preview alias set — deploy first or specify a deploy ID",
-      );
-      return;
-    }
-    deployId = preview;
+    throw err;
   }
 
-  // v1 limitation: concurrent alias writes have last-write-wins behavior.
-  // S3 PutObject is atomic for single writes but concurrent writes have undefined ordering.
-  await writeAlias(client, bucket, site, "production", deployId);
-
-  const productionDomain = config.domain?.production ?? site;
+  const productionUrl = `https://${config.domain.production}`;
   const humanMsg = [
-    `Promoted ${deployId} to production`,
+    `Promote pipeline #${pipeline.number} started`,
     ``,
-    `  Site:        ${site}`,
-    `  Deploy:      ${deployId}`,
-    `  Production:  https://${productionDomain}`,
+    `  Site:        ${config.name}`,
+    `  Production:  ${productionUrl}`,
   ].join("\n");
 
   outputSuccess(ctx, humanMsg, {
-    deployId,
-    site,
-    alias: "production",
-    productionDomain,
+    pipelineNumber: pipeline.number,
+    site: config.name,
+    productionUrl,
   });
+
+  const shouldFollow = options.follow ?? process.stdout.isTTY === true;
+  if (shouldFollow) {
+    await streamFirstStepLogs(
+      client,
+      config.woodpecker.repo_id,
+      pipeline.number,
+    );
+  }
 }

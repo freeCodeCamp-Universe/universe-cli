@@ -14,9 +14,10 @@ const fullYaml = {
   },
   static: {
     output_dir: "dist",
-    bucket: "gxy-static-1",
-    rclone_remote: "gxy-static",
-    region: "auto",
+  },
+  woodpecker: {
+    endpoint: "https://woodpecker.example",
+    repo_id: 1,
   },
 };
 
@@ -116,7 +117,7 @@ describe("loadConfig", () => {
     });
   });
 
-  it("returns fully typed ResolvedConfig with no optional fields", () => {
+  it("applies output_dir default when static omitted", () => {
     const minimalYaml = {
       name: "my-site",
       stack: "static",
@@ -124,39 +125,37 @@ describe("loadConfig", () => {
         production: "my-site.com",
         preview: "preview.my-site.com",
       },
+      woodpecker: {
+        endpoint: "https://woodpecker.example",
+        repo_id: 1,
+      },
     };
     vi.mocked(fs.readFileSync).mockReturnValue(yaml.stringify(minimalYaml));
 
     const config = loadConfig({ cwd: "/fake/project" });
 
     expect(config.static.output_dir).toBe("dist");
-    expect(config.static.bucket).toBe("gxy-static-1");
-    expect(config.static.rclone_remote).toBe("gxy-static");
-    expect(config.static.region).toBe("auto");
   });
 
   it("yaml values override schema defaults", () => {
     const customYaml = {
       ...fullYaml,
-      static: { ...fullYaml.static, output_dir: "build", region: "us-east-1" },
+      static: { output_dir: "build" },
     };
     vi.mocked(fs.readFileSync).mockReturnValue(yaml.stringify(customYaml));
 
     const config = loadConfig({ cwd: "/fake/project" });
 
     expect(config.static.output_dir).toBe("build");
-    expect(config.static.region).toBe("us-east-1");
   });
 
-  it("env vars override yaml values", () => {
+  it("env var UNIVERSE_STATIC_OUTPUT_DIR overrides yaml", () => {
     vi.mocked(fs.readFileSync).mockReturnValue(yaml.stringify(fullYaml));
     vi.stubEnv("UNIVERSE_STATIC_OUTPUT_DIR", "env-out");
-    vi.stubEnv("UNIVERSE_STATIC_BUCKET", "env-bucket");
 
     const config = loadConfig({ cwd: "/fake/project" });
 
     expect(config.static.output_dir).toBe("env-out");
-    expect(config.static.bucket).toBe("env-bucket");
   });
 
   it("flags override env and yaml values", () => {
@@ -193,15 +192,10 @@ describe("loadConfig", () => {
   it("resolution precedence: flags > env > yaml > defaults", () => {
     const yamlData = {
       ...fullYaml,
-      static: {
-        ...fullYaml.static,
-        output_dir: "yaml-out",
-        region: "yaml-region",
-      },
+      static: { output_dir: "yaml-out" },
     };
     vi.mocked(fs.readFileSync).mockReturnValue(yaml.stringify(yamlData));
     vi.stubEnv("UNIVERSE_STATIC_OUTPUT_DIR", "env-out");
-    vi.stubEnv("UNIVERSE_STATIC_REGION", "env-region");
 
     const config = loadConfig({
       cwd: "/fake/project",
@@ -209,7 +203,5 @@ describe("loadConfig", () => {
     });
 
     expect(config.static.output_dir).toBe("flag-out");
-    expect(config.static.region).toBe("env-region");
-    expect(config.static.bucket).toBe("gxy-static-1");
   });
 });

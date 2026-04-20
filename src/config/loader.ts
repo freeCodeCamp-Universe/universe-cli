@@ -28,9 +28,6 @@ export type ResolvedConfig = PlatformConfig;
 
 export interface LoadConfigFlags {
   outputDir?: string;
-  bucket?: string;
-  rcloneRemote?: string;
-  region?: string;
 }
 
 export interface LoadConfigOptions {
@@ -43,15 +40,6 @@ function readEnvOverrides(): Partial<PlatformConfig["static"]> {
   if (process.env.UNIVERSE_STATIC_OUTPUT_DIR) {
     overrides.output_dir = process.env.UNIVERSE_STATIC_OUTPUT_DIR;
   }
-  if (process.env.UNIVERSE_STATIC_BUCKET) {
-    overrides.bucket = process.env.UNIVERSE_STATIC_BUCKET;
-  }
-  if (process.env.UNIVERSE_STATIC_RCLONE_REMOTE) {
-    overrides.rclone_remote = process.env.UNIVERSE_STATIC_RCLONE_REMOTE;
-  }
-  if (process.env.UNIVERSE_STATIC_REGION) {
-    overrides.region = process.env.UNIVERSE_STATIC_REGION;
-  }
   return overrides;
 }
 
@@ -61,9 +49,6 @@ function readFlagOverrides(
   if (!flags) return {};
   const overrides: Partial<PlatformConfig["static"]> = {};
   if (flags.outputDir) overrides.output_dir = flags.outputDir;
-  if (flags.bucket) overrides.bucket = flags.bucket;
-  if (flags.rcloneRemote) overrides.rclone_remote = flags.rcloneRemote;
-  if (flags.region) overrides.region = flags.region;
   return overrides;
 }
 

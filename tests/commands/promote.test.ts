@@ -1,171 +1,129 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("../../src/config/loader.js", () => ({
-  loadConfig: vi.fn(),
+vi.mock("../../src/config/loader.js", () => ({ loadConfig: vi.fn() }));
+vi.mock("../../src/credentials/woodpecker.js", () => ({
+  resolveWoodpeckerToken: vi.fn(),
 }));
-vi.mock("../../src/credentials/resolver.js", () => ({
-  resolveCredentials: vi.fn(),
+vi.mock("../../src/deploy/git.js", () => ({ getGitState: vi.fn() }));
+vi.mock("../../src/woodpecker/client.js", () => ({
+  WoodpeckerClient: vi.fn(),
 }));
-vi.mock("../../src/storage/client.js", () => ({
-  createS3Client: vi.fn(),
-}));
-vi.mock("../../src/storage/aliases.js", () => ({
-  readAlias: vi.fn(),
-  writeAlias: vi.fn(),
-}));
-vi.mock("../../src/storage/deploys.js", () => ({
-  deployExists: vi.fn(),
+vi.mock("../../src/woodpecker/stream.js", () => ({
+  streamFirstStepLogs: vi.fn(),
 }));
 vi.mock("../../src/output/format.js", () => ({
   outputSuccess: vi.fn(),
   outputError: vi.fn(),
 }));
-vi.mock("../../src/output/exit-codes.js", async () => {
-  const actual = await vi.importActual<
-    typeof import("../../src/output/exit-codes.js")
-  >("../../src/output/exit-codes.js");
-  return {
-    ...actual,
-    exitWithCode: vi.fn(),
-  };
-});
 
 import { loadConfig } from "../../src/config/loader.js";
-import { resolveCredentials } from "../../src/credentials/resolver.js";
-import { createS3Client } from "../../src/storage/client.js";
-import { readAlias, writeAlias } from "../../src/storage/aliases.js";
-import { deployExists } from "../../src/storage/deploys.js";
+import { resolveWoodpeckerToken } from "../../src/credentials/woodpecker.js";
+import { getGitState } from "../../src/deploy/git.js";
+import { WoodpeckerClient } from "../../src/woodpecker/client.js";
+import { streamFirstStepLogs } from "../../src/woodpecker/stream.js";
 import { outputSuccess } from "../../src/output/format.js";
-import {
-  exitWithCode,
-  EXIT_ALIAS,
-  EXIT_DEPLOY_NOT_FOUND,
-} from "../../src/output/exit-codes.js";
 import { promote } from "../../src/commands/promote.js";
+import { CredentialError, PipelineError } from "../../src/errors.js";
+import { WoodpeckerError } from "../../src/woodpecker/errors.js";
 
 const mockLoadConfig = vi.mocked(loadConfig);
-const mockResolveCredentials = vi.mocked(resolveCredentials);
-const mockCreateS3Client = vi.mocked(createS3Client);
-const mockReadAlias = vi.mocked(readAlias);
-const mockWriteAlias = vi.mocked(writeAlias);
-const mockDeployExists = vi.mocked(deployExists);
+const mockResolveToken = vi.mocked(resolveWoodpeckerToken);
+const mockGetGitState = vi.mocked(getGitState);
+const mockWoodpeckerClient = vi.mocked(WoodpeckerClient);
+const mockStreamLogs = vi.mocked(streamFirstStepLogs);
 const mockOutputSuccess = vi.mocked(outputSuccess);
-const mockExitWithCode = vi.mocked(exitWithCode);
+
+let createPipelineMock: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   vi.clearAllMocks();
   mockLoadConfig.mockReturnValue({
     name: "my-site",
     stack: "static",
-    domain: { production: "example.com", preview: "preview.example.com" },
+    domain: {
+      production: "my-site.freecode.camp",
+      preview: "my-site--preview.freecode.camp",
+    },
     static: {
       output_dir: "dist",
-      bucket: "test-bucket",
-      rclone_remote: "r2",
-      region: "auto",
     },
+    woodpecker: { endpoint: "https://wp.example", repo_id: 10 },
   });
-  mockResolveCredentials.mockReturnValue({
-    accessKeyId: "key",
-    secretAccessKey: "secret",
-    endpoint: "https://example.com",
+  mockResolveToken.mockReturnValue("tok");
+  mockGetGitState.mockReturnValue({
+    hash: "abc",
+    branch: "main",
+    dirty: false,
   });
-  mockCreateS3Client.mockReturnValue({} as ReturnType<typeof createS3Client>);
+  createPipelineMock = vi.fn().mockResolvedValue({
+    number: 7,
+    status: "pending",
+    created: 0,
+    commit: "c",
+    branch: "main",
+  });
+  mockWoodpeckerClient.mockImplementation(
+    () =>
+      ({ createPipeline: createPipelineMock }) as unknown as WoodpeckerClient,
+  );
+  mockStreamLogs.mockResolvedValue(undefined);
 });
 
-describe("promote", () => {
-  it("promotes preview alias to production when no deploy-id arg", async () => {
-    mockReadAlias.mockResolvedValue("20260413-120000-abc1234");
-    mockDeployExists.mockResolvedValue(true);
-    mockWriteAlias.mockResolvedValue(undefined);
-
-    await promote({ json: false });
-
-    expect(mockReadAlias).toHaveBeenCalledWith(
-      expect.anything(),
-      "test-bucket",
-      "my-site",
-      "preview",
-    );
-    expect(mockWriteAlias).toHaveBeenCalledWith(
-      expect.anything(),
-      "test-bucket",
-      "my-site",
-      "production",
-      "20260413-120000-abc1234",
-    );
-    expect(mockOutputSuccess).toHaveBeenCalled();
+describe("promote (Woodpecker)", () => {
+  it("creates a pipeline with OP=promote on current branch", async () => {
+    await promote({ json: false, follow: false });
+    expect(createPipelineMock).toHaveBeenCalledWith(10, {
+      branch: "main",
+      variables: { OP: "promote" },
+    });
   });
 
-  it("promotes a specific deploy-id when provided", async () => {
-    mockDeployExists.mockResolvedValue(true);
-    mockWriteAlias.mockResolvedValue(undefined);
+  it("falls back to 'main' when git branch is null", async () => {
+    mockGetGitState.mockReturnValue({
+      hash: null,
+      branch: null,
+      dirty: false,
+    });
+    await promote({ json: false, follow: false });
+    expect(createPipelineMock).toHaveBeenCalledWith(10, {
+      branch: "main",
+      variables: { OP: "promote" },
+    });
+  });
 
-    await promote({ json: false, deployId: "20260412-100000-def5678" });
-
-    expect(mockReadAlias).not.toHaveBeenCalled();
-    expect(mockDeployExists).toHaveBeenCalledWith(
-      expect.anything(),
-      "test-bucket",
-      "my-site",
-      "20260412-100000-def5678",
-    );
-    expect(mockWriteAlias).toHaveBeenCalledWith(
-      expect.anything(),
-      "test-bucket",
-      "my-site",
-      "production",
-      "20260412-100000-def5678",
+  it("throws CredentialError when token missing", async () => {
+    mockResolveToken.mockImplementation(() => {
+      throw new CredentialError("no token");
+    });
+    await expect(promote({ json: false, follow: false })).rejects.toThrow(
+      CredentialError,
     );
   });
 
-  it("exits with EXIT_ALIAS when preview alias not set and no deploy-id", async () => {
-    mockReadAlias.mockResolvedValue(null);
-
-    await promote({ json: false });
-
-    expect(mockExitWithCode).toHaveBeenCalledWith(
-      EXIT_ALIAS,
-      expect.any(String),
+  it("wraps WoodpeckerError as PipelineError", async () => {
+    createPipelineMock.mockRejectedValue(new WoodpeckerError("500", 500));
+    await expect(promote({ json: false, follow: false })).rejects.toThrow(
+      PipelineError,
     );
-    expect(mockWriteAlias).not.toHaveBeenCalled();
   });
 
-  it("exits with EXIT_DEPLOY_NOT_FOUND when specified deploy does not exist", async () => {
-    mockDeployExists.mockResolvedValue(false);
-
-    await promote({ json: false, deployId: "20260412-100000-nonexist" });
-
-    expect(mockExitWithCode).toHaveBeenCalledWith(
-      EXIT_DEPLOY_NOT_FOUND,
-      expect.any(String),
-    );
-    expect(mockWriteAlias).not.toHaveBeenCalled();
-  });
-
-  it("outputs JSON when --json flag is set", async () => {
-    mockReadAlias.mockResolvedValue("20260413-120000-abc1234");
-    mockDeployExists.mockResolvedValue(true);
-    mockWriteAlias.mockResolvedValue(undefined);
-
-    await promote({ json: true });
-
+  it("outputs pipelineNumber, site, productionUrl", async () => {
+    await promote({ json: true, follow: false });
     expect(mockOutputSuccess).toHaveBeenCalledWith(
-      expect.objectContaining({ json: true, command: "promote" }),
+      expect.objectContaining({ command: "promote" }),
       expect.any(String),
-      expect.objectContaining({ deployId: "20260413-120000-abc1234" }),
+      expect.objectContaining({
+        pipelineNumber: 7,
+        site: "my-site",
+        productionUrl: "https://my-site.freecode.camp",
+      }),
     );
   });
 
-  it("follows the pipeline: loadConfig -> resolveCredentials -> createS3Client", async () => {
-    mockReadAlias.mockResolvedValue("20260413-120000-abc1234");
-    mockDeployExists.mockResolvedValue(true);
-    mockWriteAlias.mockResolvedValue(undefined);
-
-    await promote({ json: false });
-
-    expect(mockLoadConfig).toHaveBeenCalled();
-    expect(mockResolveCredentials).toHaveBeenCalled();
-    expect(mockCreateS3Client).toHaveBeenCalled();
+  it("streams logs only when follow=true", async () => {
+    await promote({ json: false, follow: false });
+    expect(mockStreamLogs).not.toHaveBeenCalled();
+    await promote({ json: false, follow: true });
+    expect(mockStreamLogs).toHaveBeenCalled();
   });
 });

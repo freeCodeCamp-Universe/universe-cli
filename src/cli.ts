@@ -24,21 +24,22 @@ export function run(argv = process.argv) {
     const staticCli = cac("universe static");
 
     staticCli
-      .command("deploy", "Deploy static site to S3")
+      .command("deploy", "Trigger a preview deploy via Woodpecker CI")
       .option("--json", "Output as JSON")
-      .option("--force", "Force deploy without git hash")
-      .option("--output-dir <dir>", "Build output directory")
+      .option("--branch <branch>", "Branch to deploy (defaults to current)")
+      .option("--follow", "Stream pipeline logs until completion")
+      .option("--no-follow", "Do not stream logs")
       .action(
         async (flags: {
           json?: boolean;
-          force?: boolean;
-          outputDir?: string;
+          branch?: string;
+          follow?: boolean;
         }) => {
           try {
             await deploy({
               json: flags.json ?? false,
-              force: flags.force ?? false,
-              outputDir: flags.outputDir,
+              branch: flags.branch,
+              follow: flags.follow,
             });
           } catch (err: unknown) {
             handleActionError("deploy", flags.json ?? false, err);
@@ -47,32 +48,40 @@ export function run(argv = process.argv) {
       );
 
     staticCli
-      .command("promote [deploy-id]", "Promote a deploy to production")
+      .command("promote", "Promote the preview deploy to production")
       .option("--json", "Output as JSON")
+      .option("--follow", "Stream pipeline logs until completion")
+      .option("--no-follow", "Do not stream logs")
+      .action(async (flags: { json?: boolean; follow?: boolean }) => {
+        try {
+          await promote({
+            json: flags.json ?? false,
+            follow: flags.follow,
+          });
+        } catch (err: unknown) {
+          handleActionError("promote", flags.json ?? false, err);
+        }
+      });
+
+    staticCli
+      .command("rollback", "Rollback production to a prior deploy")
+      .option("--json", "Output as JSON")
+      .option("--to <deploy-id>", "Deploy ID to roll back to (required)")
+      .option("--follow", "Stream pipeline logs until completion")
+      .option("--no-follow", "Do not stream logs")
       .action(
-        async (deployId: string | undefined, flags: { json?: boolean }) => {
+        async (flags: { json?: boolean; to?: string; follow?: boolean }) => {
           try {
-            await promote({ json: flags.json ?? false, deployId });
+            await rollback({
+              json: flags.json ?? false,
+              to: flags.to,
+              follow: flags.follow,
+            });
           } catch (err: unknown) {
-            handleActionError("promote", flags.json ?? false, err);
+            handleActionError("rollback", flags.json ?? false, err);
           }
         },
       );
-
-    staticCli
-      .command("rollback", "Rollback production to previous deploy")
-      .option("--json", "Output as JSON")
-      .option("--confirm", "Confirm rollback")
-      .action(async (flags: { json?: boolean; confirm?: boolean }) => {
-        try {
-          await rollback({
-            json: flags.json ?? false,
-            confirm: flags.confirm ?? false,
-          });
-        } catch (err: unknown) {
-          handleActionError("rollback", flags.json ?? false, err);
-        }
-      });
 
     staticCli.help();
     staticCli.version(version);

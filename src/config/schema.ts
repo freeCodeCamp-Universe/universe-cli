@@ -1,12 +1,14 @@
 import { z } from "zod";
+import {
+  SITE_NAME_MAX_LENGTH,
+  SITE_NAME_REGEX,
+} from "../validation/site-name.js";
 
 const staticSchema = z
   .object({
     output_dir: z.string().min(1).default("dist"),
-    bucket: z.string().min(1).default("gxy-static-1"),
-    rclone_remote: z.string().min(1).default("gxy-static"),
-    region: z.string().min(1).default("auto"),
   })
+  .strict()
   .prefault({});
 
 const domainSchema = z.object({
@@ -14,14 +16,28 @@ const domainSchema = z.object({
   preview: z.string().min(1),
 });
 
+const woodpeckerSchema = z.object({
+  endpoint: z.string().min(1).url(),
+  repo_id: z.int().positive(),
+});
+
 export const platformSchema = z.object({
   name: z
     .string()
     .min(1)
-    .regex(/^(?!.*--)[a-z0-9]([a-z0-9._-]*[a-z0-9])?$/i),
+    .max(SITE_NAME_MAX_LENGTH)
+    .regex(SITE_NAME_REGEX, {
+      message:
+        "Site name must be lowercase alphanumeric plus hyphen; no leading/trailing hyphen.",
+    })
+    .refine((n) => !n.includes("--"), {
+      message:
+        "Site name must not contain '--' (reserved for preview routing).",
+    }),
   stack: z.literal("static"),
   domain: domainSchema,
   static: staticSchema,
+  woodpecker: woodpeckerSchema,
 });
 
 export type PlatformConfig = z.infer<typeof platformSchema>;
