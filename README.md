@@ -71,6 +71,17 @@ universe static rollback --confirm
 
 All commands support `--json` for CI integration. In JSON mode, `rollback` also requires `--confirm`.
 
+## Configuration (`platform.yaml`)
+
+Every site has a `platform.yaml` at its repo root. Minimal valid file:
+
+```yaml
+site: my-site
+```
+
+Full reference (every field, defaults, validation rules, v0.3 → v0.4
+migration): [`docs/platform-yaml.md`](docs/platform-yaml.md).
+
 ## Credentials
 
 The CLI needs R2 credentials. See the [Staff Guide](docs/STAFF-GUIDE.md#2-credentials) for setup.
