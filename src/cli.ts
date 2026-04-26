@@ -2,6 +2,7 @@ import { cac } from "cac";
 import { deploy } from "./commands/deploy.js";
 import { login } from "./commands/login.js";
 import { logout } from "./commands/logout.js";
+import { ls } from "./commands/ls.js";
 import { promote } from "./commands/promote.js";
 import { rollback } from "./commands/rollback.js";
 import { whoami } from "./commands/whoami.js";
@@ -75,6 +76,21 @@ export function run(argv = process.argv) {
           });
         } catch (err: unknown) {
           handleActionError("rollback", flags.json ?? false, err);
+        }
+      });
+
+    staticCli
+      .command("ls", "List recent deploys for a site")
+      .option("--json", "Output as JSON")
+      .option("--site <site>", "Override site from platform.yaml")
+      .action(async (flags: { json?: boolean; site?: string }) => {
+        try {
+          await ls({
+            json: flags.json ?? false,
+            site: flags.site,
+          });
+        } catch (err: unknown) {
+          handleActionError("ls", flags.json ?? false, err);
         }
       });
 

@@ -270,11 +270,12 @@ describe("universe static namespace", () => {
     vi.restoreAllMocks();
   });
 
-  it("static --help lists subcommands (deploy, promote, rollback)", () => {
+  it("static --help lists subcommands (deploy, promote, rollback, ls)", () => {
     run(["node", "universe", "static", "--help"]);
     expect(output).toContain("deploy");
     expect(output).toContain("promote");
     expect(output).toContain("rollback");
+    expect(output).toContain("ls");
   });
 
   it("static deploy --help shows deploy-specific options", () => {
