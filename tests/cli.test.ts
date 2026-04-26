@@ -77,6 +77,29 @@ describe("top-level CLI", () => {
     expect(stdoutSpy).toBeDefined();
   });
 
+  it("--help lists top-level auth commands (login, logout, whoami)", () => {
+    run(["node", "universe", "--help"]);
+    expect(output).toContain("login");
+    expect(output).toContain("logout");
+    expect(output).toContain("whoami");
+  });
+
+  it("login --help shows --json and --force options", () => {
+    run(["node", "universe", "login", "--help"]);
+    expect(output).toContain("--json");
+    expect(output).toContain("--force");
+  });
+
+  it("logout --help shows --json option", () => {
+    run(["node", "universe", "logout", "--help"]);
+    expect(output).toContain("--json");
+  });
+
+  it("whoami --help shows --json option", () => {
+    run(["node", "universe", "whoami", "--help"]);
+    expect(output).toContain("--json");
+  });
+
   it("--version outputs package version", async () => {
     const pkg = JSON.parse(
       readFileSync(
@@ -98,9 +121,24 @@ vi.mock("../src/commands/promote.js", () => ({
 vi.mock("../src/commands/rollback.js", () => ({
   rollback: vi.fn(),
 }));
+vi.mock("../src/commands/login.js", () => ({
+  login: vi.fn(),
+}));
+vi.mock("../src/commands/logout.js", () => ({
+  logout: vi.fn(),
+}));
+vi.mock("../src/commands/whoami.js", () => ({
+  whoami: vi.fn(),
+}));
 
 import { deploy } from "../src/commands/deploy.js";
+import { login } from "../src/commands/login.js";
+import { logout } from "../src/commands/logout.js";
+import { whoami } from "../src/commands/whoami.js";
 const mockDeploy = vi.mocked(deploy);
+const mockLogin = vi.mocked(login);
+const mockLogout = vi.mocked(logout);
+const mockWhoami = vi.mocked(whoami);
 
 describe("top-level error handling", () => {
   beforeEach(() => {
@@ -156,6 +194,56 @@ describe("top-level error handling", () => {
     expect(mockExitWithCode).toHaveBeenCalledWith(
       EXIT_USAGE,
       "mystery failure",
+    );
+  });
+
+  it("invokes login command when 'universe login' runs", async () => {
+    mockLogin.mockResolvedValue(undefined);
+    run(["node", "universe", "login"]);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(mockLogin).toHaveBeenCalledWith(
+      expect.objectContaining({ json: false }),
+    );
+  });
+
+  it("invokes logout command with --json flag forwarded", async () => {
+    mockLogout.mockResolvedValue(undefined);
+    run(["node", "universe", "logout", "--json"]);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(mockLogout).toHaveBeenCalledWith(
+      expect.objectContaining({ json: true }),
+    );
+  });
+
+  it("invokes whoami command", async () => {
+    mockWhoami.mockResolvedValue(undefined);
+    run(["node", "universe", "whoami"]);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(mockWhoami).toHaveBeenCalledWith(
+      expect.objectContaining({ json: false }),
+    );
+  });
+
+  it("login --force forwards force flag", async () => {
+    mockLogin.mockResolvedValue(undefined);
+    run(["node", "universe", "login", "--force"]);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(mockLogin).toHaveBeenCalledWith(
+      expect.objectContaining({ force: true }),
+    );
+  });
+
+  it("routes login errors through outputError + exit code map", async () => {
+    const { ConfigError } = await import("../src/errors.js");
+    const { EXIT_CONFIG } = await import("../src/output/exit-codes.js");
+    mockLogin.mockRejectedValue(new ConfigError("missing client id"));
+
+    run(["node", "universe", "login"]);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(mockExitWithCode).toHaveBeenCalledWith(
+      EXIT_CONFIG,
+      "missing client id",
     );
   });
 });
