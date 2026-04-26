@@ -46,27 +46,32 @@ export function run(argv = process.argv) {
       );
 
     staticCli
-      .command("promote [deploy-id]", "Promote a deploy to production")
+      .command("promote", "Promote the current preview to production")
       .option("--json", "Output as JSON")
-      .action(
-        async (deployId: string | undefined, flags: { json?: boolean }) => {
-          try {
-            await promote({ json: flags.json ?? false, deployId });
-          } catch (err: unknown) {
-            handleActionError("promote", flags.json ?? false, err);
-          }
-        },
-      );
+      .option(
+        "--from <deployId>",
+        "Promote a specific past deploy id (alias rewrite)",
+      )
+      .action(async (flags: { json?: boolean; from?: string }) => {
+        try {
+          await promote({
+            json: flags.json ?? false,
+            from: flags.from,
+          });
+        } catch (err: unknown) {
+          handleActionError("promote", flags.json ?? false, err);
+        }
+      });
 
     staticCli
-      .command("rollback", "Rollback production to previous deploy")
+      .command("rollback", "Rewrite production alias to a past deploy")
       .option("--json", "Output as JSON")
-      .option("--confirm", "Confirm rollback")
-      .action(async (flags: { json?: boolean; confirm?: boolean }) => {
+      .option("--to <deployId>", "Target deploy id (required)")
+      .action(async (flags: { json?: boolean; to?: string }) => {
         try {
           await rollback({
             json: flags.json ?? false,
-            confirm: flags.confirm ?? false,
+            to: flags.to,
           });
         } catch (err: unknown) {
           handleActionError("rollback", flags.json ?? false, err);

@@ -1,86 +1,155 @@
-import { loadConfig } from "../config/loader.js";
-import { resolveCredentials } from "../credentials/resolver.js";
-import { createS3Client } from "../storage/client.js";
-import { readAlias, writeAlias } from "../storage/aliases.js";
-import { deployExists } from "../storage/deploys.js";
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
+import { log } from "@clack/prompts";
+import { CliError, ConfigError, CredentialError } from "../errors.js";
+import { resolveIdentity as defaultResolveIdentity } from "../lib/identity.js";
 import {
-  type OutputContext,
-  outputSuccess,
-  outputError,
-} from "../output/format.js";
+  parsePlatformYaml,
+  type PlatformYamlV2,
+} from "../lib/platform-yaml.js";
 import {
-  EXIT_ALIAS,
-  EXIT_DEPLOY_NOT_FOUND,
-  exitWithCode,
-} from "../output/exit-codes.js";
+  createProxyClient as defaultCreateProxyClient,
+  ProxyError,
+  type ProxyClient,
+  type ProxyClientConfig,
+} from "../lib/proxy-client.js";
+import { buildEnvelope, buildErrorEnvelope } from "../output/envelope.js";
+import { EXIT_USAGE, exitWithCode } from "../output/exit-codes.js";
 
 export interface PromoteOptions {
   json: boolean;
-  deployId?: string;
+  /** Promote a specific deploy id instead of the current preview alias. */
+  from?: string;
 }
 
-export async function promote(options: PromoteOptions): Promise<void> {
-  const config = loadConfig();
-  const credentials = resolveCredentials({
-    remoteName: config.static.rclone_remote,
-  });
-  const client = createS3Client(credentials);
+export interface PromoteDeps {
+  cwd?: string;
+  env?: NodeJS.ProcessEnv;
+  readPlatformYaml?: (cwd: string) => Promise<string>;
+  resolveIdentity?: typeof defaultResolveIdentity;
+  createProxyClient?: (cfg: ProxyClientConfig) => ProxyClient;
+  logSuccess?: (msg: string) => void;
+  logError?: (msg: string) => void;
+  exit?: (code: number, message?: string) => never;
+}
 
-  const bucket = config.static.bucket;
-  const site = config.name;
-  const ctx: OutputContext = { json: options.json, command: "promote" };
+const DEFAULT_PROXY_URL = "https://uploads.freecode.camp";
 
-  let deployId: string;
+const defaultReadPlatformYaml = async (cwd: string): Promise<string> => {
+  return readFile(resolve(cwd, "platform.yaml"), "utf-8");
+};
 
-  if (options.deployId) {
-    const exists = await deployExists(client, bucket, site, options.deployId);
-    if (!exists) {
-      outputError(
-        ctx,
-        EXIT_DEPLOY_NOT_FOUND,
-        `Deploy ${options.deployId} not found`,
+function emitJson(envelope: object): void {
+  process.stdout.write(JSON.stringify(envelope) + "\n");
+}
+
+async function readAndParseConfig(
+  cwd: string,
+  read: (cwd: string) => Promise<string>,
+): Promise<PlatformYamlV2> {
+  let raw: string;
+  try {
+    raw = await read(cwd);
+  } catch (err) {
+    if (
+      err instanceof Error &&
+      (err as NodeJS.ErrnoException).code === "ENOENT"
+    ) {
+      throw new ConfigError(
+        `platform.yaml not found in ${cwd}. See docs/platform-yaml.md.`,
       );
-      exitWithCode(
-        EXIT_DEPLOY_NOT_FOUND,
-        `Deploy ${options.deployId} not found`,
-      );
-      return;
     }
-    deployId = options.deployId;
-  } else {
-    const preview = await readAlias(client, bucket, site, "preview");
-    if (!preview) {
-      outputError(
-        ctx,
-        EXIT_ALIAS,
-        "No preview alias set — deploy first or specify a deploy ID",
-      );
-      exitWithCode(
-        EXIT_ALIAS,
-        "No preview alias set — deploy first or specify a deploy ID",
-      );
-      return;
-    }
-    deployId = preview;
+    throw err;
   }
+  const r = parsePlatformYaml(raw);
+  if (!r.ok) throw new ConfigError(r.error);
+  return r.value;
+}
 
-  // v1 limitation: concurrent alias writes have last-write-wins behavior.
-  // S3 PutObject is atomic for single writes but concurrent writes have undefined ordering.
-  await writeAlias(client, bucket, site, "production", deployId);
+export async function promote(
+  options: PromoteOptions,
+  deps: PromoteDeps = {},
+): Promise<void> {
+  const cwd = deps.cwd ?? process.cwd();
+  const env = deps.env ?? process.env;
+  const readYaml = deps.readPlatformYaml ?? defaultReadPlatformYaml;
+  const resolveId = deps.resolveIdentity ?? defaultResolveIdentity;
+  const mkClient = deps.createProxyClient ?? defaultCreateProxyClient;
+  const success = deps.logSuccess ?? ((s: string) => log.success(s));
+  const error = deps.logError ?? ((s: string) => log.error(s));
+  const exit = deps.exit ?? exitWithCode;
 
-  const productionDomain = config.domain?.production ?? site;
-  const humanMsg = [
-    `Promoted ${deployId} to production`,
-    ``,
-    `  Site:        ${site}`,
-    `  Deploy:      ${deployId}`,
-    `  Production:  https://${productionDomain}`,
-  ].join("\n");
+  try {
+    const identity = await resolveId({ env });
+    if (!identity) {
+      throw new CredentialError(
+        "No GitHub identity available. Run `universe login`, set $GITHUB_TOKEN, or install the gh CLI.",
+      );
+    }
 
-  outputSuccess(ctx, humanMsg, {
-    deployId,
-    site,
-    alias: "production",
-    productionDomain,
-  });
+    const config = await readAndParseConfig(cwd, readYaml);
+
+    const baseUrl = env["UNIVERSE_PROXY_URL"] ?? DEFAULT_PROXY_URL;
+    const client = mkClient({
+      baseUrl,
+      getAuthToken: () => identity.token,
+    });
+
+    let result: { url: string; deployId: string };
+    if (options.from) {
+      // Per ADR-016: artemis promote endpoint copies preview alias to
+      // production. To promote a *specific* prior deploy id, the alias
+      // must be rewritten directly — the rollback endpoint is the
+      // server-side primitive for that. Same atomic single-PUT.
+      result = await client.siteRollback({
+        site: config.site,
+        to: options.from,
+      });
+    } else {
+      result = await client.sitePromote({ site: config.site });
+    }
+
+    if (options.json) {
+      emitJson(
+        buildEnvelope("promote", true, {
+          deployId: result.deployId,
+          url: result.url,
+          site: config.site,
+          identitySource: identity.source,
+        }),
+      );
+    } else {
+      success(
+        [
+          `Promoted ${result.deployId} to production`,
+          ``,
+          `  Site:        ${config.site}`,
+          `  Deploy:      ${result.deployId}`,
+          `  Production:  ${result.url}`,
+        ].join("\n"),
+      );
+    }
+  } catch (err) {
+    let code: number;
+    let message: string;
+    if (err instanceof ProxyError) {
+      code = err.exitCode;
+      message = `promote failed (${err.code}): ${err.message}`;
+    } else if (err instanceof CliError) {
+      code = err.exitCode;
+      message = err.message;
+    } else if (err instanceof Error) {
+      code = EXIT_USAGE;
+      message = err.message;
+    } else {
+      code = EXIT_USAGE;
+      message = String(err);
+    }
+    if (options.json) {
+      emitJson(buildErrorEnvelope("promote", code, message));
+    } else {
+      error(message);
+    }
+    exit(code, message);
+  }
 }

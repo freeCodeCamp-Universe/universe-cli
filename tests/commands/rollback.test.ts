@@ -1,219 +1,134 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-
-vi.mock("../../src/config/loader.js", () => ({
-  loadConfig: vi.fn(),
-}));
-vi.mock("../../src/credentials/resolver.js", () => ({
-  resolveCredentials: vi.fn(),
-}));
-vi.mock("../../src/storage/client.js", () => ({
-  createS3Client: vi.fn(),
-}));
-vi.mock("../../src/storage/aliases.js", () => ({
-  readAlias: vi.fn(),
-  writeAlias: vi.fn(),
-}));
-vi.mock("../../src/storage/deploys.js", () => ({
-  listDeploys: vi.fn(),
-}));
-vi.mock("../../src/output/format.js", () => ({
-  outputSuccess: vi.fn(),
-  outputError: vi.fn(),
-}));
-vi.mock("../../src/output/exit-codes.js", async () => {
-  const actual = await vi.importActual<
-    typeof import("../../src/output/exit-codes.js")
-  >("../../src/output/exit-codes.js");
-  return {
-    ...actual,
-    exitWithCode: vi.fn(),
-  };
-});
-vi.mock("@clack/prompts", () => ({
-  confirm: vi.fn(),
-  log: { success: vi.fn(), error: vi.fn() },
-}));
-
-import { loadConfig } from "../../src/config/loader.js";
-import { resolveCredentials } from "../../src/credentials/resolver.js";
-import { createS3Client } from "../../src/storage/client.js";
-import { readAlias, writeAlias } from "../../src/storage/aliases.js";
-import { listDeploys } from "../../src/storage/deploys.js";
-import { outputSuccess } from "../../src/output/format.js";
-import {
-  exitWithCode,
-  EXIT_ALIAS,
-  EXIT_CONFIRM,
-} from "../../src/output/exit-codes.js";
-import { confirm } from "@clack/prompts";
+import { describe, expect, it, vi } from "vitest";
 import { rollback } from "../../src/commands/rollback.js";
+import { ProxyError } from "../../src/lib/proxy-client.js";
 
-const mockLoadConfig = vi.mocked(loadConfig);
-const mockResolveCredentials = vi.mocked(resolveCredentials);
-const mockCreateS3Client = vi.mocked(createS3Client);
-const mockReadAlias = vi.mocked(readAlias);
-const mockWriteAlias = vi.mocked(writeAlias);
-const mockListDeploys = vi.mocked(listDeploys);
-const mockOutputSuccess = vi.mocked(outputSuccess);
-const mockExitWithCode = vi.mocked(exitWithCode);
-const mockConfirm = vi.mocked(confirm);
+const VALID_YAML = "site: my-site\n";
 
-beforeEach(() => {
-  vi.clearAllMocks();
-  mockLoadConfig.mockReturnValue({
-    name: "my-site",
-    stack: "static",
-    domain: { production: "example.com", preview: "preview.example.com" },
-    static: {
-      output_dir: "dist",
-      bucket: "test-bucket",
-      rclone_remote: "r2",
-      region: "auto",
-    },
+function mkProxy(): {
+  whoami: ReturnType<typeof vi.fn>;
+  deployInit: ReturnType<typeof vi.fn>;
+  deployUpload: ReturnType<typeof vi.fn>;
+  deployFinalize: ReturnType<typeof vi.fn>;
+  siteDeploys: ReturnType<typeof vi.fn>;
+  sitePromote: ReturnType<typeof vi.fn>;
+  siteRollback: ReturnType<typeof vi.fn>;
+} {
+  return {
+    whoami: vi.fn(),
+    deployInit: vi.fn(),
+    deployUpload: vi.fn(),
+    deployFinalize: vi.fn(),
+    siteDeploys: vi.fn(),
+    sitePromote: vi.fn(),
+    siteRollback: vi.fn().mockResolvedValue({
+      url: "https://my-site.freecode.camp",
+      deployId: "older",
+    }),
+  };
+}
+
+interface FakeDeps {
+  cwd: string;
+  env: NodeJS.ProcessEnv;
+  readPlatformYaml: ReturnType<typeof vi.fn>;
+  resolveIdentity: ReturnType<typeof vi.fn>;
+  createProxyClient: ReturnType<typeof vi.fn>;
+  logSuccess: ReturnType<typeof vi.fn>;
+  logError: ReturnType<typeof vi.fn>;
+  exit: ReturnType<typeof vi.fn>;
+}
+
+function mkDeps(overrides: Partial<FakeDeps> = {}): FakeDeps {
+  return {
+    cwd: "/proj",
+    env: {},
+    readPlatformYaml: vi.fn().mockResolvedValue(VALID_YAML),
+    resolveIdentity: vi.fn().mockResolvedValue({
+      token: "ghp_x",
+      source: "env_GITHUB_TOKEN",
+    }),
+    createProxyClient: vi.fn().mockReturnValue(mkProxy()),
+    logSuccess: vi.fn(),
+    logError: vi.fn(),
+    exit: vi.fn().mockImplementation((_code: number) => {
+      throw new Error("__exit__");
+    }),
+    ...overrides,
+  };
+}
+
+describe("rollback command", () => {
+  it("calls siteRollback with site + to", async () => {
+    const deps = mkDeps();
+    await rollback({ json: false, to: "older" }, deps);
+    const proxy = deps.createProxyClient.mock.results[0]?.value as ReturnType<
+      typeof mkProxy
+    >;
+    expect(proxy.siteRollback).toHaveBeenCalledWith({
+      site: "my-site",
+      to: "older",
+    });
   });
-  mockResolveCredentials.mockReturnValue({
-    accessKeyId: "key",
-    secretAccessKey: "secret",
-    endpoint: "https://example.com",
+
+  it("emits success envelope in JSON mode", async () => {
+    const stdout: string[] = [];
+    const writeSpy = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation((chunk: unknown) => {
+        stdout.push(String(chunk));
+        return true;
+      });
+
+    const deps = mkDeps();
+    await rollback({ json: true, to: "older" }, deps);
+    writeSpy.mockRestore();
+
+    const env = JSON.parse(stdout.join("").trim());
+    expect(env.command).toBe("rollback");
+    expect(env.success).toBe(true);
+    expect(env.deployId).toBe("older");
+    expect(env.url).toBe("https://my-site.freecode.camp");
   });
-  mockCreateS3Client.mockReturnValue({} as ReturnType<typeof createS3Client>);
-});
 
-describe("rollback", () => {
-  it("rolls back production to previous deploy with --confirm flag", async () => {
-    mockReadAlias.mockResolvedValue("20260413-120000-ccc3333");
-    mockListDeploys.mockResolvedValue([
-      "20260413-120000-ccc3333",
-      "20260412-110000-bbb2222",
-      "20260411-100000-aaa1111",
-    ]);
-    mockWriteAlias.mockResolvedValue(undefined);
+  it("errors with EXIT_USAGE when --to is missing", async () => {
+    const deps = mkDeps();
+    await expect(
+      rollback({ json: false, to: undefined }, deps),
+    ).rejects.toThrow("__exit__");
+    expect(deps.exit).toHaveBeenCalledWith(10, expect.stringMatching(/--to/i));
+  });
 
-    await rollback({ json: false, confirm: true });
-
-    expect(mockReadAlias).toHaveBeenCalledWith(
-      expect.anything(),
-      "test-bucket",
-      "my-site",
-      "production",
+  it("errors with EXIT_CREDENTIALS when identity chain returns null", async () => {
+    const deps = mkDeps({
+      resolveIdentity: vi.fn().mockResolvedValue(null),
+    });
+    await expect(rollback({ json: false, to: "x" }, deps)).rejects.toThrow(
+      "__exit__",
     );
-    expect(mockWriteAlias).toHaveBeenCalledWith(
-      expect.anything(),
-      "test-bucket",
-      "my-site",
-      "production",
-      "20260412-110000-bbb2222",
-    );
-    expect(mockOutputSuccess).toHaveBeenCalled();
-  });
-
-  it("prompts for confirmation in human mode when --confirm not provided", async () => {
-    mockReadAlias.mockResolvedValue("20260413-120000-ccc3333");
-    mockListDeploys.mockResolvedValue([
-      "20260413-120000-ccc3333",
-      "20260412-110000-bbb2222",
-    ]);
-    mockConfirm.mockResolvedValue(true);
-    mockWriteAlias.mockResolvedValue(undefined);
-
-    await rollback({ json: false, confirm: false });
-
-    expect(mockConfirm).toHaveBeenCalled();
-    expect(mockWriteAlias).toHaveBeenCalledWith(
-      expect.anything(),
-      "test-bucket",
-      "my-site",
-      "production",
-      "20260412-110000-bbb2222",
-    );
-  });
-
-  it("aborts when user declines confirmation prompt", async () => {
-    mockReadAlias.mockResolvedValue("20260413-120000-ccc3333");
-    mockListDeploys.mockResolvedValue([
-      "20260413-120000-ccc3333",
-      "20260412-110000-bbb2222",
-    ]);
-    mockConfirm.mockResolvedValue(false);
-
-    await rollback({ json: false, confirm: false });
-
-    expect(mockWriteAlias).not.toHaveBeenCalled();
-  });
-
-  it("exits with EXIT_ALIAS when production alias not set", async () => {
-    mockReadAlias.mockResolvedValue(null);
-
-    await rollback({ json: false, confirm: true });
-
-    expect(mockExitWithCode).toHaveBeenCalledWith(
-      EXIT_ALIAS,
-      expect.any(String),
-    );
-    expect(mockWriteAlias).not.toHaveBeenCalled();
-  });
-
-  it("exits with EXIT_ALIAS when only one deploy exists", async () => {
-    mockReadAlias.mockResolvedValue("20260413-120000-ccc3333");
-    mockListDeploys.mockResolvedValue(["20260413-120000-ccc3333"]);
-
-    await rollback({ json: false, confirm: true });
-
-    expect(mockExitWithCode).toHaveBeenCalledWith(
-      EXIT_ALIAS,
-      expect.stringContaining("no previous deploy"),
-    );
-    expect(mockWriteAlias).not.toHaveBeenCalled();
-  });
-
-  it("exits with EXIT_CONFIRM in json mode when --confirm not provided", async () => {
-    mockReadAlias.mockResolvedValue("20260413-120000-ccc3333");
-    mockListDeploys.mockResolvedValue([
-      "20260413-120000-ccc3333",
-      "20260412-110000-bbb2222",
-    ]);
-
-    await rollback({ json: true, confirm: false });
-
-    expect(mockExitWithCode).toHaveBeenCalledWith(
-      EXIT_CONFIRM,
-      expect.any(String),
-    );
-    expect(mockWriteAlias).not.toHaveBeenCalled();
-  });
-
-  it("outputs JSON when --json flag is set", async () => {
-    mockReadAlias.mockResolvedValue("20260413-120000-ccc3333");
-    mockListDeploys.mockResolvedValue([
-      "20260413-120000-ccc3333",
-      "20260412-110000-bbb2222",
-    ]);
-    mockWriteAlias.mockResolvedValue(undefined);
-
-    await rollback({ json: true, confirm: true });
-
-    expect(mockOutputSuccess).toHaveBeenCalledWith(
-      expect.objectContaining({ json: true, command: "rollback" }),
-      expect.any(String),
-      expect.objectContaining({
-        previousDeployId: "20260413-120000-ccc3333",
-        rolledBackTo: "20260412-110000-bbb2222",
-      }),
+    expect(deps.exit).toHaveBeenCalledWith(
+      12,
+      expect.stringMatching(/login|identity/i),
     );
   });
 
-  it("follows the pipeline: loadConfig -> resolveCredentials -> createS3Client", async () => {
-    mockReadAlias.mockResolvedValue("20260413-120000-ccc3333");
-    mockListDeploys.mockResolvedValue([
-      "20260413-120000-ccc3333",
-      "20260412-110000-bbb2222",
-    ]);
-    mockWriteAlias.mockResolvedValue(undefined);
-
-    await rollback({ json: false, confirm: true });
-
-    expect(mockLoadConfig).toHaveBeenCalled();
-    expect(mockResolveCredentials).toHaveBeenCalled();
-    expect(mockCreateS3Client).toHaveBeenCalled();
+  it("propagates 422 deploy_missing as EXIT_STORAGE", async () => {
+    const proxy = mkProxy();
+    proxy.siteRollback.mockRejectedValue(
+      new ProxyError(
+        422,
+        "deploy_missing",
+        "target deploy no longer exists in r2",
+      ),
+    );
+    const deps = mkDeps({
+      createProxyClient: vi.fn().mockReturnValue(proxy),
+    });
+    await expect(
+      rollback({ json: false, to: "ancient" }, deps),
+    ).rejects.toThrow("__exit__");
+    expect(deps.exit).toHaveBeenCalledWith(
+      13,
+      expect.stringContaining("no longer exists"),
+    );
   });
 });

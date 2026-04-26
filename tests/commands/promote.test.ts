@@ -1,171 +1,160 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-
-vi.mock("../../src/config/loader.js", () => ({
-  loadConfig: vi.fn(),
-}));
-vi.mock("../../src/credentials/resolver.js", () => ({
-  resolveCredentials: vi.fn(),
-}));
-vi.mock("../../src/storage/client.js", () => ({
-  createS3Client: vi.fn(),
-}));
-vi.mock("../../src/storage/aliases.js", () => ({
-  readAlias: vi.fn(),
-  writeAlias: vi.fn(),
-}));
-vi.mock("../../src/storage/deploys.js", () => ({
-  deployExists: vi.fn(),
-}));
-vi.mock("../../src/output/format.js", () => ({
-  outputSuccess: vi.fn(),
-  outputError: vi.fn(),
-}));
-vi.mock("../../src/output/exit-codes.js", async () => {
-  const actual = await vi.importActual<
-    typeof import("../../src/output/exit-codes.js")
-  >("../../src/output/exit-codes.js");
-  return {
-    ...actual,
-    exitWithCode: vi.fn(),
-  };
-});
-
-import { loadConfig } from "../../src/config/loader.js";
-import { resolveCredentials } from "../../src/credentials/resolver.js";
-import { createS3Client } from "../../src/storage/client.js";
-import { readAlias, writeAlias } from "../../src/storage/aliases.js";
-import { deployExists } from "../../src/storage/deploys.js";
-import { outputSuccess } from "../../src/output/format.js";
-import {
-  exitWithCode,
-  EXIT_ALIAS,
-  EXIT_DEPLOY_NOT_FOUND,
-} from "../../src/output/exit-codes.js";
+import { describe, expect, it, vi } from "vitest";
 import { promote } from "../../src/commands/promote.js";
+import { ProxyError } from "../../src/lib/proxy-client.js";
 
-const mockLoadConfig = vi.mocked(loadConfig);
-const mockResolveCredentials = vi.mocked(resolveCredentials);
-const mockCreateS3Client = vi.mocked(createS3Client);
-const mockReadAlias = vi.mocked(readAlias);
-const mockWriteAlias = vi.mocked(writeAlias);
-const mockDeployExists = vi.mocked(deployExists);
-const mockOutputSuccess = vi.mocked(outputSuccess);
-const mockExitWithCode = vi.mocked(exitWithCode);
+const VALID_YAML = "site: my-site\n";
 
-beforeEach(() => {
-  vi.clearAllMocks();
-  mockLoadConfig.mockReturnValue({
-    name: "my-site",
-    stack: "static",
-    domain: { production: "example.com", preview: "preview.example.com" },
-    static: {
-      output_dir: "dist",
-      bucket: "test-bucket",
-      rclone_remote: "r2",
-      region: "auto",
-    },
-  });
-  mockResolveCredentials.mockReturnValue({
-    accessKeyId: "key",
-    secretAccessKey: "secret",
-    endpoint: "https://example.com",
-  });
-  mockCreateS3Client.mockReturnValue({} as ReturnType<typeof createS3Client>);
-});
+function mkProxy(): {
+  whoami: ReturnType<typeof vi.fn>;
+  deployInit: ReturnType<typeof vi.fn>;
+  deployUpload: ReturnType<typeof vi.fn>;
+  deployFinalize: ReturnType<typeof vi.fn>;
+  siteDeploys: ReturnType<typeof vi.fn>;
+  sitePromote: ReturnType<typeof vi.fn>;
+  siteRollback: ReturnType<typeof vi.fn>;
+} {
+  return {
+    whoami: vi.fn(),
+    deployInit: vi.fn(),
+    deployUpload: vi.fn(),
+    deployFinalize: vi.fn(),
+    siteDeploys: vi.fn(),
+    sitePromote: vi.fn().mockResolvedValue({
+      url: "https://my-site.freecode.camp",
+      deployId: "20260427-abc",
+    }),
+    siteRollback: vi.fn().mockResolvedValue({
+      url: "https://my-site.freecode.camp",
+      deployId: "older-deploy",
+    }),
+  };
+}
 
-describe("promote", () => {
-  it("promotes preview alias to production when no deploy-id arg", async () => {
-    mockReadAlias.mockResolvedValue("20260413-120000-abc1234");
-    mockDeployExists.mockResolvedValue(true);
-    mockWriteAlias.mockResolvedValue(undefined);
+interface FakeDeps {
+  cwd: string;
+  env: NodeJS.ProcessEnv;
+  readPlatformYaml: ReturnType<typeof vi.fn>;
+  resolveIdentity: ReturnType<typeof vi.fn>;
+  createProxyClient: ReturnType<typeof vi.fn>;
+  logSuccess: ReturnType<typeof vi.fn>;
+  logError: ReturnType<typeof vi.fn>;
+  exit: ReturnType<typeof vi.fn>;
+}
 
-    await promote({ json: false });
+function mkDeps(overrides: Partial<FakeDeps> = {}): FakeDeps {
+  return {
+    cwd: "/proj",
+    env: {},
+    readPlatformYaml: vi.fn().mockResolvedValue(VALID_YAML),
+    resolveIdentity: vi.fn().mockResolvedValue({
+      token: "ghp_x",
+      source: "env_GITHUB_TOKEN",
+    }),
+    createProxyClient: vi.fn().mockReturnValue(mkProxy()),
+    logSuccess: vi.fn(),
+    logError: vi.fn(),
+    exit: vi.fn().mockImplementation((_code: number) => {
+      throw new Error("__exit__");
+    }),
+    ...overrides,
+  };
+}
 
-    expect(mockReadAlias).toHaveBeenCalledWith(
-      expect.anything(),
-      "test-bucket",
-      "my-site",
-      "preview",
-    );
-    expect(mockWriteAlias).toHaveBeenCalledWith(
-      expect.anything(),
-      "test-bucket",
-      "my-site",
-      "production",
-      "20260413-120000-abc1234",
-    );
-    expect(mockOutputSuccess).toHaveBeenCalled();
-  });
-
-  it("promotes a specific deploy-id when provided", async () => {
-    mockDeployExists.mockResolvedValue(true);
-    mockWriteAlias.mockResolvedValue(undefined);
-
-    await promote({ json: false, deployId: "20260412-100000-def5678" });
-
-    expect(mockReadAlias).not.toHaveBeenCalled();
-    expect(mockDeployExists).toHaveBeenCalledWith(
-      expect.anything(),
-      "test-bucket",
-      "my-site",
-      "20260412-100000-def5678",
-    );
-    expect(mockWriteAlias).toHaveBeenCalledWith(
-      expect.anything(),
-      "test-bucket",
-      "my-site",
-      "production",
-      "20260412-100000-def5678",
-    );
+describe("promote command", () => {
+  it("calls sitePromote with site from platform.yaml", async () => {
+    const deps = mkDeps();
+    await promote({ json: false }, deps);
+    const proxy = deps.createProxyClient.mock.results[0]?.value as ReturnType<
+      typeof mkProxy
+    >;
+    expect(proxy.sitePromote).toHaveBeenCalledWith({ site: "my-site" });
+    expect(proxy.siteRollback).not.toHaveBeenCalled();
   });
 
-  it("exits with EXIT_ALIAS when preview alias not set and no deploy-id", async () => {
-    mockReadAlias.mockResolvedValue(null);
+  it("emits success envelope in JSON mode", async () => {
+    const stdout: string[] = [];
+    const writeSpy = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation((chunk: unknown) => {
+        stdout.push(String(chunk));
+        return true;
+      });
 
-    await promote({ json: false });
+    const deps = mkDeps();
+    await promote({ json: true }, deps);
+    writeSpy.mockRestore();
 
-    expect(mockExitWithCode).toHaveBeenCalledWith(
-      EXIT_ALIAS,
-      expect.any(String),
-    );
-    expect(mockWriteAlias).not.toHaveBeenCalled();
+    const env = JSON.parse(stdout.join("").trim());
+    expect(env.command).toBe("promote");
+    expect(env.success).toBe(true);
+    expect(env.deployId).toBe("20260427-abc");
+    expect(env.url).toBe("https://my-site.freecode.camp");
   });
 
-  it("exits with EXIT_DEPLOY_NOT_FOUND when specified deploy does not exist", async () => {
-    mockDeployExists.mockResolvedValue(false);
-
-    await promote({ json: false, deployId: "20260412-100000-nonexist" });
-
-    expect(mockExitWithCode).toHaveBeenCalledWith(
-      EXIT_DEPLOY_NOT_FOUND,
-      expect.any(String),
-    );
-    expect(mockWriteAlias).not.toHaveBeenCalled();
+  it("--from flag routes through siteRollback (alias rewrite)", async () => {
+    const deps = mkDeps();
+    await promote({ json: false, from: "older-deploy" }, deps);
+    const proxy = deps.createProxyClient.mock.results[0]?.value as ReturnType<
+      typeof mkProxy
+    >;
+    expect(proxy.siteRollback).toHaveBeenCalledWith({
+      site: "my-site",
+      to: "older-deploy",
+    });
+    expect(proxy.sitePromote).not.toHaveBeenCalled();
   });
 
-  it("outputs JSON when --json flag is set", async () => {
-    mockReadAlias.mockResolvedValue("20260413-120000-abc1234");
-    mockDeployExists.mockResolvedValue(true);
-    mockWriteAlias.mockResolvedValue(undefined);
-
-    await promote({ json: true });
-
-    expect(mockOutputSuccess).toHaveBeenCalledWith(
-      expect.objectContaining({ json: true, command: "promote" }),
-      expect.any(String),
-      expect.objectContaining({ deployId: "20260413-120000-abc1234" }),
+  it("errors with EXIT_CREDENTIALS when identity chain returns null", async () => {
+    const deps = mkDeps({
+      resolveIdentity: vi.fn().mockResolvedValue(null),
+    });
+    await expect(promote({ json: false }, deps)).rejects.toThrow("__exit__");
+    expect(deps.exit).toHaveBeenCalledWith(
+      12,
+      expect.stringMatching(/login|identity/i),
     );
   });
 
-  it("follows the pipeline: loadConfig -> resolveCredentials -> createS3Client", async () => {
-    mockReadAlias.mockResolvedValue("20260413-120000-abc1234");
-    mockDeployExists.mockResolvedValue(true);
-    mockWriteAlias.mockResolvedValue(undefined);
+  it("errors with EXIT_CONFIG when platform.yaml missing", async () => {
+    const err = new Error("ENOENT") as NodeJS.ErrnoException;
+    err.code = "ENOENT";
+    const deps = mkDeps({
+      readPlatformYaml: vi.fn().mockRejectedValue(err),
+    });
+    await expect(promote({ json: false }, deps)).rejects.toThrow("__exit__");
+    expect(deps.exit).toHaveBeenCalledWith(
+      11,
+      expect.stringMatching(/platform\.yaml/i),
+    );
+  });
 
-    await promote({ json: false });
+  it("propagates 422 no_preview as EXIT_STORAGE", async () => {
+    const proxy = mkProxy();
+    proxy.sitePromote.mockRejectedValue(
+      new ProxyError(422, "no_preview", "no preview alias to promote"),
+    );
+    const deps = mkDeps({
+      createProxyClient: vi.fn().mockReturnValue(proxy),
+    });
+    await expect(promote({ json: false }, deps)).rejects.toThrow("__exit__");
+    expect(deps.exit).toHaveBeenCalledWith(
+      13,
+      expect.stringContaining("no preview alias"),
+    );
+  });
 
-    expect(mockLoadConfig).toHaveBeenCalled();
-    expect(mockResolveCredentials).toHaveBeenCalled();
-    expect(mockCreateS3Client).toHaveBeenCalled();
+  it("propagates 403 site_unauthorized as EXIT_CREDENTIALS", async () => {
+    const proxy = mkProxy();
+    proxy.sitePromote.mockRejectedValue(
+      new ProxyError(403, "user_unauthorized", "no team"),
+    );
+    const deps = mkDeps({
+      createProxyClient: vi.fn().mockReturnValue(proxy),
+    });
+    await expect(promote({ json: false }, deps)).rejects.toThrow("__exit__");
+    expect(deps.exit).toHaveBeenCalledWith(
+      12,
+      expect.stringContaining("no team"),
+    );
   });
 });
