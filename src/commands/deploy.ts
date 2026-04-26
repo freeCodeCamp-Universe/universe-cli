@@ -1,173 +1,286 @@
-import { StorageError } from "../errors.js";
-import { loadConfig } from "../config/loader.js";
-import { resolveCredentials } from "../credentials/resolver.js";
-import { createS3Client } from "../storage/client.js";
-import { writeAlias } from "../storage/aliases.js";
-import { listObjects } from "../storage/operations.js";
-import { generateDeployId } from "../deploy/id.js";
-import { getGitState } from "../deploy/git.js";
-import { validateOutputDir } from "../deploy/preflight.js";
-import { uploadDirectory } from "../deploy/upload.js";
-import { writeDeployMetadata } from "../deploy/metadata.js";
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
+import { log } from "@clack/prompts";
 import {
-  type OutputContext,
-  outputSuccess,
-  outputError,
-} from "../output/format.js";
+  CliError,
+  ConfigError,
+  CredentialError,
+  GitError,
+  StorageError,
+} from "../errors.js";
 import {
-  EXIT_GIT,
-  EXIT_OUTPUT_DIR,
+  getGitState as defaultGetGitState,
+  type GitState,
+} from "../deploy/git.js";
+import { walkFiles as defaultWalkFiles } from "../deploy/walk.js";
+import { runBuild as defaultRunBuild } from "../lib/build.js";
+import { resolveIdentity as defaultResolveIdentity } from "../lib/identity.js";
+import { createIgnoreFilter } from "../lib/ignore.js";
+import {
+  parsePlatformYaml,
+  type PlatformYamlV2,
+} from "../lib/platform-yaml.js";
+import {
+  createProxyClient as defaultCreateProxyClient,
+  ProxyError,
+  type ProxyClient,
+  type ProxyClientConfig,
+} from "../lib/proxy-client.js";
+import { uploadFiles as defaultUploadFiles } from "../lib/upload.js";
+import { buildEnvelope, buildErrorEnvelope } from "../output/envelope.js";
+import {
   EXIT_PARTIAL,
+  EXIT_USAGE,
   exitWithCode,
 } from "../output/exit-codes.js";
 
-const MAX_COLLISION_RETRIES = 3;
-const COLLISION_DELAY_MS = 1000;
-
 export interface DeployOptions {
   json: boolean;
-  force?: boolean;
-  outputDir?: string;
+  promote?: boolean;
+  /** Override `build.output` from platform.yaml (matches `--dir` flag). */
+  dir?: string;
 }
 
-async function resolveDeployId(
-  client: ReturnType<typeof createS3Client>,
-  bucket: string,
-  site: string,
-  gitHash: string | undefined,
-  force: boolean,
-): Promise<string> {
-  let lastDeployId = "";
-  for (let attempt = 0; attempt < MAX_COLLISION_RETRIES; attempt++) {
-    const deployId = generateDeployId(gitHash, force);
-    lastDeployId = deployId;
-    const prefix = `${site}/deploys/${deployId}/`;
-    const existing = await listObjects(client, { bucket, prefix });
-
-    if (existing.length === 0) {
-      return deployId;
-    }
-
-    if (attempt < MAX_COLLISION_RETRIES - 1) {
-      await new Promise((resolve) => setTimeout(resolve, COLLISION_DELAY_MS));
-    }
-  }
-
-  throw new StorageError(
-    `Deploy ID collision could not be resolved after ${MAX_COLLISION_RETRIES} attempts (last attempted: ${lastDeployId}). Commit a new change and retry, or wait for the timestamp to advance.`,
-  );
+export interface DeployDeps {
+  cwd?: string;
+  env?: NodeJS.ProcessEnv;
+  readPlatformYaml?: (cwd: string) => Promise<string>;
+  resolveIdentity?: typeof defaultResolveIdentity;
+  createProxyClient?: (cfg: ProxyClientConfig) => ProxyClient;
+  getGitState?: () => GitState;
+  runBuild?: typeof defaultRunBuild;
+  walkFiles?: typeof defaultWalkFiles;
+  uploadFiles?: typeof defaultUploadFiles;
+  logSuccess?: (msg: string) => void;
+  logInfo?: (msg: string) => void;
+  logWarn?: (msg: string) => void;
+  logError?: (msg: string) => void;
+  exit?: (code: number, message?: string) => never;
 }
 
-export async function deploy(options: DeployOptions): Promise<void> {
-  const config = loadConfig({
-    flags: options.outputDir ? { outputDir: options.outputDir } : undefined,
-  });
-  const credentials = resolveCredentials({
-    remoteName: config.static.rclone_remote,
-  });
-  const client = createS3Client(credentials);
+const DEFAULT_PROXY_URL = "https://uploads.freecode.camp";
+const DEFAULT_OUTPUT_DIR = "dist";
 
-  const bucket = config.static.bucket;
-  const site = config.name;
-  const ctx: OutputContext = { json: options.json, command: "deploy" };
+const defaultReadPlatformYaml = async (cwd: string): Promise<string> => {
+  return readFile(resolve(cwd, "platform.yaml"), "utf-8");
+};
 
-  const git = getGitState();
+function emitJson(envelope: object): void {
+  process.stdout.write(JSON.stringify(envelope) + "\n");
+}
 
-  if (git.hash === null && !options.force) {
-    outputError(
-      ctx,
-      EXIT_GIT,
-      "Git hash not available — use --force to deploy without git info",
-    );
-    exitWithCode(
-      EXIT_GIT,
-      "Git hash not available — use --force to deploy without git info",
-    );
-    return;
+async function readAndParseConfig(
+  cwd: string,
+  read: (cwd: string) => Promise<string>,
+): Promise<PlatformYamlV2> {
+  let raw: string;
+  try {
+    raw = await read(cwd);
+  } catch (err) {
+    if (
+      err instanceof Error &&
+      (err as NodeJS.ErrnoException).code === "ENOENT"
+    ) {
+      throw new ConfigError(
+        `platform.yaml not found in ${cwd}. See docs/platform-yaml.md.`,
+      );
+    }
+    throw err;
   }
+  const r = parsePlatformYaml(raw);
+  if (!r.ok) throw new ConfigError(r.error);
+  return r.value;
+}
 
-  if (git.dirty) {
-    console.warn(
-      "Warning: git working tree is dirty — uncommitted changes will not be reflected in the deploy",
+function syntheticSha(): string {
+  return `nogit-${Date.now().toString(36)}`;
+}
+
+/**
+ * Re-throws a proxy error with a prefixed message but preserves the
+ * original status + code so the outer catch maps to the correct exit
+ * code (401/403 → EXIT_CREDENTIALS, 422/5xx → EXIT_STORAGE).
+ */
+function rethrowProxy(prefix: string, err: unknown): never {
+  if (err instanceof ProxyError) {
+    throw new ProxyError(
+      err.status,
+      err.code,
+      `${prefix} (${err.code}): ${err.message}`,
     );
   }
+  if (err instanceof Error) throw new StorageError(`${prefix}: ${err.message}`);
+  throw new StorageError(`${prefix}: ${String(err)}`);
+}
 
-  const preflight = validateOutputDir(config.static.output_dir);
-  if (!preflight.valid) {
-    outputError(
-      ctx,
-      EXIT_OUTPUT_DIR,
-      `Output directory invalid: ${preflight.error}`,
-    );
-    exitWithCode(
-      EXIT_OUTPUT_DIR,
-      `Output directory invalid: ${preflight.error}`,
-    );
-    return;
+export async function deploy(
+  options: DeployOptions,
+  deps: DeployDeps = {},
+): Promise<void> {
+  const cwd = deps.cwd ?? process.cwd();
+  const env = deps.env ?? process.env;
+  const readYaml = deps.readPlatformYaml ?? defaultReadPlatformYaml;
+  const resolveId = deps.resolveIdentity ?? defaultResolveIdentity;
+  const mkClient = deps.createProxyClient ?? defaultCreateProxyClient;
+  const gitState = deps.getGitState ?? defaultGetGitState;
+  const build = deps.runBuild ?? defaultRunBuild;
+  const walk = deps.walkFiles ?? defaultWalkFiles;
+  const upload = deps.uploadFiles ?? defaultUploadFiles;
+  const success = deps.logSuccess ?? ((s: string) => log.success(s));
+  const info = deps.logInfo ?? ((s: string) => log.info(s));
+  const warn = deps.logWarn ?? ((s: string) => log.warn(s));
+  const error = deps.logError ?? ((s: string) => log.error(s));
+  const exit = deps.exit ?? exitWithCode;
+
+  try {
+    // 1. Identity.
+    const identity = await resolveId({ env });
+    if (!identity) {
+      throw new CredentialError(
+        "No GitHub identity available. Run `universe login`, set $GITHUB_TOKEN, or install the gh CLI.",
+      );
+    }
+
+    // 2. Config.
+    const config = await readAndParseConfig(cwd, readYaml);
+
+    // 3. Git state (informational).
+    const git = gitState();
+    if (git.dirty) {
+      warn(
+        "git working tree is dirty — uncommitted changes will not be reflected.",
+      );
+    }
+    const sha = git.hash ?? syntheticSha();
+
+    // 4. Build.
+    const outputDir = options.dir ?? config.build?.output ?? DEFAULT_OUTPUT_DIR;
+    const buildResult = await build({
+      command: config.build?.command,
+      cwd,
+      outputDir,
+    });
+    if (buildResult.skipped) {
+      info("build.command not set — using pre-built output.");
+    }
+    const resolvedOutputDir = buildResult.outputDir;
+
+    // 5. Walk + ignore.
+    const walked = walk(resolvedOutputDir);
+    const ignore = createIgnoreFilter(config.deploy.ignore);
+    const filtered = walked.filter((f) => !ignore(f.relPath));
+    if (filtered.length === 0) {
+      throw new GitError(`No files to deploy under ${resolvedOutputDir}.`);
+    }
+    const fileList = filtered.map((f) => f.relPath);
+
+    // 6. Proxy client.
+    const baseUrl = env["UNIVERSE_PROXY_URL"] ?? DEFAULT_PROXY_URL;
+    const client = mkClient({
+      baseUrl,
+      getAuthToken: () => identity.token,
+    });
+
+    // 7. Init.
+    let initResult;
+    try {
+      initResult = await client.deployInit({
+        site: config.site,
+        sha,
+        files: fileList,
+      });
+    } catch (err) {
+      rethrowProxy("deploy init failed", err);
+    }
+
+    // 8. Upload.
+    const uploadResult = await upload({
+      client,
+      deployId: initResult.deployId,
+      jwt: initResult.jwt,
+      files: filtered,
+    });
+    if (uploadResult.errors.length > 0) {
+      const message = `Upload partially failed: ${uploadResult.errors.length} file(s) failed:\n  - ${uploadResult.errors.join("\n  - ")}`;
+      // EXIT_PARTIAL is dedicated; throw a CliError that maps to it.
+      throw new PartialUploadError(message);
+    }
+
+    // 9. Finalize.
+    const mode: "preview" | "production" = options.promote
+      ? "production"
+      : "preview";
+    let finalizeResult;
+    try {
+      finalizeResult = await client.deployFinalize({
+        deployId: initResult.deployId,
+        jwt: initResult.jwt,
+        mode,
+        files: fileList,
+      });
+    } catch (err) {
+      rethrowProxy("deploy finalize failed", err);
+    }
+
+    // 10. Output.
+    if (options.json) {
+      emitJson(
+        buildEnvelope("deploy", true, {
+          deployId: finalizeResult.deployId,
+          url: finalizeResult.url,
+          mode: finalizeResult.mode,
+          site: config.site,
+          sha,
+          fileCount: uploadResult.fileCount,
+          totalSize: uploadResult.totalSize,
+          identitySource: identity.source,
+        }),
+      );
+    } else {
+      const sizeKB = (uploadResult.totalSize / 1024).toFixed(1);
+      const nextLine =
+        mode === "preview"
+          ? "Next: universe static promote"
+          : "Promoted to production.";
+      success(
+        [
+          `Deployed ${finalizeResult.deployId}`,
+          ``,
+          `  Site:     ${config.site}`,
+          `  Files:    ${uploadResult.fileCount}`,
+          `  Size:     ${sizeKB} KB`,
+          `  Mode:     ${mode}`,
+          `  URL:      ${finalizeResult.url}`,
+          ``,
+          nextLine,
+        ].join("\n"),
+      );
+    }
+  } catch (err) {
+    let code: number;
+    let message: string;
+    if (err instanceof ProxyError) {
+      code = err.exitCode;
+      message = err.message;
+    } else if (err instanceof CliError) {
+      code = err.exitCode;
+      message = err.message;
+    } else if (err instanceof Error) {
+      code = EXIT_USAGE;
+      message = err.message;
+    } else {
+      code = EXIT_USAGE;
+      message = String(err);
+    }
+    if (options.json) {
+      emitJson(buildErrorEnvelope("deploy", code, message));
+    } else {
+      error(message);
+    }
+    exit(code, message);
   }
+}
 
-  const gitHash = git.hash ?? undefined;
-  const deployId = await resolveDeployId(
-    client,
-    bucket,
-    site,
-    gitHash,
-    options.force ?? false,
-  );
-
-  const uploadResult = await uploadDirectory(
-    client,
-    bucket,
-    site,
-    deployId,
-    config.static.output_dir,
-  );
-
-  if (uploadResult.errors.length > 0) {
-    outputError(
-      ctx,
-      EXIT_PARTIAL,
-      `Upload partially failed: ${uploadResult.errors.length} file(s) failed`,
-      uploadResult.errors,
-    );
-    exitWithCode(
-      EXIT_PARTIAL,
-      `Upload partially failed: ${uploadResult.errors.length} file(s) failed`,
-    );
-    return;
-  }
-
-  await writeDeployMetadata(client, bucket, site, deployId, {
-    deployId,
-    timestamp: new Date().toISOString(),
-    gitHash: git.hash,
-    gitDirty: git.dirty,
-    fileCount: uploadResult.fileCount,
-    totalSize: uploadResult.totalSize,
-  });
-
-  await writeAlias(client, bucket, site, "preview", deployId);
-
-  const sizeKB = (uploadResult.totalSize / 1024).toFixed(1);
-  const previewDomain = config.domain?.preview ?? `preview.${site}`;
-  const humanMsg = [
-    `Deployed ${deployId}`,
-    ``,
-    `  Site:     ${site}`,
-    `  Files:    ${uploadResult.fileCount}`,
-    `  Size:     ${sizeKB} KB`,
-    `  Alias:    preview`,
-    `  Preview:  https://${previewDomain}`,
-    ``,
-    `Next: universe static promote`,
-  ].join("\n");
-
-  outputSuccess(ctx, humanMsg, {
-    deployId,
-    site,
-    fileCount: uploadResult.fileCount,
-    totalSize: uploadResult.totalSize,
-    alias: "preview",
-    previewDomain,
-  });
+class PartialUploadError extends CliError {
+  readonly exitCode = EXIT_PARTIAL;
 }

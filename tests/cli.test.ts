@@ -280,7 +280,7 @@ describe("universe static namespace", () => {
   it("static deploy --help shows deploy-specific options", () => {
     run(["node", "universe", "static", "deploy", "--help"]);
     expect(output).toContain("--json");
-    expect(output).toContain("--force");
-    expect(output).toContain("--output-dir");
+    expect(output).toContain("--promote");
+    expect(output).toContain("--dir");
   });
 });

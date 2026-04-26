@@ -27,21 +27,17 @@ export function run(argv = process.argv) {
     const staticCli = cac("universe static");
 
     staticCli
-      .command("deploy", "Deploy static site to S3")
+      .command("deploy", "Deploy static site via the artemis proxy")
       .option("--json", "Output as JSON")
-      .option("--force", "Force deploy without git hash")
-      .option("--output-dir <dir>", "Build output directory")
+      .option("--promote", "Finalize as production (default: preview)")
+      .option("--dir <path>", "Override build.output dir from platform.yaml")
       .action(
-        async (flags: {
-          json?: boolean;
-          force?: boolean;
-          outputDir?: string;
-        }) => {
+        async (flags: { json?: boolean; promote?: boolean; dir?: string }) => {
           try {
             await deploy({
               json: flags.json ?? false,
-              force: flags.force ?? false,
-              outputDir: flags.outputDir,
+              promote: flags.promote ?? false,
+              dir: flags.dir,
             });
           } catch (err: unknown) {
             handleActionError("deploy", flags.json ?? false, err);

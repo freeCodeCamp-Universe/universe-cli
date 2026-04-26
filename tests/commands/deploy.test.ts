@@ -1,286 +1,367 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-
-vi.mock("../../src/config/loader.js", () => ({
-  loadConfig: vi.fn(),
-}));
-vi.mock("../../src/credentials/resolver.js", () => ({
-  resolveCredentials: vi.fn(),
-}));
-vi.mock("../../src/storage/client.js", () => ({
-  createS3Client: vi.fn(),
-}));
-vi.mock("../../src/storage/aliases.js", () => ({
-  writeAlias: vi.fn(),
-}));
-vi.mock("../../src/storage/operations.js", () => ({
-  listObjects: vi.fn(),
-}));
-vi.mock("../../src/deploy/id.js", () => ({
-  generateDeployId: vi.fn(),
-}));
-vi.mock("../../src/deploy/git.js", () => ({
-  getGitState: vi.fn(),
-}));
-vi.mock("../../src/deploy/preflight.js", () => ({
-  validateOutputDir: vi.fn(),
-}));
-vi.mock("../../src/deploy/upload.js", () => ({
-  uploadDirectory: vi.fn(),
-}));
-vi.mock("../../src/deploy/metadata.js", () => ({
-  writeDeployMetadata: vi.fn(),
-}));
-vi.mock("../../src/output/format.js", () => ({
-  outputSuccess: vi.fn(),
-  outputError: vi.fn(),
-}));
-vi.mock("../../src/output/exit-codes.js", async () => {
-  const actual = await vi.importActual<
-    typeof import("../../src/output/exit-codes.js")
-  >("../../src/output/exit-codes.js");
-  return {
-    ...actual,
-    exitWithCode: vi.fn(),
-  };
-});
-
-import { loadConfig } from "../../src/config/loader.js";
-import { resolveCredentials } from "../../src/credentials/resolver.js";
-import { createS3Client } from "../../src/storage/client.js";
-import { writeAlias } from "../../src/storage/aliases.js";
-import { listObjects } from "../../src/storage/operations.js";
-import { generateDeployId } from "../../src/deploy/id.js";
-import { getGitState } from "../../src/deploy/git.js";
-import { validateOutputDir } from "../../src/deploy/preflight.js";
-import { uploadDirectory } from "../../src/deploy/upload.js";
-import { writeDeployMetadata } from "../../src/deploy/metadata.js";
-import { outputSuccess, outputError } from "../../src/output/format.js";
-import {
-  exitWithCode,
-  EXIT_GIT,
-  EXIT_OUTPUT_DIR,
-  EXIT_PARTIAL,
-} from "../../src/output/exit-codes.js";
+import { describe, expect, it, vi } from "vitest";
 import { deploy } from "../../src/commands/deploy.js";
+import { ProxyError } from "../../src/lib/proxy-client.js";
 
-const mockLoadConfig = vi.mocked(loadConfig);
-const mockResolveCredentials = vi.mocked(resolveCredentials);
-const mockCreateS3Client = vi.mocked(createS3Client);
-const mockWriteAlias = vi.mocked(writeAlias);
-const mockListObjects = vi.mocked(listObjects);
-const mockGenerateDeployId = vi.mocked(generateDeployId);
-const mockGetGitState = vi.mocked(getGitState);
-const mockValidateOutputDir = vi.mocked(validateOutputDir);
-const mockUploadDirectory = vi.mocked(uploadDirectory);
-const mockWriteDeployMetadata = vi.mocked(writeDeployMetadata);
-const mockOutputSuccess = vi.mocked(outputSuccess);
-const mockOutputError = vi.mocked(outputError);
-const mockExitWithCode = vi.mocked(exitWithCode);
+interface FakeDeps {
+  cwd: string;
+  env: NodeJS.ProcessEnv;
+  readPlatformYaml: ReturnType<typeof vi.fn>;
+  resolveIdentity: ReturnType<typeof vi.fn>;
+  createProxyClient: ReturnType<typeof vi.fn>;
+  getGitState: ReturnType<typeof vi.fn>;
+  runBuild: ReturnType<typeof vi.fn>;
+  walkFiles: ReturnType<typeof vi.fn>;
+  uploadFiles: ReturnType<typeof vi.fn>;
+  logSuccess: ReturnType<typeof vi.fn>;
+  logInfo: ReturnType<typeof vi.fn>;
+  logWarn: ReturnType<typeof vi.fn>;
+  logError: ReturnType<typeof vi.fn>;
+  exit: ReturnType<typeof vi.fn>;
+}
 
-beforeEach(() => {
-  vi.clearAllMocks();
-  mockLoadConfig.mockReturnValue({
-    name: "my-site",
-    stack: "static",
-    domain: { production: "example.com", preview: "preview.example.com" },
-    static: {
-      output_dir: "dist",
-      bucket: "test-bucket",
-      rclone_remote: "r2",
-      region: "auto",
-    },
-  });
-  mockResolveCredentials.mockReturnValue({
-    accessKeyId: "key",
-    secretAccessKey: "secret",
-    endpoint: "https://example.com",
-  });
-  mockCreateS3Client.mockReturnValue({} as ReturnType<typeof createS3Client>);
-  mockGetGitState.mockReturnValue({ hash: "abc1234def5678", dirty: false });
-  mockGenerateDeployId.mockReturnValue("20260413-120000-abc1234");
-  mockValidateOutputDir.mockReturnValue({ valid: true, fileCount: 5 });
-  mockListObjects.mockResolvedValue([]);
-  mockUploadDirectory.mockResolvedValue({
-    fileCount: 5,
-    totalSize: 2048,
-    errors: [],
-  });
-  mockWriteDeployMetadata.mockResolvedValue(undefined);
-  mockWriteAlias.mockResolvedValue(undefined);
-});
+const VALID_YAML = `site: my-site
+build:
+  command: bun run build
+  output: dist
+deploy:
+  preview: true
+  ignore:
+    - "*.map"
+`;
 
-describe("deploy", () => {
-  it("follows the full pipeline: config -> credentials -> client -> git -> id -> preflight -> upload -> metadata -> alias -> output", async () => {
-    await deploy({ json: false });
+function mkProxy(): {
+  whoami: ReturnType<typeof vi.fn>;
+  deployInit: ReturnType<typeof vi.fn>;
+  deployUpload: ReturnType<typeof vi.fn>;
+  deployFinalize: ReturnType<typeof vi.fn>;
+  siteDeploys: ReturnType<typeof vi.fn>;
+  sitePromote: ReturnType<typeof vi.fn>;
+  siteRollback: ReturnType<typeof vi.fn>;
+} {
+  return {
+    whoami: vi.fn(),
+    deployInit: vi.fn().mockResolvedValue({
+      deployId: "20260427-abc1234",
+      jwt: "jwt_xxx",
+      expiresAt: "2026-04-27T01:00:00Z",
+    }),
+    deployUpload: vi.fn(),
+    deployFinalize: vi.fn().mockResolvedValue({
+      url: "https://my-site.preview.freecode.camp",
+      deployId: "20260427-abc1234",
+      mode: "preview",
+    }),
+    siteDeploys: vi.fn(),
+    sitePromote: vi.fn(),
+    siteRollback: vi.fn(),
+  };
+}
 
-    expect(mockLoadConfig).toHaveBeenCalled();
-    expect(mockResolveCredentials).toHaveBeenCalled();
-    expect(mockCreateS3Client).toHaveBeenCalled();
-    expect(mockGetGitState).toHaveBeenCalled();
-    expect(mockGenerateDeployId).toHaveBeenCalled();
-    expect(mockValidateOutputDir).toHaveBeenCalled();
-    expect(mockUploadDirectory).toHaveBeenCalled();
-    expect(mockWriteDeployMetadata).toHaveBeenCalled();
-    expect(mockWriteAlias).toHaveBeenCalled();
-    expect(mockOutputSuccess).toHaveBeenCalled();
-  });
+function mkDeps(overrides: Partial<FakeDeps> = {}): FakeDeps {
+  const proxy = mkProxy();
+  return {
+    cwd: "/proj",
+    env: {},
+    readPlatformYaml: vi.fn().mockResolvedValue(VALID_YAML),
+    resolveIdentity: vi.fn().mockResolvedValue({
+      token: "ghp_x",
+      source: "env_GITHUB_TOKEN",
+    }),
+    createProxyClient: vi.fn().mockReturnValue(proxy),
+    getGitState: vi.fn().mockReturnValue({
+      hash: "abc1234567",
+      dirty: false,
+    }),
+    runBuild: vi.fn().mockResolvedValue({
+      skipped: false,
+      outputDir: "/proj/dist",
+    }),
+    walkFiles: vi.fn().mockReturnValue([
+      { relPath: "index.html", absPath: "/proj/dist/index.html" },
+      { relPath: "main.js", absPath: "/proj/dist/main.js" },
+    ]),
+    uploadFiles: vi.fn().mockResolvedValue({
+      fileCount: 2,
+      totalSize: 2048,
+      uploaded: ["index.html", "main.js"],
+      errors: [],
+    }),
+    logSuccess: vi.fn(),
+    logInfo: vi.fn(),
+    logWarn: vi.fn(),
+    logError: vi.fn(),
+    exit: vi.fn().mockImplementation((_code: number) => {
+      throw new Error("__exit__");
+    }),
+    ...overrides,
+  };
+}
 
-  it("exits with EXIT_GIT when git hash is missing and no --force", async () => {
-    mockGetGitState.mockReturnValue({ hash: null, dirty: false });
+describe("deploy command (proxy plane)", () => {
+  describe("happy path", () => {
+    it("walks identity → init → build → upload → finalize", async () => {
+      const deps = mkDeps();
+      await deploy({ json: false }, deps);
 
-    await deploy({ json: false });
-
-    expect(mockExitWithCode).toHaveBeenCalledWith(EXIT_GIT, expect.any(String));
-    expect(mockUploadDirectory).not.toHaveBeenCalled();
-  });
-
-  it("continues without git hash when --force is set", async () => {
-    mockGetGitState.mockReturnValue({ hash: null, dirty: false });
-
-    await deploy({ json: false, force: true });
-
-    expect(mockExitWithCode).not.toHaveBeenCalled();
-    expect(mockUploadDirectory).toHaveBeenCalled();
-  });
-
-  it("exits with EXIT_OUTPUT_DIR when output dir is invalid", async () => {
-    mockValidateOutputDir.mockReturnValue({
-      valid: false,
-      fileCount: 0,
-      error: "directory not found",
+      expect(deps.resolveIdentity).toHaveBeenCalledTimes(1);
+      expect(deps.runBuild).toHaveBeenCalledTimes(1);
+      expect(deps.walkFiles).toHaveBeenCalledWith("/proj/dist");
+      const proxy = deps.createProxyClient.mock.results[0]?.value as ReturnType<
+        typeof mkProxy
+      >;
+      expect(proxy.deployInit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          site: "my-site",
+          sha: "abc1234567",
+          files: ["index.html", "main.js"],
+        }),
+      );
+      expect(deps.uploadFiles).toHaveBeenCalled();
+      expect(proxy.deployFinalize).toHaveBeenCalledWith(
+        expect.objectContaining({
+          deployId: "20260427-abc1234",
+          jwt: "jwt_xxx",
+          mode: "preview",
+        }),
+      );
     });
 
-    await deploy({ json: false });
+    it("emits success envelope in JSON mode", async () => {
+      const stdout: string[] = [];
+      const writeSpy = vi
+        .spyOn(process.stdout, "write")
+        .mockImplementation((chunk: unknown) => {
+          stdout.push(String(chunk));
+          return true;
+        });
 
-    expect(mockExitWithCode).toHaveBeenCalledWith(
-      EXIT_OUTPUT_DIR,
-      expect.any(String),
-    );
-    expect(mockUploadDirectory).not.toHaveBeenCalled();
-  });
+      const deps = mkDeps();
+      await deploy({ json: true }, deps);
+      writeSpy.mockRestore();
 
-  it("writes preview alias after successful upload", async () => {
-    await deploy({ json: false });
-
-    expect(mockWriteAlias).toHaveBeenCalledWith(
-      expect.anything(),
-      "test-bucket",
-      "my-site",
-      "preview",
-      "20260413-120000-abc1234",
-    );
-  });
-
-  it("passes --output-dir flag to config loader", async () => {
-    await deploy({ json: false, outputDir: "build" });
-
-    expect(mockLoadConfig).toHaveBeenCalledWith(
-      expect.objectContaining({
-        flags: expect.objectContaining({ outputDir: "build" }),
-      }),
-    );
-  });
-
-  it("supports --json flag for JSON envelope output", async () => {
-    await deploy({ json: true });
-
-    expect(mockOutputSuccess).toHaveBeenCalledWith(
-      expect.objectContaining({ json: true, command: "deploy" }),
-      expect.any(String),
-      expect.objectContaining({ deployId: "20260413-120000-abc1234" }),
-    );
-  });
-
-  it("throws StorageError when collision retries exhaust", async () => {
-    const { StorageError } = await import("../../src/errors.js");
-    const collision = [
-      {
-        key: "my-site/deploys/20260413-120000-abc1234/index.html",
-        size: 100,
-        lastModified: new Date(),
-      },
-    ];
-    mockListObjects
-      .mockResolvedValueOnce(collision)
-      .mockResolvedValueOnce(collision)
-      .mockResolvedValueOnce(collision);
-    mockGenerateDeployId
-      .mockReturnValueOnce("20260413-120000-abc1234")
-      .mockReturnValueOnce("20260413-120001-abc1234")
-      .mockReturnValueOnce("20260413-120002-abc1234");
-
-    await expect(deploy({ json: false })).rejects.toThrow(StorageError);
-    expect(mockUploadDirectory).not.toHaveBeenCalled();
-  });
-
-  it("retries with new deploy ID on collision", async () => {
-    mockListObjects
-      .mockResolvedValueOnce([
-        {
-          key: "my-site/deploys/20260413-120000-abc1234/index.html",
-          size: 100,
-          lastModified: new Date(),
-        },
-      ])
-      .mockResolvedValueOnce([]);
-    mockGenerateDeployId
-      .mockReturnValueOnce("20260413-120000-abc1234")
-      .mockReturnValueOnce("20260413-120001-abc1234");
-
-    await deploy({ json: false });
-
-    expect(mockGenerateDeployId).toHaveBeenCalledTimes(2);
-    expect(mockUploadDirectory).toHaveBeenCalled();
-  });
-
-  it("logs warning when git is dirty but continues", async () => {
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    mockGetGitState.mockReturnValue({ hash: "abc1234def5678", dirty: true });
-
-    await deploy({ json: false });
-
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("dirty"));
-    expect(mockUploadDirectory).toHaveBeenCalled();
-    warnSpy.mockRestore();
-  });
-
-  it("exits with EXIT_PARTIAL and skips alias when upload has errors", async () => {
-    mockUploadDirectory.mockResolvedValue({
-      fileCount: 3,
-      totalSize: 1024,
-      errors: ["bad.css: Upload failed", "img.png: Timeout"],
+      const env = JSON.parse(stdout.join("").trim());
+      expect(env.command).toBe("deploy");
+      expect(env.success).toBe(true);
+      expect(env.deployId).toBe("20260427-abc1234");
+      expect(env.url).toBe("https://my-site.preview.freecode.camp");
+      expect(env.mode).toBe("preview");
+      expect(env.fileCount).toBe(2);
     });
 
-    await deploy({ json: false });
-
-    expect(mockOutputError).toHaveBeenCalledWith(
-      expect.objectContaining({ command: "deploy" }),
-      EXIT_PARTIAL,
-      expect.any(String),
-      expect.arrayContaining(["bad.css: Upload failed", "img.png: Timeout"]),
-    );
-    expect(mockExitWithCode).toHaveBeenCalledWith(
-      EXIT_PARTIAL,
-      expect.any(String),
-    );
-    expect(mockWriteAlias).not.toHaveBeenCalled();
+    it("prints summary in text mode (deploy id + preview url)", async () => {
+      const deps = mkDeps();
+      await deploy({ json: false }, deps);
+      const msg = deps.logSuccess.mock.calls[0]?.[0] ?? "";
+      expect(msg).toContain("20260427-abc1234");
+      expect(msg).toContain("https://my-site.preview.freecode.camp");
+    });
   });
 
-  it("writes deploy metadata with correct fields", async () => {
-    await deploy({ json: false });
+  describe("--promote flag", () => {
+    it("forwards mode=production to finalize", async () => {
+      const deps = mkDeps();
+      await deploy({ json: false, promote: true }, deps);
+      const proxy = deps.createProxyClient.mock.results[0]?.value as ReturnType<
+        typeof mkProxy
+      >;
+      const finalizeArg = proxy.deployFinalize.mock.calls[0]?.[0] as {
+        mode: string;
+      };
+      expect(finalizeArg.mode).toBe("production");
+    });
+  });
 
-    expect(mockWriteDeployMetadata).toHaveBeenCalledWith(
-      expect.anything(),
-      "test-bucket",
-      "my-site",
-      "20260413-120000-abc1234",
-      expect.objectContaining({
-        deployId: "20260413-120000-abc1234",
-        gitHash: "abc1234def5678",
-        gitDirty: false,
-        fileCount: 5,
-        totalSize: 2048,
-      }),
-    );
+  describe("--dir flag", () => {
+    it("overrides build output directory", async () => {
+      const deps = mkDeps({
+        runBuild: vi.fn().mockResolvedValue({
+          skipped: false,
+          outputDir: "/proj/build-out",
+        }),
+      });
+      await deploy({ json: false, dir: "build-out" }, deps);
+      const arg = deps.runBuild.mock.calls[0]?.[0] as { outputDir: string };
+      expect(arg.outputDir).toBe("build-out");
+      expect(deps.walkFiles).toHaveBeenCalledWith("/proj/build-out");
+    });
+  });
+
+  describe("identity / config errors", () => {
+    it("errors with EXIT_CREDENTIALS when identity chain returns null", async () => {
+      const deps = mkDeps({
+        resolveIdentity: vi.fn().mockResolvedValue(null),
+      });
+      await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
+      expect(deps.runBuild).not.toHaveBeenCalled();
+      expect(deps.exit).toHaveBeenCalledWith(
+        12,
+        expect.stringMatching(/login|identity/i),
+      );
+    });
+
+    it("errors with EXIT_CONFIG when platform.yaml is missing", async () => {
+      const err = new Error("ENOENT") as NodeJS.ErrnoException;
+      err.code = "ENOENT";
+      const deps = mkDeps({
+        readPlatformYaml: vi.fn().mockRejectedValue(err),
+      });
+      await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
+      expect(deps.exit).toHaveBeenCalledWith(
+        11,
+        expect.stringMatching(/platform\.yaml/i),
+      );
+    });
+
+    it("errors with EXIT_CONFIG on v1 platform.yaml fragment", async () => {
+      const v1 = "name: my-site\nr2:\n  bucket: x\n";
+      const deps = mkDeps({
+        readPlatformYaml: vi.fn().mockResolvedValue(v1),
+      });
+      await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
+      expect(deps.exit).toHaveBeenCalledWith(
+        11,
+        expect.stringMatching(/v1|migration/i),
+      );
+    });
+
+    it("errors with EXIT_CONFIG on invalid site name", async () => {
+      const bad = "site: BAD-Name\n";
+      const deps = mkDeps({
+        readPlatformYaml: vi.fn().mockResolvedValue(bad),
+      });
+      await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
+      expect(deps.exit).toHaveBeenCalledWith(11, expect.any(String));
+    });
+  });
+
+  describe("git state", () => {
+    it("warns but proceeds when working tree is dirty", async () => {
+      const deps = mkDeps({
+        getGitState: vi.fn().mockReturnValue({ hash: "abcdef0", dirty: true }),
+      });
+      await deploy({ json: false }, deps);
+      expect(deps.logWarn).toHaveBeenCalled();
+      const proxy = deps.createProxyClient.mock.results[0]?.value as ReturnType<
+        typeof mkProxy
+      >;
+      expect(proxy.deployInit).toHaveBeenCalled();
+    });
+
+    it("falls back to a synthetic sha when no git state", async () => {
+      const deps = mkDeps({
+        getGitState: vi
+          .fn()
+          .mockReturnValue({ hash: null, dirty: false, error: "no git" }),
+      });
+      await deploy({ json: false }, deps);
+      const proxy = deps.createProxyClient.mock.results[0]?.value as ReturnType<
+        typeof mkProxy
+      >;
+      const initArg = proxy.deployInit.mock.calls[0]?.[0] as { sha: string };
+      expect(initArg.sha).toMatch(/^nogit-/);
+    });
+  });
+
+  describe("ignore filter", () => {
+    it("excludes files matching deploy.ignore patterns", async () => {
+      const deps = mkDeps({
+        walkFiles: vi.fn().mockReturnValue([
+          { relPath: "index.html", absPath: "/p/index.html" },
+          { relPath: "main.js.map", absPath: "/p/main.js.map" },
+          { relPath: "main.js", absPath: "/p/main.js" },
+        ]),
+      });
+      await deploy({ json: false }, deps);
+      const proxy = deps.createProxyClient.mock.results[0]?.value as ReturnType<
+        typeof mkProxy
+      >;
+      const initArg = proxy.deployInit.mock.calls[0]?.[0] as {
+        files: string[];
+      };
+      expect(initArg.files).toEqual(["index.html", "main.js"]);
+      const uploadArg = deps.uploadFiles.mock.calls[0]?.[0] as {
+        files: { relPath: string }[];
+      };
+      expect(uploadArg.files.map((f) => f.relPath)).toEqual([
+        "index.html",
+        "main.js",
+      ]);
+    });
+  });
+
+  describe("upload errors", () => {
+    it("aborts with EXIT_PARTIAL when uploadFiles surfaces errors", async () => {
+      const deps = mkDeps({
+        uploadFiles: vi.fn().mockResolvedValue({
+          fileCount: 1,
+          totalSize: 100,
+          uploaded: ["a.html"],
+          errors: ["b.html: 503"],
+        }),
+      });
+      await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
+      expect(deps.exit).toHaveBeenCalledWith(
+        19,
+        expect.stringMatching(/partial|failed/i),
+      );
+      const proxy = deps.createProxyClient.mock.results[0]?.value as ReturnType<
+        typeof mkProxy
+      >;
+      expect(proxy.deployFinalize).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("proxy errors", () => {
+    it("propagates ProxyError from deployInit", async () => {
+      const proxy = mkProxy();
+      proxy.deployInit.mockRejectedValue(
+        new ProxyError(403, "site_unauthorized", "no team"),
+      );
+      const deps = mkDeps({
+        createProxyClient: vi.fn().mockReturnValue(proxy),
+      });
+      await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
+      expect(deps.exit).toHaveBeenCalledWith(
+        12,
+        expect.stringContaining("no team"),
+      );
+    });
+
+    it("propagates ProxyError from deployFinalize", async () => {
+      const proxy = mkProxy();
+      proxy.deployFinalize.mockRejectedValue(
+        new ProxyError(422, "verify_failed", "missing"),
+      );
+      const deps = mkDeps({
+        createProxyClient: vi.fn().mockReturnValue(proxy),
+      });
+      await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
+      expect(deps.exit).toHaveBeenCalledWith(
+        13,
+        expect.stringContaining("missing"),
+      );
+    });
+  });
+
+  describe("baseUrl resolution", () => {
+    it("uses default https://uploads.freecode.camp", async () => {
+      const deps = mkDeps();
+      await deploy({ json: false }, deps);
+      const cfg = deps.createProxyClient.mock.calls[0]?.[0] as {
+        baseUrl: string;
+      };
+      expect(cfg.baseUrl).toBe("https://uploads.freecode.camp");
+    });
+
+    it("respects $UNIVERSE_PROXY_URL env override", async () => {
+      const deps = mkDeps({
+        env: { UNIVERSE_PROXY_URL: "https://staging.example" },
+      });
+      await deploy({ json: false }, deps);
+      const cfg = deps.createProxyClient.mock.calls[0]?.[0] as {
+        baseUrl: string;
+      };
+      expect(cfg.baseUrl).toBe("https://staging.example");
+    });
   });
 });
