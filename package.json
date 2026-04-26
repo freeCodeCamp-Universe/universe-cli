@@ -6,6 +6,7 @@
     "test": "vitest run",
     "build": "tsup",
     "lint": "oxlint src tests",
+    "typecheck": "tsc --noEmit",
     "prepare": "husky"
   },
   "author": "Mrugesh Mohapatra <noreply@mrugesh.dev> (https://mrugesh.dev/)",
