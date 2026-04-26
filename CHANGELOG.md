@@ -7,24 +7,96 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0-alpha.1] - 2026-04-27
+
+Proxy-plane pivot. Staff and CI hands hold only a `platform.yaml` and a
+GitHub identity. The R2 admin token lives exclusively inside the
+`artemis` proxy service at `uploads.freecode.camp`. Locked by
+[Universe ADR-016](https://github.com/freeCodeCamp-Universe/Universe/blob/main/decisions/016-deploy-proxy.md)
+
+- Sprint 2026-04-26 DECISIONS Q9–Q15 + 2026-04-27 CLI namespace
+  amendment.
+
 ### Added
+
+- `universe login` / `logout` / `whoami` top-level commands. `login`
+  drives a GitHub OAuth device flow against `UNIVERSE_GH_CLIENT_ID` and
+  persists the bearer at `~/.config/universe-cli/token` (mode 0600).
+- `universe static ls [--site <site>]` lists recent deploys for the
+  current (or specified) site.
+- `src/lib/proxy-client.ts` — typed fetch wrapper for the artemis
+  routes (`/api/whoami`, `/api/deploy/{init,upload,finalize}`,
+  `/api/site/{site}/{deploys,promote,rollback}`). 401/403 →
+  `EXIT_CREDENTIALS`; 422/5xx → `EXIT_STORAGE`; other 4xx → `EXIT_USAGE`.
+- `src/lib/identity.ts` — five-slot priority chain per ADR-016 Q10
+  (env → GHA OIDC → Woodpecker OIDC → `gh auth token` → device-flow
+  stored). `whoami` surfaces the resolved slot.
+- `src/lib/device-flow.ts` — RFC-8628 GitHub device flow with `slow_down`
+  - `expired_token` + `access_denied` handling.
+- `src/lib/token-store.ts` — `~/.config/universe-cli/token` reader /
+  writer / deleter; respects `$XDG_CONFIG_HOME`; file mode 0600 + dir
+  mode 0700.
+- `src/lib/build.ts` — runs `platform.yaml` `build.command` in cwd via
+  `shell: true` and verifies `build.output` directory landed.
+- `src/lib/upload.ts` — sequential per-file PUT to artemis with a
+  configurable concurrency cap (default 6) and per-file error
+  isolation. Surfaces partial uploads via `result.errors[]` so the
+  caller can refuse to finalize.
+- `src/lib/ignore.ts` — minimal gitignore-style matcher for the upload
+  set (`*`, `**`, `?`, anchored vs basename matches).
+- Husky pre-commit gate now runs `pnpm typecheck` (tsc --noEmit)
+  alongside lint + test.
+
+### Changed
+
+- **BREAKING (CLI surface):** the v0.3 namespaced verbs change shape.
+  - `universe static deploy --force` → removed; missing git state
+    auto-falls-back to a synthetic sha.
+  - `universe static deploy --output-dir` → `--dir`.
+  - `universe static promote <deployId>` (positional) →
+    `--from <deployId>` (flag).
+  - `universe static rollback --confirm` → `--to <deployId>` (required).
+- **BREAKING (network):** the CLI no longer reads R2 credentials. All
+  uploads are streamed through the artemis proxy. Direct-to-R2 paths
+  (`@aws-sdk/client-s3`, `rclone` config probing, `~/.aws/credentials`)
+  are gone. Set `UNIVERSE_PROXY_URL` to override the default
+  `https://uploads.freecode.camp` host.
+- `universe static deploy` reads `platform.yaml` v2 (BREAKING schema in
+  the prior unreleased entry — same `site` / `build` / `deploy` shape;
+  no credential fields).
+
+### Removed
+
+- `src/credentials/` — R2 credential resolver.
+- `src/storage/` — direct S3 client + alias / deploys / operations
+  helpers.
+- `src/deploy/{upload,id,preflight,metadata}.ts` — pre-pivot deploy
+  pipeline. The proxy now owns deploy id minting, alias atomicity, and
+  metadata.
+- `src/config/{loader,schema}.ts` — replaced by `src/lib/platform-yaml.*`
+  (v2).
+- `errors.OutputDirError`, `errors.AliasError`,
+  `errors.DeployNotFoundError` — no callers post-pivot.
+- Dependencies: `@aws-sdk/client-s3`, `@smithy/util-stream`,
+  `aws-sdk-client-mock`, `aws-sdk-client-mock-vitest`.
+
+### Migrated
+
+- `docs/platform-yaml.md` references updated `universe deploy` →
+  `universe static deploy` (folded from sprint 2026-04-26 / T33).
+
+### Schema (v2 — pre-pivot snapshot, unchanged)
 
 - `platform.yaml` v2 schema (`src/lib/platform-yaml.{ts,schema.ts}`) with
   zod validator and strict unknown-key rejection. Surface:
   `parsePlatformYaml(text)` returns `{ok, value | error}`.
-- `docs/platform-yaml.md` — v2 schema reference: every field, defaults,
-  validation rules, examples, and v0.3 → v0.4 migration delta.
+- `docs/platform-yaml.md` — v2 schema reference.
 - v1 migration detector: any of `r2`, `stack`, `domain`, `static`, `name`
   at the root produces a clear error pointing at the migration doc.
-
-### Changed
-
-- **BREAKING (schema):** `platform.yaml` v0.3 → v0.4. Removed: `name`
-  (renamed to `site`), `stack`, `domain`, `static.*`, `r2.*`. New shape
-  is `site` (required) + optional `build` + optional `deploy`. See
-  `docs/platform-yaml.md` for the migration delta. Locked by
-  [ADR-016](https://github.com/freeCodeCamp-Universe/Universe/blob/main/decisions/016-deploy-proxy.md)
-  and Sprint 2026-04-26 DECISIONS Q9–Q15.
+- **BREAKING (schema, retained from prior unreleased):** `platform.yaml`
+  v0.3 → v0.4. Removed `name` (renamed to `site`), `stack`, `domain`,
+  `static.*`, `r2.*`. New shape: `site` (required) + optional `build` +
+  optional `deploy`.
 
 ## [0.3.3] - 2026-04-18
 
