@@ -1,7 +1,7 @@
 # `platform.yaml` — schema reference
 
-`platform.yaml` lives at the repo root and tells `universe deploy` what to
-build and how to deploy. It is the **only** config the CLI reads.
+`platform.yaml` lives at the repo root and tells `universe static deploy` what
+to build and how to deploy. It is the **only** config the CLI reads.
 
 This document covers schema **v2** (CLI v0.4+). For the v0.3 → v0.4
 migration delta, see [Migration](#migration-v03--v04).
@@ -78,7 +78,7 @@ Controls how the artifact is published.
 
 | Key       | Type            | Required | Default                                            | Description                                                                                 |
 | --------- | --------------- | -------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| `preview` | boolean         | no       | `true`                                             | When `true`, `universe deploy` publishes to preview unless `--promote` is passed.           |
+| `preview` | boolean         | no       | `true`                                             | When `true`, `universe static deploy` publishes to preview unless `--promote` is passed.    |
 | `ignore`  | array of string | no       | `["*.map", "node_modules/**", ".git/**", ".env*"]` | gitignore-style patterns applied to the upload set. Override **replaces** the default list. |
 
 Omit `deploy:` entirely to take all defaults.
