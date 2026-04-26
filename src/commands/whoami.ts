@@ -25,7 +25,7 @@ export interface WhoAmIDeps {
 
 const DEFAULT_PROXY_URL = "https://uploads.freecode.camp";
 
-function emitJson(envelope: Record<string, unknown>): void {
+function emitJson(envelope: object): void {
   process.stdout.write(JSON.stringify(envelope) + "\n");
 }
 

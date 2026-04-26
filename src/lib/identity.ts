@@ -41,7 +41,7 @@ interface GhaOidcResponse {
   value?: string;
 }
 
-function isNonEmpty(s: string | undefined): s is string {
+function isNonEmpty(s: string | null | undefined): s is string {
   return typeof s === "string" && s.trim().length > 0;
 }
 
