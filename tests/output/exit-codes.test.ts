@@ -58,6 +58,42 @@ describe("exit code constants", () => {
   it("EXIT_PARTIAL is 19", () => {
     expect(EXIT_PARTIAL).toBe(19);
   });
+
+  // F5 — round-trip contract. Locks the FULL set so future renumbering
+  // (or dropping a "reserved" code) breaks tests, not consumers.
+  // CLAUDE.md flags EXIT_OUTPUT_DIR / EXIT_ALIAS / EXIT_DEPLOY_NOT_FOUND
+  // as reserved-with-no-callers; this snapshot enforces "reserved
+  // means stable, not free to renumber".
+  it("exposes the full numeric contract without duplicates", () => {
+    const codes = {
+      EXIT_SUCCESS,
+      EXIT_USAGE,
+      EXIT_CONFIG,
+      EXIT_CREDENTIALS,
+      EXIT_STORAGE,
+      EXIT_OUTPUT_DIR,
+      EXIT_GIT,
+      EXIT_ALIAS,
+      EXIT_DEPLOY_NOT_FOUND,
+      EXIT_CONFIRM,
+      EXIT_PARTIAL,
+    };
+    expect(codes).toEqual({
+      EXIT_SUCCESS: 0,
+      EXIT_USAGE: 10,
+      EXIT_CONFIG: 11,
+      EXIT_CREDENTIALS: 12,
+      EXIT_STORAGE: 13,
+      EXIT_OUTPUT_DIR: 14,
+      EXIT_GIT: 15,
+      EXIT_ALIAS: 16,
+      EXIT_DEPLOY_NOT_FOUND: 17,
+      EXIT_CONFIRM: 18,
+      EXIT_PARTIAL: 19,
+    });
+    const values = Object.values(codes);
+    expect(new Set(values).size).toBe(values.length);
+  });
 });
 
 describe("exitWithCode", () => {

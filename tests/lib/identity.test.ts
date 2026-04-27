@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { resolveIdentity } from "../../src/lib/identity.js";
 
 function mkEnv(
@@ -18,7 +18,6 @@ describe("resolveIdentity — priority chain (ADR-016 Q10)", () => {
       env: mkEnv({}),
       execGhAuthToken: async () => null,
       loadStoredToken: async () => null,
-      fetch: vi.fn(),
     });
     expect(r).toBeNull();
   });
@@ -29,7 +28,6 @@ describe("resolveIdentity — priority chain (ADR-016 Q10)", () => {
         env: mkEnv({ GITHUB_TOKEN: "ghp_env" }),
         execGhAuthToken: async () => "should_not_run",
         loadStoredToken: async () => "should_not_run",
-        fetch: vi.fn(),
       });
       expect(r).toEqual({ token: "ghp_env", source: "env_GITHUB_TOKEN" });
     });
@@ -39,7 +37,6 @@ describe("resolveIdentity — priority chain (ADR-016 Q10)", () => {
         env: mkEnv({ GH_TOKEN: "ghp_gh" }),
         execGhAuthToken: async () => "should_not_run",
         loadStoredToken: async () => "should_not_run",
-        fetch: vi.fn(),
       });
       expect(r).toEqual({ token: "ghp_gh", source: "env_GH_TOKEN" });
     });
@@ -49,7 +46,6 @@ describe("resolveIdentity — priority chain (ADR-016 Q10)", () => {
         env: mkEnv({ GITHUB_TOKEN: "win", GH_TOKEN: "lose" }),
         execGhAuthToken: async () => null,
         loadStoredToken: async () => null,
-        fetch: vi.fn(),
       });
       expect(r?.token).toBe("win");
     });
@@ -59,109 +55,37 @@ describe("resolveIdentity — priority chain (ADR-016 Q10)", () => {
         env: mkEnv({ GITHUB_TOKEN: "", GH_TOKEN: "" }),
         execGhAuthToken: async () => null,
         loadStoredToken: async () => "device",
-        fetch: vi.fn(),
       });
       expect(r?.source).toBe("device_flow");
     });
   });
 
-  describe("slot 2 — GHA OIDC", () => {
-    it("fetches OIDC token from $ACTIONS_ID_TOKEN_REQUEST_URL", async () => {
-      const fetchMock = vi.fn().mockResolvedValue(
-        new Response(JSON.stringify({ value: "oidc_jwt" }), {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        }),
-      );
-      const r = await resolveIdentity({
-        env: mkEnv({
-          ACTIONS_ID_TOKEN_REQUEST_URL: "https://gha.example/token",
-          ACTIONS_ID_TOKEN_REQUEST_TOKEN: "gha_req",
-        }),
-        execGhAuthToken: async () => null,
-        loadStoredToken: async () => null,
-        fetch: fetchMock,
-      });
-      expect(r).toEqual({ token: "oidc_jwt", source: "gha_oidc" });
-      const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-      expect(url).toContain("https://gha.example/token");
-      expect(url).toContain("audience=artemis");
-      const headers = init.headers as Record<string, string>;
-      expect(headers["Authorization"]).toBe("Bearer gha_req");
-    });
-
-    it("respects custom audience option", async () => {
-      const fetchMock = vi.fn().mockResolvedValue(
-        new Response(JSON.stringify({ value: "x" }), {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        }),
-      );
-      await resolveIdentity({
-        env: mkEnv({
-          ACTIONS_ID_TOKEN_REQUEST_URL: "https://gha.example/token",
-          ACTIONS_ID_TOKEN_REQUEST_TOKEN: "gha_req",
-        }),
-        execGhAuthToken: async () => null,
-        loadStoredToken: async () => null,
-        fetch: fetchMock,
-        ghaAudience: "custom",
-      });
-      expect(fetchMock.mock.calls[0]?.[0]).toContain("audience=custom");
-    });
-
-    it("falls through when only one of the two env vars is set", async () => {
-      const fetchMock = vi.fn();
-      const r = await resolveIdentity({
-        env: mkEnv({
-          ACTIONS_ID_TOKEN_REQUEST_URL: "https://gha.example/token",
-        }),
-        execGhAuthToken: async () => "ghcli",
-        loadStoredToken: async () => null,
-        fetch: fetchMock,
-      });
-      expect(r?.source).toBe("gh_cli");
-      expect(fetchMock).not.toHaveBeenCalled();
-    });
-
-    it("falls through when OIDC fetch returns non-200", async () => {
-      const fetchMock = vi
-        .fn()
-        .mockResolvedValue(new Response("nope", { status: 500 }));
+  describe("GHA OIDC slot removed (F7)", () => {
+    // Per F7 review, the GHA OIDC slot was retired: artemis validates
+    // bearers via GitHub `GET /user`, which only accepts user-scoped
+    // PATs / OAuth tokens — not OIDC ID tokens. CI users supply
+    // `$GITHUB_TOKEN` explicitly. Removed slot must NOT short-circuit
+    // when ACTIONS_ID_TOKEN_REQUEST_URL/_TOKEN are present.
+    it("ignores ACTIONS_ID_TOKEN_REQUEST_* env, falls to gh CLI", async () => {
       const r = await resolveIdentity({
         env: mkEnv({
           ACTIONS_ID_TOKEN_REQUEST_URL: "https://gha.example/token",
           ACTIONS_ID_TOKEN_REQUEST_TOKEN: "gha_req",
         }),
         execGhAuthToken: async () => "ghcli",
-        loadStoredToken: async () => null,
-        fetch: fetchMock,
+        loadStoredToken: async () => "device_lose",
       });
       expect(r?.source).toBe("gh_cli");
-    });
-
-    it("falls through when OIDC fetch throws", async () => {
-      const fetchMock = vi.fn().mockRejectedValue(new TypeError("net"));
-      const r = await resolveIdentity({
-        env: mkEnv({
-          ACTIONS_ID_TOKEN_REQUEST_URL: "https://gha.example/token",
-          ACTIONS_ID_TOKEN_REQUEST_TOKEN: "gha_req",
-        }),
-        execGhAuthToken: async () => "ghcli",
-        loadStoredToken: async () => null,
-        fetch: fetchMock,
-      });
-      expect(r?.source).toBe("gh_cli");
+      expect(r?.token).toBe("ghcli");
     });
   });
 
-  describe("slot 4 — gh auth token shell-out", () => {
+  describe("slot 2 — gh auth token shell-out", () => {
     it("uses gh auth token output when no env match", async () => {
       const r = await resolveIdentity({
         env: mkEnv({}),
         execGhAuthToken: async () => "gho_cli",
         loadStoredToken: async () => "should_not_run",
-        fetch: vi.fn(),
       });
       expect(r).toEqual({ token: "gho_cli", source: "gh_cli" });
     });
@@ -171,7 +95,6 @@ describe("resolveIdentity — priority chain (ADR-016 Q10)", () => {
         env: mkEnv({}),
         execGhAuthToken: async () => "  gho_trim  \n",
         loadStoredToken: async () => null,
-        fetch: vi.fn(),
       });
       expect(r?.token).toBe("gho_trim");
     });
@@ -181,7 +104,6 @@ describe("resolveIdentity — priority chain (ADR-016 Q10)", () => {
         env: mkEnv({}),
         execGhAuthToken: async () => null,
         loadStoredToken: async () => "stored",
-        fetch: vi.fn(),
       });
       expect(r?.source).toBe("device_flow");
     });
@@ -191,19 +113,17 @@ describe("resolveIdentity — priority chain (ADR-016 Q10)", () => {
         env: mkEnv({}),
         execGhAuthToken: async () => "",
         loadStoredToken: async () => "stored",
-        fetch: vi.fn(),
       });
       expect(r?.source).toBe("device_flow");
     });
   });
 
-  describe("slot 5 — device-flow stored token", () => {
+  describe("slot 3 — device-flow stored token", () => {
     it("uses stored token as last resort", async () => {
       const r = await resolveIdentity({
         env: mkEnv({}),
         execGhAuthToken: async () => null,
         loadStoredToken: async () => "stored_tok",
-        fetch: vi.fn(),
       });
       expect(r).toEqual({ token: "stored_tok", source: "device_flow" });
     });
@@ -215,28 +135,17 @@ describe("resolveIdentity — priority chain (ADR-016 Q10)", () => {
         env: mkEnv({ GITHUB_TOKEN: "env_wins" }),
         execGhAuthToken: async () => "gh_loses",
         loadStoredToken: async () => "device_loses",
-        fetch: vi.fn(),
       });
       expect(r?.source).toBe("env_GITHUB_TOKEN");
     });
 
-    it("GHA OIDC beats gh CLI beats device flow", async () => {
-      const fetchMock = vi.fn().mockResolvedValue(
-        new Response(JSON.stringify({ value: "oidc_wins" }), {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        }),
-      );
+    it("gh CLI beats device flow", async () => {
       const r = await resolveIdentity({
-        env: mkEnv({
-          ACTIONS_ID_TOKEN_REQUEST_URL: "https://gha.example/token",
-          ACTIONS_ID_TOKEN_REQUEST_TOKEN: "gha_req",
-        }),
-        execGhAuthToken: async () => "gh_loses",
+        env: mkEnv({}),
+        execGhAuthToken: async () => "gh_wins",
         loadStoredToken: async () => "device_loses",
-        fetch: fetchMock,
       });
-      expect(r?.source).toBe("gha_oidc");
+      expect(r?.source).toBe("gh_cli");
     });
   });
 });

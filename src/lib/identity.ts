@@ -5,13 +5,17 @@ import { loadToken as defaultLoadToken } from "./token-store.js";
 const execFileP = promisify(execFile);
 
 /**
- * Identity priority chain — ADR-016 Q10.
+ * Identity priority chain — ADR-016 Q10 (post-F7).
  *
  *   1. $GITHUB_TOKEN / $GH_TOKEN env (CI explicit)
- *   2. GHA OIDC ($ACTIONS_ID_TOKEN_REQUEST_URL + _TOKEN)
- *   3. Woodpecker OIDC env — placeholder; never matches in v1
- *   4. `gh auth token` shell-out
- *   5. Device-flow stored token (~/.config/universe-cli/token)
+ *   2. `gh auth token` shell-out (laptop with gh installed)
+ *   3. Device-flow stored token (~/.config/universe-cli/token)
+ *
+ * GHA OIDC and Woodpecker OIDC slots were dropped: artemis validates
+ * bearers via GitHub `GET /user`, which only accepts user-scoped PATs /
+ * OAuth tokens — OIDC ID tokens cannot satisfy that probe. CI users
+ * must explicitly export `$GITHUB_TOKEN`. Re-add these slots only when
+ * artemis grows an OIDC verifier.
  *
  * Source labels are stable strings used by `whoami` output and tests.
  */
@@ -19,8 +23,6 @@ const execFileP = promisify(execFile);
 export type IdentitySource =
   | "env_GITHUB_TOKEN"
   | "env_GH_TOKEN"
-  | "gha_oidc"
-  | "woodpecker_oidc"
   | "gh_cli"
   | "device_flow";
 
@@ -31,14 +33,8 @@ export interface ResolvedIdentity {
 
 export interface ResolveIdentityOptions {
   env?: NodeJS.ProcessEnv;
-  fetch?: typeof globalThis.fetch;
   execGhAuthToken?: () => Promise<string | null>;
   loadStoredToken?: () => Promise<string | null>;
-  ghaAudience?: string;
-}
-
-interface GhaOidcResponse {
-  value?: string;
 }
 
 function isNonEmpty(s: string | null | undefined): s is string {
@@ -56,42 +52,12 @@ async function defaultExecGhAuthToken(): Promise<string | null> {
   }
 }
 
-async function tryGhaOidc(
-  env: NodeJS.ProcessEnv,
-  fetchImpl: typeof globalThis.fetch,
-  audience: string,
-): Promise<string | null> {
-  const url = env["ACTIONS_ID_TOKEN_REQUEST_URL"];
-  const reqTok = env["ACTIONS_ID_TOKEN_REQUEST_TOKEN"];
-  if (!isNonEmpty(url) || !isNonEmpty(reqTok)) return null;
-
-  const sep = url.includes("?") ? "&" : "?";
-  const fullUrl = `${url}${sep}audience=${encodeURIComponent(audience)}`;
-  try {
-    const resp = await fetchImpl(fullUrl, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${reqTok}`,
-        Accept: "application/json",
-      },
-    });
-    if (!resp.ok) return null;
-    const body = (await resp.json()) as GhaOidcResponse;
-    if (!isNonEmpty(body.value)) return null;
-    return body.value.trim();
-  } catch {
-    return null;
-  }
-}
-
 export async function resolveIdentity(
   opts: ResolveIdentityOptions = {},
 ): Promise<ResolvedIdentity | null> {
   const env = opts.env ?? process.env;
-  const fetchImpl = opts.fetch ?? globalThis.fetch.bind(globalThis);
   const execGh = opts.execGhAuthToken ?? defaultExecGhAuthToken;
   const loadStored = opts.loadStoredToken ?? defaultLoadToken;
-  const audience = opts.ghaAudience ?? "artemis";
 
   // Slot 1 — env vars (GITHUB_TOKEN preferred over GH_TOKEN).
   const ghEnv = env["GITHUB_TOKEN"];
@@ -103,22 +69,13 @@ export async function resolveIdentity(
     return { token: ghTokenEnv.trim(), source: "env_GH_TOKEN" };
   }
 
-  // Slot 2 — GHA OIDC.
-  const oidc = await tryGhaOidc(env, fetchImpl, audience);
-  if (oidc) {
-    return { token: oidc, source: "gha_oidc" };
-  }
-
-  // Slot 3 — Woodpecker OIDC (deferred per ADR-016; placeholder).
-  // Intentionally empty — falls through.
-
-  // Slot 4 — gh auth token shell-out.
+  // Slot 2 — gh auth token shell-out.
   const ghCli = await execGh();
   if (isNonEmpty(ghCli)) {
     return { token: ghCli.trim(), source: "gh_cli" };
   }
 
-  // Slot 5 — device-flow stored token.
+  // Slot 3 — device-flow stored token.
   const stored = await loadStored();
   if (isNonEmpty(stored)) {
     return { token: stored.trim(), source: "device_flow" };

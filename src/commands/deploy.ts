@@ -6,6 +6,7 @@ import {
   ConfigError,
   CredentialError,
   GitError,
+  PartialUploadError,
   StorageError,
 } from "../errors.js";
 import {
@@ -14,6 +15,7 @@ import {
 } from "../deploy/git.js";
 import { walkFiles as defaultWalkFiles } from "../deploy/walk.js";
 import { runBuild as defaultRunBuild } from "../lib/build.js";
+import { DEFAULT_PROXY_URL } from "../lib/constants.js";
 import { resolveIdentity as defaultResolveIdentity } from "../lib/identity.js";
 import { createIgnoreFilter } from "../lib/ignore.js";
 import {
@@ -28,11 +30,7 @@ import {
 } from "../lib/proxy-client.js";
 import { uploadFiles as defaultUploadFiles } from "../lib/upload.js";
 import { buildEnvelope, buildErrorEnvelope } from "../output/envelope.js";
-import {
-  EXIT_PARTIAL,
-  EXIT_USAGE,
-  exitWithCode,
-} from "../output/exit-codes.js";
+import { EXIT_USAGE, exitWithCode } from "../output/exit-codes.js";
 
 export interface DeployOptions {
   json: boolean;
@@ -57,9 +55,6 @@ export interface DeployDeps {
   logError?: (msg: string) => void;
   exit?: (code: number, message?: string) => never;
 }
-
-const DEFAULT_PROXY_URL = "https://uploads.freecode.camp";
-const DEFAULT_OUTPUT_DIR = "dist";
 
 const defaultReadPlatformYaml = async (cwd: string): Promise<string> => {
   return readFile(resolve(cwd, "platform.yaml"), "utf-8");
@@ -144,7 +139,47 @@ export async function deploy(
     // 2. Config.
     const config = await readAndParseConfig(cwd, readYaml);
 
-    // 3. Git state (informational).
+    // 3. Proxy client (early so preflight can run before the slow build).
+    const baseUrl = env["UNIVERSE_PROXY_URL"] ?? DEFAULT_PROXY_URL;
+    const client = mkClient({
+      baseUrl,
+      getAuthToken: () => identity.token,
+    });
+
+    // 4. Preflight authorization. Catches the most common staff-side
+    // failure (`site_unauthorized`) BEFORE running the build, and points
+    // at the registration runbook so the user knows the ask: "platform
+    // admin must add the site to artemis sites.yaml". One GET; cheap.
+    let me;
+    try {
+      me = await client.whoami();
+    } catch (err) {
+      rethrowProxy("whoami preflight failed", err);
+    }
+    if (!me.authorizedSites.includes(config.site)) {
+      const sitesLine =
+        me.authorizedSites.length > 0
+          ? me.authorizedSites.join(", ")
+          : "(no sites authorized)";
+      throw new CredentialError(
+        [
+          `Site '${config.site}' is not registered for your GitHub identity.`,
+          ``,
+          `  You are:           ${me.login}`,
+          `  Authorized sites:  ${sitesLine}`,
+          ``,
+          `Likely causes (most common first):`,
+          `  1. Platform admin has not added '${config.site}' to artemis`,
+          `     'config/sites.yaml' yet (one-time, per site).`,
+          `  2. You are not in any GitHub team listed for '${config.site}'.`,
+          ``,
+          `Runbook:`,
+          `  https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/01-deploy-new-constellation-site.md`,
+        ].join("\n"),
+      );
+    }
+
+    // 5. Git state (informational).
     const git = gitState();
     if (git.dirty) {
       warn(
@@ -153,10 +188,10 @@ export async function deploy(
     }
     const sha = git.hash ?? syntheticSha();
 
-    // 4. Build.
-    const outputDir = options.dir ?? config.build?.output ?? DEFAULT_OUTPUT_DIR;
+    // 6. Build.
+    const outputDir = options.dir ?? config.build.output;
     const buildResult = await build({
-      command: config.build?.command,
+      command: config.build.command,
       cwd,
       outputDir,
     });
@@ -165,7 +200,7 @@ export async function deploy(
     }
     const resolvedOutputDir = buildResult.outputDir;
 
-    // 5. Walk + ignore.
+    // 7. Walk + ignore.
     const walked = walk(resolvedOutputDir);
     const ignore = createIgnoreFilter(config.deploy.ignore);
     const filtered = walked.filter((f) => !ignore(f.relPath));
@@ -174,14 +209,7 @@ export async function deploy(
     }
     const fileList = filtered.map((f) => f.relPath);
 
-    // 6. Proxy client.
-    const baseUrl = env["UNIVERSE_PROXY_URL"] ?? DEFAULT_PROXY_URL;
-    const client = mkClient({
-      baseUrl,
-      getAuthToken: () => identity.token,
-    });
-
-    // 7. Init.
+    // 8. Init.
     let initResult;
     try {
       initResult = await client.deployInit({
@@ -279,8 +307,4 @@ export async function deploy(
     }
     exit(code, message);
   }
-}
-
-class PartialUploadError extends CliError {
-  readonly exitCode = EXIT_PARTIAL;
 }

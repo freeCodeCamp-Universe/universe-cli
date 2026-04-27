@@ -21,10 +21,33 @@ function handleActionError(command: string, json: boolean, err: unknown): void {
   exitWithCode(code, message);
 }
 
+/**
+ * cac (v6.7.x) does not support nested subcommands — it matches against
+ * a single argv segment only. We keep two cac instances and dispatch
+ * by detecting `static` as the first **non-flag** positional. This
+ * preserves global flags placed before the namespace token (e.g.
+ * `universe --json static deploy`).
+ */
+function findFirstPositional(args: readonly string[]): number {
+  for (let i = 0; i < args.length; i += 1) {
+    const a = args[i];
+    if (typeof a === "string" && !a.startsWith("-")) return i;
+  }
+  return -1;
+}
+
 export function run(argv = process.argv) {
   const args = argv.slice(2);
+  const firstPosIdx = findFirstPositional(args);
+  const isStatic = firstPosIdx >= 0 && args[firstPosIdx] === "static";
 
-  if (args[0] === "static") {
+  if (isStatic) {
+    // Drop just the `static` token; preserve flags + remaining args
+    // (the sub-action like `deploy`, plus any further flags).
+    const staticArgs = [
+      ...args.slice(0, firstPosIdx),
+      ...args.slice(firstPosIdx + 1),
+    ];
     const staticCli = cac("universe static");
 
     staticCli
@@ -96,7 +119,7 @@ export function run(argv = process.argv) {
 
     staticCli.help();
     staticCli.version(version);
-    staticCli.parse(["node", "universe-static", ...args.slice(1)]);
+    staticCli.parse(["node", "universe-static", ...staticArgs]);
   } else {
     const cli = cac("universe");
 
@@ -137,11 +160,9 @@ export function run(argv = process.argv) {
         }
       });
 
-    cli
-      .command("static [...args]", "Static site deployment commands")
-      .action(() => {
-        console.log("Run: universe static --help");
-      });
+    // Register `static` only for help text — the dispatch above
+    // intercepts before cac runs, so this action is unreachable.
+    cli.command("static <subcommand>", "Static site deployment commands");
 
     cli.help();
     cli.version(version);

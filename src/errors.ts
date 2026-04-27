@@ -3,7 +3,9 @@ import {
   EXIT_CONFIRM,
   EXIT_CREDENTIALS,
   EXIT_GIT,
+  EXIT_PARTIAL,
   EXIT_STORAGE,
+  EXIT_USAGE,
 } from "./output/exit-codes.js";
 
 /**
@@ -47,4 +49,12 @@ export class GitError extends CliError {
 
 export class ConfirmError extends CliError {
   readonly exitCode = EXIT_CONFIRM;
+}
+
+export class PartialUploadError extends CliError {
+  readonly exitCode = EXIT_PARTIAL;
+}
+
+export class UsageError extends CliError {
+  readonly exitCode = EXIT_USAGE;
 }

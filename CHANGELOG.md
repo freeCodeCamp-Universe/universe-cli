@@ -7,92 +7,83 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.4.0-alpha.2] - 2026-04-27
+## [0.4.0] - 2026-04-27
 
-Bake the freeCodeCamp GitHub OAuth App client id into the published
-binary so `universe login` works out of the box on user laptops without
-exporting `UNIVERSE_GH_CLIENT_ID` first. Matches `gh`, `vercel`,
-`supabase` CLI patterns. Closes the G2 (npm publish) blocker for
-sprint 2026-04-26.
+Proxy-plane pivot. Staff and CI hold only a `platform.yaml` + a GitHub
+identity; the R2 admin token lives exclusively inside the `artemis`
+proxy at `uploads.freecode.camp`. Locked by Universe ADR-016 + sprint
+2026-04-26 DECISIONS Q9–Q15 + 2026-04-27 CLI namespace amendment.
 
-### Added
-
-- `src/lib/constants.ts` — `DEFAULT_GH_CLIENT_ID` constant. Public
-  client id for the GitHub OAuth App "Universe CLI"; device flow does
-  not use a `client_secret`, so the value is safe to ship in source.
-
-### Changed
-
-- `universe login` no longer hard-errors when `UNIVERSE_GH_CLIENT_ID`
-  is unset, empty, or whitespace — it falls back to
-  `DEFAULT_GH_CLIENT_ID`. The env var still wins when set, preserving
-  the override path for fork tenants and self-hosted mirrors.
-- `README.md` — environment table updated to reflect the baked-in
-  default and the override semantics.
-
-### Removed
-
-- `src/commands/login.ts` no longer imports or invokes `EXIT_CONFIG`.
-  The previous "missing client id" error path is unreachable now that
-  a default is always available.
-
-## [0.4.0-alpha.1] - 2026-04-27
-
-Proxy-plane pivot. Staff and CI hands hold only a `platform.yaml` and a
-GitHub identity. The R2 admin token lives exclusively inside the
-`artemis` proxy service at `uploads.freecode.camp`. Locked by
-[Universe ADR-016](https://github.com/freeCodeCamp-Universe/Universe/blob/main/decisions/016-deploy-proxy.md)
-
-- Sprint 2026-04-26 DECISIONS Q9–Q15 + 2026-04-27 CLI namespace
-  amendment.
+This is a BREAKING release. v0.3.x consumers must migrate
+`platform.yaml` to the v2 schema and update the CLI surface (see
+**Changed**). The CLI no longer holds R2 credentials and never will.
 
 ### Added
 
 - `universe login` / `logout` / `whoami` top-level commands. `login`
-  drives a GitHub OAuth device flow against `UNIVERSE_GH_CLIENT_ID` and
+  drives a GitHub OAuth device flow against the baked-in
+  `DEFAULT_GH_CLIENT_ID` (override via `UNIVERSE_GH_CLIENT_ID`) and
   persists the bearer at `~/.config/universe-cli/token` (mode 0600).
 - `universe static ls [--site <site>]` lists recent deploys for the
   current (or specified) site.
 - `src/lib/proxy-client.ts` — typed fetch wrapper for the artemis
   routes (`/api/whoami`, `/api/deploy/{init,upload,finalize}`,
   `/api/site/{site}/{deploys,promote,rollback}`). 401/403 →
-  `EXIT_CREDENTIALS`; 422/5xx → `EXIT_STORAGE`; other 4xx → `EXIT_USAGE`.
-- `src/lib/identity.ts` — five-slot priority chain per ADR-016 Q10
-  (env → GHA OIDC → Woodpecker OIDC → `gh auth token` → device-flow
-  stored). `whoami` surfaces the resolved slot.
-- `src/lib/device-flow.ts` — RFC-8628 GitHub device flow with `slow_down`
-  - `expired_token` + `access_denied` handling.
+  `EXIT_CREDENTIALS`; 422/5xx → `EXIT_STORAGE`; other 4xx →
+  `EXIT_USAGE`. Exports `wrapProxyError(cmd, err)` so commands map
+  thrown errors to one envelope/exit pair.
+- `src/lib/identity.ts` — three-slot priority chain (post-F7):
+  `$GITHUB_TOKEN` / `$GH_TOKEN` env → `gh auth token` shell-out →
+  device-flow stored token. `whoami` surfaces the resolved slot.
+- `src/lib/device-flow.ts` — RFC-8628 GitHub device flow with
+  `slow_down` + `expired_token` + `access_denied` handling.
 - `src/lib/token-store.ts` — `~/.config/universe-cli/token` reader /
   writer / deleter; respects `$XDG_CONFIG_HOME`; file mode 0600 + dir
   mode 0700.
 - `src/lib/build.ts` — runs `platform.yaml` `build.command` in cwd via
   `shell: true` and verifies `build.output` directory landed.
-- `src/lib/upload.ts` — sequential per-file PUT to artemis with a
-  configurable concurrency cap (default 6) and per-file error
-  isolation. Surfaces partial uploads via `result.errors[]` so the
-  caller can refuse to finalize.
+- `src/lib/upload.ts` — per-file PUT to artemis with a configurable
+  concurrency cap (default 6) and per-file error isolation. Surfaces
+  partial uploads via `result.errors[]` so the caller can refuse to
+  finalize. Hand-rolled async semaphore + inline static-site MIME map
+  (no `p-limit` / `mrmime` runtime deps).
 - `src/lib/ignore.ts` — minimal gitignore-style matcher for the upload
   set (`*`, `**`, `?`, anchored vs basename matches).
-- Husky pre-commit gate now runs `pnpm typecheck` (tsc --noEmit)
-  alongside lint + test.
+- `src/lib/constants.ts` — `DEFAULT_GH_CLIENT_ID` (public OAuth App
+  client id, safe to ship in source) and `DEFAULT_PROXY_URL`
+  (`https://uploads.freecode.camp`).
+- `platform.yaml` v2 schema (`src/lib/platform-yaml.{ts,schema.ts}`)
+  with zod validator and strict unknown-key rejection. v1 migration
+  detector: any of `r2`, `stack`, `domain`, `static`, `name` at the
+  root produces a clear error pointing at `docs/platform-yaml.md`.
+- Husky pre-commit gate runs `pnpm lint` + `pnpm typecheck` +
+  `pnpm test`.
+- Release workflow now derives the npm dist-tag from the version
+  string (`alpha` / `beta` / `next` / `latest`) and flags GitHub
+  prerelease badges automatically.
 
 ### Changed
 
-- **BREAKING (CLI surface):** the v0.3 namespaced verbs change shape.
+- **BREAKING (CLI surface):**
   - `universe static deploy --force` → removed; missing git state
     auto-falls-back to a synthetic sha.
   - `universe static deploy --output-dir` → `--dir`.
   - `universe static promote <deployId>` (positional) →
     `--from <deployId>` (flag).
   - `universe static rollback --confirm` → `--to <deployId>` (required).
-- **BREAKING (network):** the CLI no longer reads R2 credentials. All
+  - cli.ts now detects `static` as the first non-flag positional, so
+    `universe --json static deploy` works alongside
+    `universe static deploy --json`.
+- **BREAKING (network):** CLI no longer reads R2 credentials. All
   uploads are streamed through the artemis proxy. Direct-to-R2 paths
-  (`@aws-sdk/client-s3`, `rclone` config probing, `~/.aws/credentials`)
-  are gone. Set `UNIVERSE_PROXY_URL` to override the default
-  `https://uploads.freecode.camp` host.
-- `universe static deploy` reads `platform.yaml` v2 (BREAKING schema in
-  the prior unreleased entry — same `site` / `build` / `deploy` shape;
-  no credential fields).
+  (`@aws-sdk/client-s3`, `rclone` config probing,
+  `~/.aws/credentials`) are gone. Set `UNIVERSE_PROXY_URL` to override
+  the default proxy host.
+- **BREAKING (`platform.yaml`):** v1 → v2. Removed `name` (renamed to
+  `site`), `stack`, `domain`, `static.*`, `r2.*`. New shape: `site`
+  (required) + `build` (defaulted) + `deploy` (defaulted).
+- `docs/platform-yaml.md` — `universe deploy` →
+  `universe static deploy` references updated.
 
 ### Removed
 
@@ -100,32 +91,18 @@ GitHub identity. The R2 admin token lives exclusively inside the
 - `src/storage/` — direct S3 client + alias / deploys / operations
   helpers.
 - `src/deploy/{upload,id,preflight,metadata}.ts` — pre-pivot deploy
-  pipeline. The proxy now owns deploy id minting, alias atomicity, and
-  metadata.
-- `src/config/{loader,schema}.ts` — replaced by `src/lib/platform-yaml.*`
-  (v2).
+  pipeline. The proxy now owns deploy id minting, alias atomicity,
+  and metadata.
+- `src/config/{loader,schema}.ts` — replaced by
+  `src/lib/platform-yaml.*` (v2).
 - `errors.OutputDirError`, `errors.AliasError`,
   `errors.DeployNotFoundError` — no callers post-pivot.
-- Dependencies: `@aws-sdk/client-s3`, `@smithy/util-stream`,
-  `aws-sdk-client-mock`, `aws-sdk-client-mock-vitest`.
-
-### Migrated
-
-- `docs/platform-yaml.md` references updated `universe deploy` →
-  `universe static deploy` (folded from sprint 2026-04-26 / T33).
-
-### Schema (v2 — pre-pivot snapshot, unchanged)
-
-- `platform.yaml` v2 schema (`src/lib/platform-yaml.{ts,schema.ts}`) with
-  zod validator and strict unknown-key rejection. Surface:
-  `parsePlatformYaml(text)` returns `{ok, value | error}`.
-- `docs/platform-yaml.md` — v2 schema reference.
-- v1 migration detector: any of `r2`, `stack`, `domain`, `static`, `name`
-  at the root produces a clear error pointing at the migration doc.
-- **BREAKING (schema, retained from prior unreleased):** `platform.yaml`
-  v0.3 → v0.4. Removed `name` (renamed to `site`), `stack`, `domain`,
-  `static.*`, `r2.*`. New shape: `site` (required) + optional `build` +
-  optional `deploy`.
+- Identity slots `gha_oidc` and `woodpecker_oidc` — artemis validates
+  bearers via GitHub `GET /user`, which only accepts user-scoped PATs
+  / OAuth tokens. Re-add when artemis grows an OIDC verifier.
+- Runtime deps: `@aws-sdk/client-s3`, `@smithy/util-stream`,
+  `aws-sdk-client-mock`, `aws-sdk-client-mock-vitest`, `mrmime`,
+  `p-limit`.
 
 ## [0.3.3] - 2026-04-18
 

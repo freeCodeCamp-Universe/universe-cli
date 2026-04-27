@@ -155,7 +155,20 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm tsup
       - run: npm version "$VERSION" --no-git-tag-version --allow-same-version
-      - run: npm publish --provenance --access public
+      # G1 — derive npm dist-tag from the version. Stable releases land
+      # on `latest`; prereleases on `alpha` / `beta` / `next` so that
+      # `npm i -g @freecodecamp/universe-cli` keeps resolving to the
+      # last stable for unflagged consumers.
+      - name: Resolve npm dist-tag
+        id: npmtag
+        run: |
+          case "$VERSION" in
+            *-alpha*) echo "tag=alpha" >> "$GITHUB_OUTPUT" ;;
+            *-beta*)  echo "tag=beta"  >> "$GITHUB_OUTPUT" ;;
+            *-rc*)    echo "tag=next"  >> "$GITHUB_OUTPUT" ;;
+            *)        echo "tag=latest" >> "$GITHUB_OUTPUT" ;;
+          esac
+      - run: npm publish --provenance --access public --tag ${{ steps.npmtag.outputs.tag }}
 
   release:
     needs: [bump, build, publish]
@@ -191,10 +204,21 @@ jobs:
             echo "ERROR: No CHANGELOG.md section found for version $VERSION_PATTERN" >&2
             exit 1
           fi
+      # G2 — flag prereleases so the GitHub UI badges them and `latest
+      # release` API stays pinned to the last stable.
+      - name: Resolve prerelease flag
+        id: prerelease
+        run: |
+          if [[ "$VERSION" == *-* ]]; then
+            echo "flag=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "flag=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: Create release
         uses: softprops/action-gh-release@6da8fa9354ddfdc4aeace5fc48d7f679b5214090
         with:
           tag_name: "v${{ inputs.version }}"
+          prerelease: ${{ steps.prerelease.outputs.flag }}
           body_path: RELEASE_NOTES.md
           files: |
             universe-darwin-arm64

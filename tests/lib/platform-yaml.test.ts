@@ -17,7 +17,11 @@ describe("parsePlatformYaml — v2 schema", () => {
           ".git/**",
           ".env*",
         ]);
-        expect(r.value.build).toBeUndefined();
+        // F3 — build defaults via schema prefault to keep
+        // `config.build.output` reachable without `?? "dist"` fallback
+        // in command code.
+        expect(r.value.build).toEqual({ output: "dist" });
+        expect(r.value.build.command).toBeUndefined();
       }
     });
 
@@ -50,7 +54,7 @@ describe("parsePlatformYaml — v2 schema", () => {
       const r = parsePlatformYaml(text);
       expect(r.ok).toBe(true);
       if (r.ok) {
-        expect(r.value.build?.output).toBe("dist");
+        expect(r.value.build.output).toBe("dist");
       }
     });
   });

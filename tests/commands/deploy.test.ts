@@ -39,7 +39,10 @@ function mkProxy(): {
   siteRollback: ReturnType<typeof vi.fn>;
 } {
   return {
-    whoami: vi.fn(),
+    whoami: vi.fn().mockResolvedValue({
+      login: "raisedadead",
+      authorizedSites: ["my-site"],
+    }),
     deployInit: vi.fn().mockResolvedValue({
       deployId: "20260427-abc1234",
       jwt: "jwt_xxx",
@@ -231,6 +234,46 @@ describe("deploy command (proxy plane)", () => {
       });
       await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
       expect(deps.exit).toHaveBeenCalledWith(11, expect.any(String));
+    });
+  });
+
+  describe("preflight authorization (whoami)", () => {
+    it("calls whoami before runBuild and short-circuits when site not authorized", async () => {
+      const proxy = mkProxy();
+      proxy.whoami.mockResolvedValue({
+        login: "freeCodeCamp-bot",
+        authorizedSites: ["other-site"],
+      });
+      const deps = mkDeps({
+        createProxyClient: vi.fn().mockReturnValue(proxy),
+      });
+      await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
+      // whoami called BEFORE the slow build step.
+      expect(proxy.whoami).toHaveBeenCalledTimes(1);
+      expect(deps.runBuild).not.toHaveBeenCalled();
+      expect(proxy.deployInit).not.toHaveBeenCalled();
+      // Exit credentials with helpful body: login, authorized list, runbook URL.
+      expect(deps.exit).toHaveBeenCalledWith(
+        12,
+        expect.stringContaining("my-site"),
+      );
+      const exitMsg = deps.exit.mock.calls[0]?.[1] as string;
+      expect(exitMsg).toContain("freeCodeCamp-bot");
+      expect(exitMsg).toContain("other-site");
+      expect(exitMsg).toContain(
+        "freeCodeCamp/infra/blob/main/docs/runbooks/01-deploy-new-constellation-site.md",
+      );
+    });
+
+    it("proceeds when site IS in authorizedSites (default happy fixture)", async () => {
+      const deps = mkDeps();
+      await deploy({ json: false }, deps);
+      const proxy = deps.createProxyClient.mock.results[0]?.value as ReturnType<
+        typeof mkProxy
+      >;
+      expect(proxy.whoami).toHaveBeenCalledTimes(1);
+      expect(deps.runBuild).toHaveBeenCalledTimes(1);
+      expect(proxy.deployInit).toHaveBeenCalledTimes(1);
     });
   });
 

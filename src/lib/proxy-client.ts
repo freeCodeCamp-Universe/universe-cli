@@ -123,6 +123,37 @@ function mapExitCode(status: number): number {
   return EXIT_USAGE;
 }
 
+/**
+ * Format a proxy or generic error for the per-command catch path.
+ * promote/rollback/ls share the same shape:
+ *
+ *   ProxyError → `<cmd> failed (<code>): <message>`
+ *   CliError   → preserve message verbatim
+ *   Error      → preserve message verbatim
+ *   other      → String(err)
+ *
+ * Pure — returns `{code, message}` so the caller writes one
+ * envelope/exit pair without re-implementing the dispatch.
+ */
+export function wrapProxyError(
+  command: string,
+  err: unknown,
+): { code: number; message: string } {
+  if (err instanceof ProxyError) {
+    return {
+      code: err.exitCode,
+      message: `${command} failed (${err.code}): ${err.message}`,
+    };
+  }
+  if (err instanceof CliError) {
+    return { code: err.exitCode, message: err.message };
+  }
+  if (err instanceof Error) {
+    return { code: EXIT_USAGE, message: err.message };
+  }
+  return { code: EXIT_USAGE, message: String(err) };
+}
+
 interface ProxyErrorEnvelope {
   error?: {
     code?: string;

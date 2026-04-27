@@ -13,3 +13,10 @@
  * env var; the env value wins when set.
  */
 export const DEFAULT_GH_CLIENT_ID = "Iv23liIuGmZRyPd5wUeN";
+
+/**
+ * Public artemis deploy proxy. Override via `UNIVERSE_PROXY_URL` env
+ * (used by the integration suite + staged smoke runs against
+ * `uploads-staging.freecode.camp` or local `http://localhost:8080`).
+ */
+export const DEFAULT_PROXY_URL = "https://uploads.freecode.camp";

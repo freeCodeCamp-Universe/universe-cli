@@ -284,4 +284,22 @@ describe("universe static namespace", () => {
     expect(output).toContain("--promote");
     expect(output).toContain("--dir");
   });
+
+  it("global --json BEFORE 'static' still routes to staticCli (F6)", async () => {
+    mockDeploy.mockResolvedValue(undefined);
+    run(["node", "universe", "--json", "static", "deploy"]);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(mockDeploy).toHaveBeenCalledWith(
+      expect.objectContaining({ json: true }),
+    );
+  });
+
+  it("flags AFTER 'static deploy' still parse correctly", async () => {
+    mockDeploy.mockResolvedValue(undefined);
+    run(["node", "universe", "static", "deploy", "--json", "--promote"]);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(mockDeploy).toHaveBeenCalledWith(
+      expect.objectContaining({ json: true, promote: true }),
+    );
+  });
 });

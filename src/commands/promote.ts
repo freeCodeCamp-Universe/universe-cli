@@ -1,7 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { log } from "@clack/prompts";
-import { CliError, ConfigError, CredentialError } from "../errors.js";
+import { ConfigError, CredentialError } from "../errors.js";
+import { DEFAULT_PROXY_URL } from "../lib/constants.js";
 import { resolveIdentity as defaultResolveIdentity } from "../lib/identity.js";
 import {
   parsePlatformYaml,
@@ -9,12 +10,12 @@ import {
 } from "../lib/platform-yaml.js";
 import {
   createProxyClient as defaultCreateProxyClient,
-  ProxyError,
+  wrapProxyError,
   type ProxyClient,
   type ProxyClientConfig,
 } from "../lib/proxy-client.js";
 import { buildEnvelope, buildErrorEnvelope } from "../output/envelope.js";
-import { EXIT_USAGE, exitWithCode } from "../output/exit-codes.js";
+import { exitWithCode } from "../output/exit-codes.js";
 
 export interface PromoteOptions {
   json: boolean;
@@ -32,8 +33,6 @@ export interface PromoteDeps {
   logError?: (msg: string) => void;
   exit?: (code: number, message?: string) => never;
 }
-
-const DEFAULT_PROXY_URL = "https://uploads.freecode.camp";
 
 const defaultReadPlatformYaml = async (cwd: string): Promise<string> => {
   return readFile(resolve(cwd, "platform.yaml"), "utf-8");
@@ -130,21 +129,7 @@ export async function promote(
       );
     }
   } catch (err) {
-    let code: number;
-    let message: string;
-    if (err instanceof ProxyError) {
-      code = err.exitCode;
-      message = `promote failed (${err.code}): ${err.message}`;
-    } else if (err instanceof CliError) {
-      code = err.exitCode;
-      message = err.message;
-    } else if (err instanceof Error) {
-      code = EXIT_USAGE;
-      message = err.message;
-    } else {
-      code = EXIT_USAGE;
-      message = String(err);
-    }
+    const { code, message } = wrapProxyError("promote", err);
     if (options.json) {
       emitJson(buildErrorEnvelope("promote", code, message));
     } else {

@@ -58,7 +58,7 @@ const deploySchema = z
 export const platformYamlSchemaV2 = z
   .object({
     site: siteName,
-    build: buildSchema.optional(),
+    build: buildSchema.prefault({}),
     deploy: deploySchema,
   })
   .strict();
