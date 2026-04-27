@@ -9,7 +9,7 @@ import {
  * Typed fetch wrapper for the artemis deploy proxy.
  *
  * Mirrors the routes defined in
- * `~/DEV/fCC-U/artemis/internal/server/server.go` and the request /
+ * `~/DEV/fCC/artemis/internal/server/server.go` and the request /
  * response shapes from `internal/handler/{deploy,site,whoami}.go`.
  *
  *   GET    /api/whoami                                — GitHub bearer
