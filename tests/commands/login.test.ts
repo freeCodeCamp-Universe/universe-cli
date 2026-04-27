@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { login } from "../../src/commands/login.js";
+import { DEFAULT_GH_CLIENT_ID } from "../../src/lib/constants.js";
 
 interface FakeDeps {
   runDeviceFlow: ReturnType<typeof vi.fn>;
@@ -119,12 +120,30 @@ describe("login command", () => {
     expect(successLine.stored).toBe(true);
   });
 
-  it("errors when UNIVERSE_GH_CLIENT_ID env is unset", async () => {
+  it("falls back to DEFAULT_GH_CLIENT_ID when env is unset", async () => {
     const deps = mkDeps({ env: {} });
-    await expect(login({ json: false }, deps)).rejects.toThrow("__exit__");
-    expect(deps.runDeviceFlow).not.toHaveBeenCalled();
-    expect(deps.logError).toHaveBeenCalled();
-    expect(deps.exit).toHaveBeenCalledWith(11, expect.any(String));
+    await login({ json: false }, deps);
+    expect(deps.runDeviceFlow).toHaveBeenCalledTimes(1);
+    const arg = deps.runDeviceFlow.mock.calls[0][0];
+    expect(arg.clientId).toBe(DEFAULT_GH_CLIENT_ID);
+    expect(deps.exit).not.toHaveBeenCalled();
+  });
+
+  it("falls back to DEFAULT_GH_CLIENT_ID when env is empty string", async () => {
+    const deps = mkDeps({ env: { UNIVERSE_GH_CLIENT_ID: "" } });
+    await login({ json: false }, deps);
+    expect(deps.runDeviceFlow).toHaveBeenCalledTimes(1);
+    const arg = deps.runDeviceFlow.mock.calls[0][0];
+    expect(arg.clientId).toBe(DEFAULT_GH_CLIENT_ID);
+    expect(deps.exit).not.toHaveBeenCalled();
+  });
+
+  it("falls back to DEFAULT_GH_CLIENT_ID when env is whitespace", async () => {
+    const deps = mkDeps({ env: { UNIVERSE_GH_CLIENT_ID: "   " } });
+    await login({ json: false }, deps);
+    expect(deps.runDeviceFlow).toHaveBeenCalledTimes(1);
+    const arg = deps.runDeviceFlow.mock.calls[0][0];
+    expect(arg.clientId).toBe(DEFAULT_GH_CLIENT_ID);
   });
 
   it("refuses to overwrite existing token without --force", async () => {

@@ -1,4 +1,5 @@
 import { log } from "@clack/prompts";
+import { DEFAULT_GH_CLIENT_ID } from "../lib/constants.js";
 import { runDeviceFlow as defaultRunDeviceFlow } from "../lib/device-flow.js";
 import {
   loadToken as defaultLoadToken,
@@ -6,7 +7,6 @@ import {
 } from "../lib/token-store.js";
 import { buildEnvelope } from "../output/envelope.js";
 import {
-  EXIT_CONFIG,
   EXIT_CONFIRM,
   EXIT_CREDENTIALS,
   exitWithCode,
@@ -47,24 +47,11 @@ export async function login(
   const error = deps.logError ?? ((s: string) => log.error(s));
   const exit = deps.exit ?? exitWithCode;
 
-  const clientId = env["UNIVERSE_GH_CLIENT_ID"];
-  if (!clientId || clientId.trim().length === 0) {
-    const msg =
-      "UNIVERSE_GH_CLIENT_ID env var is required. Ask the platform team for the GitHub OAuth App client id.";
-    if (options.json) {
-      emitJson({
-        schemaVersion: "1",
-        command: "login",
-        success: false,
-        timestamp: new Date().toISOString(),
-        error: { code: EXIT_CONFIG, message: msg },
-      });
-    } else {
-      error(msg);
-    }
-    exit(EXIT_CONFIG, msg);
-    return;
-  }
+  const envClientId = env["UNIVERSE_GH_CLIENT_ID"];
+  const clientId =
+    envClientId && envClientId.trim().length > 0
+      ? envClientId
+      : DEFAULT_GH_CLIENT_ID;
 
   if (!options.force) {
     const existing = await load();

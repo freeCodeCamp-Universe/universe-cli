@@ -131,11 +131,17 @@ explicitly.
 
 ## Environment overrides
 
-| Env                         | Default                         | Purpose                            |
-| --------------------------- | ------------------------------- | ---------------------------------- |
-| `UNIVERSE_PROXY_URL`        | `https://uploads.freecode.camp` | Override proxy host (staging etc.) |
-| `UNIVERSE_GH_CLIENT_ID`     | —                               | GitHub OAuth App id (`login` only) |
-| `GITHUB_TOKEN` / `GH_TOKEN` | —                               | Slot 1 of identity chain           |
+| Env                         | Default                          | Purpose                                                   |
+| --------------------------- | -------------------------------- | --------------------------------------------------------- |
+| `UNIVERSE_PROXY_URL`        | `https://uploads.freecode.camp`  | Override proxy host (staging etc.)                        |
+| `UNIVERSE_GH_CLIENT_ID`     | _baked-in freeCodeCamp OAuth id_ | Override GitHub OAuth App id (fork tenants, `login` only) |
+| `GITHUB_TOKEN` / `GH_TOKEN` | —                                | Slot 1 of identity chain                                  |
+
+The shipped binary embeds the `freeCodeCamp` GitHub OAuth App client id
+(public; device flow uses no `client_secret`), so `universe login` works
+out of the box for staff. Fork operators and self-hosted mirror tenants
+set `UNIVERSE_GH_CLIENT_ID` to their own OAuth App's id — env value
+wins when set.
 
 ## Development
 

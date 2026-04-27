@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0-alpha.2] - 2026-04-27
+
+Bake the freeCodeCamp GitHub OAuth App client id into the published
+binary so `universe login` works out of the box on user laptops without
+exporting `UNIVERSE_GH_CLIENT_ID` first. Matches `gh`, `vercel`,
+`supabase` CLI patterns. Closes the G2 (npm publish) blocker for
+sprint 2026-04-26.
+
+### Added
+
+- `src/lib/constants.ts` — `DEFAULT_GH_CLIENT_ID` constant. Public
+  client id for the GitHub OAuth App "Universe CLI"; device flow does
+  not use a `client_secret`, so the value is safe to ship in source.
+
+### Changed
+
+- `universe login` no longer hard-errors when `UNIVERSE_GH_CLIENT_ID`
+  is unset, empty, or whitespace — it falls back to
+  `DEFAULT_GH_CLIENT_ID`. The env var still wins when set, preserving
+  the override path for fork tenants and self-hosted mirrors.
+- `README.md` — environment table updated to reflect the baked-in
+  default and the override semantics.
+
+### Removed
+
+- `src/commands/login.ts` no longer imports or invokes `EXIT_CONFIG`.
+  The previous "missing client id" error path is unreachable now that
+  a default is always available.
+
 ## [0.4.0-alpha.1] - 2026-04-27
 
 Proxy-plane pivot. Staff and CI hands hold only a `platform.yaml` and a
