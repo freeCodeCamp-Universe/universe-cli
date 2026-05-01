@@ -70,7 +70,7 @@ Static-site verbs (namespaced under `static`):
 universe static deploy [--promote] [--dir <path>]
 universe static promote [--from <deployId>]
 universe static rollback --to <deployId>
-universe static ls [--site <site>]
+universe static list [--site <site>]
 ```
 
 All commands support `--json` for CI integration.
@@ -116,7 +116,7 @@ universe static deploy
 universe whoami
 
 # 4. List recent deploys for the current site
-universe static ls
+universe static list
 
 # 5. Promote current preview to production
 universe static promote
@@ -148,9 +148,10 @@ wins when set.
 ```sh
 pnpm install
 pnpm test          # vitest
-pnpm typecheck     # tsc --noEmit
+pnpm check         # tsc --noEmit
 pnpm lint          # oxlint
-pnpm build         # tsup → dist/
+pnpm build         # tsc -> dist
+pnpm start
 ```
 
 ## Releasing

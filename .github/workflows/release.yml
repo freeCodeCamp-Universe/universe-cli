@@ -109,7 +109,7 @@ jobs:
           node-version: "24"
           cache: "pnpm"
       - run: pnpm install --frozen-lockfile
-      - run: pnpm tsup
+      - run: pnpm tsdown
       - name: Generate SEA blob
         run: node --experimental-sea-config sea-config.json
       - name: Create executable
@@ -153,7 +153,7 @@ jobs:
           cache: "pnpm"
           registry-url: "https://registry.npmjs.org"
       - run: pnpm install --frozen-lockfile
-      - run: pnpm tsup
+      - run: pnpm tsdown
       - run: npm version "$VERSION" --no-git-tag-version --allow-same-version
       # G1 — derive npm dist-tag from the version. Stable releases land
       # on `latest`; prereleases on `alpha` / `beta` / `next` so that

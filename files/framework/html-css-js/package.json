@@ -1,0 +1,10 @@
+{
+  "devDependencies": {
+    "serve": "^14"
+  },
+  "name": "{{name}}",
+  "private": true,
+  "scripts": {
+    "dev": "serve public -l {{port}}"
+  }
+}

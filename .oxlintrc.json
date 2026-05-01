@@ -1,6 +1,101 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["import", "typescript"],
-  "ignorePatterns": ["dist/", "coverage/", "node_modules/"],
-  "rules": {}
+  "plugins": ["eslint", "import", "typescript", "react", "oxc", "promise", "vitest"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "pedantic": "error",
+    "perf": "error",
+    "style": "error"
+  },
+  "options": {
+    "typeAware": true,
+    "typeCheck": true,
+    "reportUnusedDisableDirectives": "error"
+  },
+  "ignorePatterns": ["files/**", "dist/**", ".lintstagedrc.mjs"],
+  "rules": {
+    /* This is a fine rule, but only if it's auto-fixable (which it isn't right now) */
+    "sort-imports": "off",
+    /* Small ids are fine. Correct usage is too context-dependent for a lint
+    rule*/
+    "id-length": "off",
+    /* I don't find `() => voidFun()` confusing. */
+    "typescript/no-confusing-void-expression": ["error", { "ignoreArrowShorthand": true }],
+    /* Ternaries are fine - excessive nesting is not */
+    "no-ternary": "off",
+    /* Import: each module should have a single export declaration so it's
+    immediately obvious what is in the public api */
+    "import/no-named-export": "off",
+    "import/no-default-export": "error",
+    "import/group-exports": "error",
+    "import/prefer-default-export": "off",
+    /* Too dogmatic. A responsibility does not have to be contained with a
+    single class */
+    "max-classes-per-file": "off",
+    "max-params": ["error", { "max": 4 }],
+    /* This is a useful code smell, but fixing it on the fly warps the codebase.
+    It only makes sense as a refactoring hint */
+    "import/max-dependencies": "off",
+    /* We're using node */
+    "import/no-nodejs-modules": "off",
+    /* Makes it explicit */
+    "import/enforce-node-protocol-usage": "error",
+    /* Various rules conflict  */
+    "no-duplicate-imports": ["error", { "allowSeparateTypeImports": true }],
+    /* TEST SPECIFIC RULES BELOW. Move to override when override bugs are fixed */
+    "vitest/prefer-describe-function-title": "error",
+    "jest/valid-title": "off",
+    /* This doesn't apply to vitest and the vitest version does not work */
+    "jest/valid-expect": "off",
+    /* describe blocks include functions and can be quite large, so this doesn't make sense*/
+    "max-lines-per-function": "off",
+    /* each test is a statement */
+    "max-statements": "off",
+    /* Starting a comment with a capital letter is generally nicer, but there are common exceptions (e.g. function names: // mkdir needs to be...) */
+    "eslint/capitalized-comments": "off",
+    /* magic numbers aren't great, but the blanket rule has too many false
+    positives (e.g. 0 in a loop or 2 as a divisor) and I don't want to configure
+    it */
+    "no-magic-numbers": "off",
+    "max-lines": ["error", { "max": 1000 }],
+    /* Before/after hooks have their place*/
+    "no-hooks": "off",
+    /* A fairly common pattern is to declare a variable in describe block and
+    initialize it in a hook. We want to allow this. */
+    "init-declarations": "off",
+    /* Strictness is preferrable for true or false */
+    "vitest/prefer-to-be-falsy": "off",
+    "vitest/prefer-to-be-truthy": "off",
+    /* Either calledOnce or calledTimes(1) is fine, but we should pick one for consistency */
+    "vitest/prefer-called-times": "off",
+    /* We're more interested in testing behaviour. If a test needs to make an unsafe assertion, that's okay */
+    "typescript/no-unsafe-type-assertion": "off",
+    /* Nullable booleans get a pass so that optional flags (e.g. opts.isWhatever) can be used in ternaries */
+    "typescript/strict-boolean-expressions": [
+      "error",
+      { "allowNullableBoolean": true, "allowNullableString": true }
+    ],
+    /* Generally this is a little neater, but there are lot of false positives.
+    Consider simply disabling if the allowedPrefixes balloons */
+    "jest/prefer-lowercase-title": [
+      "error",
+      {
+        "allowedPrefixes": [
+          /* HTTP methods */
+          "GET",
+          "POST",
+          "PUT",
+          "PATCH",
+          "DELETE",
+          "HEAD",
+          "OPTIONS",
+          "TRACE",
+          "CONNECT",
+          /* Standard acronyms */
+          "URL"
+        ]
+      }
+    ]
+  }
 }

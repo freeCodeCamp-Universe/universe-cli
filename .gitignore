@@ -1,6 +1,10 @@
+# Workaround for oxlint (which includes parent folder's .gitignores): explicitly include all files, then exclude the ones we don't want
+!**/*
 node_modules/
 dist/
 coverage/
+tmp/
+.vscode
 
 # Beads / Dolt files (added by bd init)
 .dolt/
