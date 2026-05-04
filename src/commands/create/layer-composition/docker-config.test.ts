@@ -1,5 +1,5 @@
 import { parse as parseYaml } from "yaml";
-import { buildComposeDevYaml } from "./build-compose-dev-yaml.js";
+import { buildComposeDevYaml } from "./docker-config.js";
 import type { FrameworkLayerData, PackageManagerLayerData } from "./schemas/layers.js";
 
 const framework: FrameworkLayerData = {

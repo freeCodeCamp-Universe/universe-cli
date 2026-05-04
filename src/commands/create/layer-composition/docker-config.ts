@@ -38,4 +38,23 @@ const buildComposeDevYaml = (
   return stringifyYaml(compose);
 };
 
-export { buildComposeDevYaml };
+const buildDevcontainerComposeYaml = () => `services:
+  devcontainer:
+    build:
+      context: ..
+      target: dev
+    command: ["sleep", "infinity"]
+    volumes:
+    # first mount the source
+      - ..:/app:cached
+    # then override node_modules with the container's folder
+      - /app/node_modules
+`;
+
+const buildDevcontainerJson = () => `{
+  "dockerComposeFile": ["./docker-compose.yml"],
+  "service": "devcontainer",
+  "workspaceFolder": "/app"
+}`;
+
+export { buildComposeDevYaml, buildDevcontainerComposeYaml, buildDevcontainerJson };

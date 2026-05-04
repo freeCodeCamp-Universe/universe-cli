@@ -1,5 +1,9 @@
 import type { CreateSelections } from "../prompt/prompt.port.js";
-import { buildComposeDevYaml } from "./build-compose-dev-yaml.js";
+import {
+  buildComposeDevYaml,
+  buildDevcontainerComposeYaml,
+  buildDevcontainerJson,
+} from "./docker-config.js";
 import { composeLayerFiles } from "./compose-layer-files.js";
 import databaseLayer from "./layers/database.json" with { type: "json" };
 import serviceLayer from "./layers/service.json" with { type: "json" };
@@ -126,6 +130,8 @@ class LayerCompositionService implements LayerComposer {
           buildDockerfileData(runtimeData, frameworkData, pmData),
         );
         renderedFiles["docker-compose.dev.yml"] = buildComposeDevYaml(frameworkData, pmData);
+        renderedFiles[".devcontainer/docker-compose.yml"] = buildDevcontainerComposeYaml();
+        renderedFiles[".devcontainer/devcontainer.json"] = buildDevcontainerJson();
       }
     }
 

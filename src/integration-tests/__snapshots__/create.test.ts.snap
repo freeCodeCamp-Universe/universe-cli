@@ -2,6 +2,23 @@
 
 exports[`create > snapshots generated Node.js scaffold output 1`] = `
 {
+  ".devcontainer/devcontainer.json": "{
+  "dockerComposeFile": ["./docker-compose.yml"],
+  "service": "devcontainer",
+  "workspaceFolder": "/app"
+}",
+  ".devcontainer/docker-compose.yml": "services:
+  devcontainer:
+    build:
+      context: ..
+      target: dev
+    command: ["sleep", "infinity"]
+    volumes:
+    # first mount the source
+      - ..:/app:cached
+    # then override node_modules with the container's folder
+      - /app/node_modules
+",
   ".dockerignore": ".git
 node_modules
 dist
@@ -111,6 +128,23 @@ app.listen(3000, () => {
 
 exports[`create > snapshots generated Static scaffold output 1`] = `
 {
+  ".devcontainer/devcontainer.json": "{
+  "dockerComposeFile": ["./docker-compose.yml"],
+  "service": "devcontainer",
+  "workspaceFolder": "/app"
+}",
+  ".devcontainer/docker-compose.yml": "services:
+  devcontainer:
+    build:
+      context: ..
+      target: dev
+    command: ["sleep", "infinity"]
+    volumes:
+    # first mount the source
+      - ..:/app:cached
+    # then override node_modules with the container's folder
+      - /app/node_modules
+",
   ".dockerignore": ".git
 node_modules
 dist
