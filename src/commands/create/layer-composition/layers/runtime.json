@@ -1,0 +1,48 @@
+{
+  "node": {
+    "baseImage": "node:22-alpine",
+    "databases": [
+      "postgresql",
+      "redis"
+    ],
+    "files": {
+      "package.json": "{\n  \"name\": \"{{name}}\",\n  \"private\": true,\n  \"type\": \"module\"\n}\n",
+      "Procfile": "web: node dist/index.js\n"
+    },
+    "frameworks": [
+      "express",
+      "typescript"
+    ],
+    "packageManagers": [
+      "pnpm",
+      "bun"
+    ],
+    "services": [
+      "analytics",
+      "auth",
+      "email"
+    ]
+  },
+  "static_web": {
+    "baseImage": "node:22-alpine",
+    "databases": [],
+    "files": {
+      "pnpm-workspace.yaml": "",
+      "Procfile": "web: npx serve public -l {{port}}\n"
+    },
+    "frameworks": [
+      "html-css-js",
+      "react-vite",
+      "tanstack-shadcn"
+    ],
+    "packageManagers": [
+      "pnpm",
+      "bun"
+    ],
+    "services": [
+      "analytics",
+      "auth",
+      "email"
+    ]
+  }
+}

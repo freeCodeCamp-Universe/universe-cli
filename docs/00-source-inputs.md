@@ -53,49 +53,52 @@ One unified `universe` CLI using [clack](https://github.com/bombshell-dev/clack)
 ### Two-step creation flow
 
 **Step 1: Scaffold locally (`universe create`)**
-
 ```
+
 $ universe create
 
-┌  Create a new constellation
+┌ Create a new constellation
 │
-◆  Name?
-│  my-awesome-app
+◆ Name?
+│ my-awesome-app
 │
-◆  Runtime
-│  ○ Node.js (TypeScript)
-│  ○ Python
-│  ○ Go
-│  ○ Static (HTML/CSS/JS)
+◆ Runtime
+│ ○ Node.js (TypeScript)
+│ ○ Python
+│ ○ Go
+│ ○ Static (HTML/CSS/JS)
 │
-◆  Framework
-│  ○ Express / Next.js / Fastify / Hono / None
+◆ Framework
+│ ○ Express / Next.js / Fastify / Hono / None
 │
-◆  Database (pick any)
-│  ☐ PostgreSQL  ☐ MongoDB  ☐ SQLite  ☐ Redis  ☐ None
+◆ Database (pick any)
+│ ☐ PostgreSQL ☐ MongoDB ☐ SQLite ☐ Redis ☐ None
 │
-◆  Platform services (pick any)
-│  ☐ Auth (OIDC)  ☐ Email  ☐ Analytics
+◆ Platform services (pick any)
+│ ☐ Auth (OIDC) ☐ Email ☐ Analytics
 │
-└  Created my-awesome-app/ locally
+└ Created my-awesome-app/ locally
+
 ```
 
 **Step 2: Register with the platform (`universe register`)**
 
 ```
+
 $ cd my-awesome-app
 $ universe register
 
-┌  Registering constellation: my-awesome-app
+┌ Registering constellation: my-awesome-app
 │
-◇  Created GitHub repo: freeCodeCamp-Universe/my-awesome-app
-◇  Added to app registry
-◇  Provisioning services...
-◇  Configuring build pipeline
+◇ Created GitHub repo: freeCodeCamp-Universe/my-awesome-app
+◇ Added to app registry
+◇ Provisioning services...
+◇ Configuring build pipeline
 │
-└  Registered! Push code to deploy.
-    Preview: preview.my-awesome-app.com
-    Production: my-awesome-app.com
+└ Registered! Push code to deploy.
+Preview: preview.my-awesome-app.com
+Production: my-awesome-app.com
+
 ```
 
 Separation matters: scaffolding is free and local. Registration provisions real infrastructure (costs money, can fail).
@@ -105,31 +108,33 @@ Separation matters: scaffolding is free and local. Registration provisions real 
 Templates assembled from independent layers, not monolithic starters:
 
 ```
+
 layers/
-├── base/              # runtime: tsconfig/pyproject.toml/go.mod + Procfile
-│   ├── node-ts/
-│   ├── python/
-│   ├── go/
-│   └── static/
-├── frameworks/        # contextual to runtime
-│   ├── express/
-│   ├── nextjs/
-│   ├── fastify/
-│   ├── flask/
-│   └── ...
-├── services/          # additive integrations
-│   ├── postgres/      # DB client + DATABASE_URL
-│   ├── mongodb/       # Mongo client
-│   ├── sqlite/        # SQLite setup
-│   ├── redis/         # Redis client (maps to Valkey under the hood)
-│   ├── auth/          # OIDC middleware + JWT validation
-│   ├── email/         # Email helper calling Account Service API
-│   └── analytics/     # Script tag / SDK
-└── always/            # every constellation gets these
-    ├── platform.yaml
-    ├── docker-compose.dev.yml
-    ├── .gitignore
-    └── README.md
+├── base/ # runtime: tsconfig/pyproject.toml/go.mod + Procfile
+│ ├── node-ts/
+│ ├── python/
+│ ├── go/
+│ └── static/
+├── frameworks/ # contextual to runtime
+│ ├── express/
+│ ├── nextjs/
+│ ├── fastify/
+│ ├── flask/
+│ └── ...
+├── services/ # additive integrations
+│ ├── postgres/ # DB client + DATABASE_URL
+│ ├── mongodb/ # Mongo client
+│ ├── sqlite/ # SQLite setup
+│ ├── redis/ # Redis client (maps to Valkey under the hood)
+│ ├── auth/ # OIDC middleware + JWT validation
+│ ├── email/ # Email helper calling Account Service API
+│ └── analytics/ # Script tag / SDK
+└── always/ # every constellation gets these
+├── platform.yaml
+├── docker-compose.dev.yml
+├── .gitignore
+└── README.md
+
 ```
 
 CLI assembles: `base/{runtime}` + `frameworks/{framework}` + `services/{each}` + `always/`.
@@ -143,8 +148,10 @@ Developer-facing type in `platform.yaml` is `redis` (familiar). Under the hood, 
 Templates include a `Procfile` (not a Dockerfile):
 
 ```
+
 web: node src/index.js
-```
+
+````
 
 Cloud Native Buildpacks auto-detect the language and build the OCI image. If a developer includes a Dockerfile, the build pipeline uses BuildKit instead (ADR-003).
 
@@ -176,7 +183,7 @@ resources:
   replicas:
     preview: 1
     production: 2
-```
+````
 
 ### Static constellations
 
@@ -299,7 +306,8 @@ docker compose up
 - `universe register` is the critical path — orchestrates GitHub, Windmill, DNS, ArgoCD
 - `universe teardown` is platform-team-restricted (prevents accidental infrastructure destruction)
 - Adding a new runtime/framework/service = adding one layer, not updating all templates
-```
+
+````
 
 ## Additional Static Deploy CLI User Stories
 
@@ -484,7 +492,7 @@ NON-GOALS (out of scope for this CLI)
 - TLS certificate management (handled by Cloudflare)
 - Analytics setup (handled by Vector + ClickHouse pipeline)
 - Build step (developer or CI runs their own build command)
-```
+````
 
 ## Vite-Specific Clarification and Project Layout
 
@@ -496,19 +504,19 @@ Example Vite config shared:
 
 ```js
 // vite.config.js
-import { resolve } from 'path'
-import { defineConfig } from 'vite'
+import { resolve } from "path";
+import { defineConfig } from "vite";
 
 export default defineConfig({
   build: {
     rollupOptions: {
       input: {
-        main: resolve(__dirname, 'index.html'),
-        about: resolve(__dirname, 'about.html'),
+        main: resolve(__dirname, "index.html"),
+        about: resolve(__dirname, "about.html"),
       },
     },
   },
-})
+});
 ```
 
 Recommended project structure shared:

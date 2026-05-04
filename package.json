@@ -1,22 +1,25 @@
 {
   "name": "@freecodecamp/universe-cli",
-  "version": "0.4.0",
-  "main": "dist/index.js",
-  "scripts": {
-    "test": "vitest run",
-    "build": "tsup",
-    "lint": "oxlint src tests",
-    "typecheck": "tsc --noEmit",
-    "prepare": "husky"
+  "version": "0.5.0",
+  "description": "Static site deployment CLI for the freeCodeCamp Universe platform",
+  "keywords": [
+    "cli",
+    "deployment",
+    "freecodecamp",
+    "static-site"
+  ],
+  "homepage": "https://github.com/freeCodeCamp-Universe/universe-cli#readme",
+  "bugs": {
+    "url": "https://github.com/freeCodeCamp-Universe/universe-cli/issues"
   },
-  "author": "Mrugesh Mohapatra <noreply@mrugesh.dev> (https://mrugesh.dev/)",
   "license": "ISC",
+  "author": "freeCodeCamp <team@freecodecamp.org>",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/freeCodeCamp-Universe/universe-cli.git"
   },
-  "publishConfig": {
-    "access": "public"
+  "bin": {
+    "universe": "dist/index.cjs"
   },
   "files": [
     "dist/",
@@ -24,37 +27,49 @@
     "LICENSE"
   ],
   "type": "module",
-  "bin": {
-    "universe": "dist/index.js"
+  "main": "dist/index.cjs",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "build:bundle": "tsdown",
+    "build:sea": "node --experimental-sea-config sea-config.json && cp $(command -v node) dist/universe && npx postject dist/universe NODE_SEA_BLOB dist/sea.blob --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2",
+    "check": "tsc --noEmit",
+    "clean": "rm -rf dist",
+    "codegen": "node scripts/generate-layer-files.mjs",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "start": "node --enable-source-maps dist/index.js",
+    "test": "vitest run",
+    "watch:unit": "vitest --config vitest.unit.config.ts",
+    "test:e2e": "vitest run --config vitest.e2e.config.ts",
+    "fmt": "oxfmt",
+    "fmt:check": "oxfmt --check",
+    "prepare": "husky"
   },
   "dependencies": {
-    "@clack/prompts": "^1.2.0",
-    "cac": "^7.0.0",
-    "yaml": "^2.8.3",
-    "zod": "^4.3.6"
+    "@clack/prompts": "1.2.0",
+    "commander": "14.0.3",
+    "lodash": "4.18.1",
+    "yaml": "2.8.3",
+    "zod": "4.3.6"
   },
   "devDependencies": {
-    "@types/node": "^24.12.2",
-    "husky": "^9.1.7",
-    "oxlint": "^1.60.0",
-    "postject": "1.0.0-alpha.6",
-    "tsup": "^8.5.1",
-    "typescript": "^5.9.3",
-    "vitest": "^3.2.4"
+    "@types/lodash": "4.17.24",
+    "@types/node": "24.12.2",
+    "husky": "9.1.7",
+    "lint-staged": "16.4.0",
+    "oxfmt": "0.42.0",
+    "oxlint": "1.57.0",
+    "oxlint-tsgolint": "0.17.3",
+    "picomatch": "4.0.4",
+    "tsdown": "0.21.10",
+    "typescript": "5.9.3",
+    "vitest": "3.1.1"
   },
-  "packageManager": "pnpm@10.33.0",
   "engines": {
     "node": ">=22.11.0"
   },
-  "description": "Static site deployment CLI for the freeCodeCamp Universe platform",
-  "homepage": "https://github.com/freeCodeCamp-Universe/universe-cli#readme",
-  "bugs": {
-    "url": "https://github.com/freeCodeCamp-Universe/universe-cli/issues"
-  },
-  "keywords": [
-    "cli",
-    "static-site",
-    "deployment",
-    "freecodecamp"
-  ]
+  "packageManager": "pnpm@10.33.0"
 }

@@ -298,9 +298,7 @@ describe("storage adapter", () => {
   });
 
   it("reads an alias file", async () => {
-    const stream = sdkStreamMixin(
-      Readable.from([Buffer.from("20260413-120000-abc1234")]),
-    );
+    const stream = sdkStreamMixin(Readable.from([Buffer.from("20260413-120000-abc1234")]));
     s3Mock.on(GetObjectCommand).resolves({ Body: stream });
 
     // const deployId = await storageAdapter.readAlias('my-site', 'preview');
@@ -351,9 +349,7 @@ describe("storage adapter", () => {
   });
 
   it("bulk deletes deploy artifacts", async () => {
-    s3Mock
-      .on(DeleteObjectsCommand)
-      .resolves({ Deleted: [{ Key: "a" }, { Key: "b" }] });
+    s3Mock.on(DeleteObjectsCommand).resolves({ Deleted: [{ Key: "a" }, { Key: "b" }] });
 
     // await storageAdapter.bulkDelete('my-site', ['a', 'b']);
 

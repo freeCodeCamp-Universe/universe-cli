@@ -7,6 +7,74 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### feat: `universe create` — interactive project scaffolding
+
+Merges the `universe create` command from the parallel development branch.
+The CLI can now scaffold new freeCodeCamp Universe projects interactively,
+producing a ready-to-run project directory with Docker support, a
+`platform.yaml` manifest, and a git initial commit.
+
+#### Scaffolding system
+
+- Layer composition service assembles files in deterministic order:
+  `always` → `runtime` → `framework` → `package-manager` → `services`.
+  Config files (YAML/JSON) are merged; binary collisions fail loudly.
+- Config-driven. `runtime.json` is the single source of
+  truth for which runtime/framework/package-manager combinations are valid.
+  Adding a new framework requires only a `files/framework/<key>/` directory
+  and a JSON entry.
+- Template substitution resolves `{{name}}`, `{{runtime}}`, `{{framework}}`,
+  and `{{port}}` placeholders in layer files at composition time.
+- Static file scaffolds added for all supported frameworks under `files/`:
+  `express`, `typescript`, `react-vite`, `html-css-js`, `tanstack-shadcn`
+  (frameworks); `pnpm`, `bun` (package managers); `node`, `static_web`
+  (runtimes); `postgresql`, `redis` (databases); `analytics`, `auth`
+  (services).
+
+#### Docker scaffold
+
+- Layer composition emits a two-stage `Dockerfile` (`base` + `dev`) and a
+  `docker-compose.dev.yml` with Compose Watch entries when all required
+  layer slots are present.
+- Framework port numbers flow through `{{port}}` substitution into
+  `src/index.ts`, compose `ports:`, and compose `develop.watch` entries,
+  keeping Dockerfile, compose, and source in sync.
+
+#### Architecture
+
+Restructured to a hexagonal (ports-and-adapters) layout so that
+platform-facing and I/O-facing concerns are isolated behind explicit
+interfaces, making each boundary independently testable and replaceable:
+
+- `src/platform/` — port interfaces and stubs for all backend clients:
+  proxy, deploy, promote, rollback, list, logs, status, teardown,
+  registration.
+- `src/io/` — filesystem writer, project reader, and git repo initialiser
+  ports with local adapters.
+- `src/observability/` — `ObservabilityClient` port + safe base class that
+  guarantees best-effort behaviour.
+- `src/errors/` — unified `CliError` hierarchy and `exit-codes.ts` as the
+  single source of truth for all exit code constants.
+- `src/output/` — injectable `Logger` interface (`clackLogger` default),
+  `writeJson`/`writeErrorJson` for structured output, and `format.ts`
+  façade. `output: string` removed from `HandlerResult`; all handlers now
+  return `{ exitCode }` only.
+
+#### Test organisation
+
+Tests moved from `tests/` (flat) to be colocated with their source files
+under `src/`. Unit and E2E suites split into separate vitest configs
+(`vitest.unit.config.ts`, `vitest.e2e.config.ts`).
+
+#### Tooling
+
+- Build tool switched from `tsup` to `tsdown` (`tsdown.config.ts`);
+  `tsconfig.build.json` added for build-only includes.
+- `lint-staged` configuration extracted to `.lintstagedrc.mjs`; `oxfmt`
+  formatter added (`.oxfmtrc.json`).
+- `cac` -> `commander` for better sub command handling.
+- Claude Code skills and settings added (`.claude/`).
+
 ## [0.4.0] - 2026-04-27
 
 Proxy-plane pivot. Staff and CI hold only a `platform.yaml` + a GitHub

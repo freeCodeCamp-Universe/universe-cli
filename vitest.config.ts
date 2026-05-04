@@ -1,13 +1,11 @@
-import { readFileSync } from "node:fs";
-import { defineConfig } from "vitest/config";
+import { defaultExclude, defineConfig } from "vitest/config";
 
-const pkg = JSON.parse(readFileSync("package.json", "utf-8"));
-
+// oxlint-disable-next-line import/no-default-export
 export default defineConfig({
-  define: {
-    __VERSION__: JSON.stringify(pkg.version),
-  },
   test: {
-    include: ["tests/**/*.test.ts"],
+    dir: "src",
+    exclude: [...defaultExclude, "**/e2e-tests/**"],
+    globalSetup: ["./scripts/vitest-setup.mjs"],
+    globals: true,
   },
 });
