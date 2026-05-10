@@ -6,6 +6,10 @@ import { ls } from "./commands/ls.js";
 import { promote } from "./commands/promote.js";
 import { rollback } from "./commands/rollback.js";
 import { whoami } from "./commands/whoami.js";
+import { ls as sitesLs } from "./commands/sites/ls.js";
+import { register as sitesRegister } from "./commands/sites/register.js";
+import { rm as sitesRm } from "./commands/sites/rm.js";
+import { update as sitesUpdate } from "./commands/sites/update.js";
 import { type OutputContext, outputError } from "./output/format.js";
 import { EXIT_USAGE, exitWithCode } from "./output/exit-codes.js";
 import { CliError } from "./errors.js";
@@ -23,9 +27,9 @@ function handleActionError(command: string, json: boolean, err: unknown): void {
 
 /**
  * cac (v6.7.x) does not support nested subcommands — it matches against
- * a single argv segment only. We keep two cac instances and dispatch
- * by detecting `static` as the first **non-flag** positional. This
- * preserves global flags placed before the namespace token (e.g.
+ * a single argv segment only. We keep three cac instances and dispatch
+ * by detecting `static` or `sites` as the first **non-flag** positional.
+ * Preserves global flags placed before the namespace token (e.g.
  * `universe --json static deploy`).
  */
 function findFirstPositional(args: readonly string[]): number {
@@ -39,7 +43,95 @@ function findFirstPositional(args: readonly string[]): number {
 export function run(argv = process.argv) {
   const args = argv.slice(2);
   const firstPosIdx = findFirstPositional(args);
-  const isStatic = firstPosIdx >= 0 && args[firstPosIdx] === "static";
+  const namespace = firstPosIdx >= 0 ? args[firstPosIdx] : undefined;
+  const isStatic = namespace === "static";
+  const isSites = namespace === "sites";
+
+  if (isSites) {
+    const sitesArgs = [
+      ...args.slice(0, firstPosIdx),
+      ...args.slice(firstPosIdx + 1),
+    ];
+    const sitesCli = cac("universe sites");
+
+    sitesCli
+      .command("register <slug>", "Register a new static site (staff only)")
+      .option("--json", "Output as JSON")
+      .option(
+        "--team <name>",
+        "GitHub team slug (repeatable, or comma-separated). Defaults to staff.",
+      )
+      .action(
+        async (
+          slug: string,
+          flags: { json?: boolean; team?: string | string[] },
+        ) => {
+          try {
+            await sitesRegister({
+              json: flags.json ?? false,
+              slug,
+              team: flags.team,
+            });
+          } catch (err: unknown) {
+            handleActionError("sites register", flags.json ?? false, err);
+          }
+        },
+      );
+
+    sitesCli
+      .command("ls", "List every registered site")
+      .option("--json", "Output as JSON")
+      .action(async (flags: { json?: boolean }) => {
+        try {
+          await sitesLs({ json: flags.json ?? false });
+        } catch (err: unknown) {
+          handleActionError("sites ls", flags.json ?? false, err);
+        }
+      });
+
+    sitesCli
+      .command(
+        "update <slug>",
+        "Replace the teams list for an existing site (staff only)",
+      )
+      .option("--json", "Output as JSON")
+      .option(
+        "--team <name>",
+        "GitHub team slug (repeatable, or comma-separated). Required.",
+      )
+      .action(
+        async (
+          slug: string,
+          flags: { json?: boolean; team?: string | string[] },
+        ) => {
+          try {
+            await sitesUpdate({
+              json: flags.json ?? false,
+              slug,
+              team: flags.team,
+            });
+          } catch (err: unknown) {
+            handleActionError("sites update", flags.json ?? false, err);
+          }
+        },
+      );
+
+    sitesCli
+      .command("rm <slug>", "Remove a site from the registry (staff only)")
+      .option("--json", "Output as JSON")
+      .action(async (slug: string, flags: { json?: boolean }) => {
+        try {
+          await sitesRm({ json: flags.json ?? false, slug });
+        } catch (err: unknown) {
+          handleActionError("sites rm", flags.json ?? false, err);
+        }
+      });
+
+    sitesCli.help();
+    sitesCli.version(version);
+    sitesCli.parse(["node", "universe-sites", ...sitesArgs]);
+    return;
+  }
 
   if (isStatic) {
     // Drop just the `static` token; preserve flags + remaining args
@@ -160,9 +252,10 @@ export function run(argv = process.argv) {
         }
       });
 
-    // Register `static` only for help text — the dispatch above
-    // intercepts before cac runs, so this action is unreachable.
+    // Register `static` and `sites` only for help text — the dispatch
+    // above intercepts before cac runs, so these actions are unreachable.
     cli.command("static <subcommand>", "Static site deployment commands");
+    cli.command("sites <subcommand>", "Static site registry commands");
 
     cli.help();
     cli.version(version);
