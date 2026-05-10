@@ -44,7 +44,7 @@
   },
   "packageManager": "pnpm@10.33.0",
   "engines": {
-    "node": ">=22.11.0"
+    "node": ">=24.0.0"
   },
   "description": "Static site deployment CLI for the freeCodeCamp Universe platform",
   "homepage": "https://github.com/freeCodeCamp-Universe/universe-cli#readme",
