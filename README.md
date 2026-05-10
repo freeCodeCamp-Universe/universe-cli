@@ -73,6 +73,15 @@ universe static rollback --to <deployId>
 universe static ls [--site <site>]
 ```
 
+Static-app registry (namespaced under `sites`, staff-only writes):
+
+```sh
+universe sites register <slug> [--team=<name>...]   # create new entry
+universe sites ls                                   # list every site
+universe sites update <slug> --team=<name>...       # replace teams
+universe sites rm <slug>                            # delete entry
+```
+
 All commands support `--json` for CI integration.
 
 ## Identity (priority chain)
@@ -86,8 +95,9 @@ The CLI resolves a GitHub identity in this order — first match wins:
 5. Device-flow stored token at `~/.config/universe-cli/token`
 
 The proxy validates whatever it receives via GitHub `GET /user`, then
-authorizes against the `sites.yaml` map server-side. Run
-`universe whoami` to see which slot resolved.
+authorizes against the registry server-side (Valkey-backed; the
+git-tracked `sites.yaml` was retired in artemis `feat/valkey-registry`).
+Run `universe whoami` to see which slot resolved.
 
 ## Configuration (`platform.yaml`)
 

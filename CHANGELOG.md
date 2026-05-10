@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-05-10
+
+Static-apps registry consumer. The artemis proxy gained four new
+endpoints (`POST /api/site/register`, `GET /api/sites`,
+`PATCH /api/site/{slug}`, `DELETE /api/site/{slug}`) replacing the
+git-tracked `artemis/config/sites.yaml` ops loop with a Valkey-backed
+registry. This release wires the CLI to those endpoints.
+
+This is a non-breaking release. All v0.4 commands behave unchanged.
+
+### Added
+
+- `universe sites <subcommand>` namespace — distinct from the existing
+  per-site `universe ls` (which lists deploys), this lists / mutates
+  the registry of every static site.
+  - `universe sites register <slug> [--team=<name>...]` — POST
+    `/api/site/register`. `--team` accepts repeated flags or
+    comma-separated values; omitted → server defaults to
+    `[RegistryAuthzTeam]` (typically `staff`). Staff-only.
+  - `universe sites ls [--json]` — GET `/api/sites`. Open to any
+    GitHub bearer (no special team membership required). Renders a
+    plain text table (slug / teams / created-by / created-at) or a
+    `{count, sites[]}` JSON envelope.
+  - `universe sites update <slug> --team=<name>...` — PATCH
+    `/api/site/{slug}`. `--team` is required with at least one entry;
+    CLI rejects empty with `EXIT_USAGE` before round-tripping. Staff
+    only.
+  - `universe sites rm <slug>` — DELETE `/api/site/{slug}`. R2 deploy
+    bytes are NOT touched (post-GA cleanup cron handles that). Staff
+    only.
+- `src/lib/proxy-client.ts` — four typed methods (`registerSite`,
+  `listSites`, `updateSite`, `deleteSite`) mirroring the artemis Go
+  handler shapes. Exports `SiteRow` (slug, teams, createdAt, updatedAt,
+  createdBy) — the canonical wire shape returned by register / list /
+  update.
+- `src/commands/sites/_shared.ts` — `parseTeamsFlag` helper, identity
+  resolution, and shared `SitesCommandDeps` interface so all four
+  commands share one wiring pattern.
+
+### Notes
+
+- Authz: staff-only commands rely on the artemis `requireRegistryAuthz`
+  middleware (configurable via the `REGISTRY_AUTHZ_TEAM` env on the
+  proxy; `staff` by default). The CLI does not pre-check team
+  membership — it forwards the GitHub bearer and surfaces 403
+  responses.
+- Identity: same chain as v0.4 — `$GITHUB_TOKEN` / `$GH_TOKEN` env →
+  `gh auth token` → device-flow stored token. Run `universe login`
+  first if no slot resolves.
+
 ## [0.4.0] - 2026-04-27
 
 Proxy-plane pivot. Staff and CI hold only a `platform.yaml` + a GitHub
