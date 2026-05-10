@@ -484,4 +484,266 @@ describe("createProxyClient", () => {
       );
     });
   });
+
+  describe("registerSite", () => {
+    const siteRow = {
+      slug: "blog",
+      teams: ["staff"],
+      createdAt: "2026-05-10T00:00:00Z",
+      updatedAt: "2026-05-10T00:00:00Z",
+      createdBy: "alice",
+    };
+
+    it("POSTs JSON to /api/site/register with bearer", async () => {
+      const fetchMock = vi.fn().mockResolvedValue(jsonResponse(201, siteRow));
+      const client = createProxyClient({
+        baseUrl,
+        getAuthToken,
+        fetch: fetchMock,
+      });
+      const r = await client.registerSite({
+        slug: "blog",
+        teams: ["staff"],
+      });
+      const init = getInit(fetchMock.mock.calls[0]);
+      expect(getUrl(fetchMock.mock.calls[0])).toBe(
+        "https://uploads.freecode.camp/api/site/register",
+      );
+      expect(init.method).toBe("POST");
+      expect(init.headers["Authorization"]).toBe("Bearer ghp_test");
+      expect(init.headers["Content-Type"]).toBe("application/json");
+      expect(JSON.parse(init.body as string)).toEqual({
+        slug: "blog",
+        teams: ["staff"],
+      });
+      expect(r.slug).toBe("blog");
+      expect(r.teams).toEqual(["staff"]);
+    });
+
+    it("omits empty teams from body so server applies default", async () => {
+      const fetchMock = vi.fn().mockResolvedValue(jsonResponse(201, siteRow));
+      const client = createProxyClient({
+        baseUrl,
+        getAuthToken,
+        fetch: fetchMock,
+      });
+      await client.registerSite({ slug: "blog" });
+      const init = getInit(fetchMock.mock.calls[0]);
+      expect(JSON.parse(init.body as string)).toEqual({ slug: "blog" });
+    });
+
+    it("throws ProxyError on 409 already_exists", async () => {
+      const fetchMock = vi.fn().mockResolvedValue(
+        jsonResponse(409, {
+          error: {
+            code: "already_exists",
+            message: "site is already registered",
+          },
+        }),
+      );
+      const client = createProxyClient({
+        baseUrl,
+        getAuthToken,
+        fetch: fetchMock,
+      });
+      const err = (await client
+        .registerSite({ slug: "blog" })
+        .catch((e: unknown) => e)) as ProxyError;
+      expect(err).toBeInstanceOf(ProxyError);
+      expect(err.status).toBe(409);
+      expect(err.code).toBe("already_exists");
+      expect(err.exitCode).toBe(EXIT_USAGE);
+    });
+  });
+
+  describe("listSites", () => {
+    it("GETs /api/sites with bearer", async () => {
+      const rows = [
+        {
+          slug: "a",
+          teams: ["staff"],
+          createdAt: "t",
+          updatedAt: "t",
+          createdBy: "bob",
+        },
+        {
+          slug: "b",
+          teams: ["news-editors"],
+          createdAt: "t",
+          updatedAt: "t",
+          createdBy: "carol",
+        },
+      ];
+      const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, rows));
+      const client = createProxyClient({
+        baseUrl,
+        getAuthToken,
+        fetch: fetchMock,
+      });
+      const r = await client.listSites();
+      expect(getUrl(fetchMock.mock.calls[0])).toBe(
+        "https://uploads.freecode.camp/api/sites",
+      );
+      expect(getInit(fetchMock.mock.calls[0]).method).toBe("GET");
+      expect(r).toEqual(rows);
+    });
+
+    it("throws ProxyError on 502 registry_read_failed", async () => {
+      const fetchMock = vi.fn().mockResolvedValue(
+        jsonResponse(502, {
+          error: { code: "registry_read_failed", message: "valkey down" },
+        }),
+      );
+      const client = createProxyClient({
+        baseUrl,
+        getAuthToken,
+        fetch: fetchMock,
+      });
+      const err = (await client
+        .listSites()
+        .catch((e: unknown) => e)) as ProxyError;
+      expect(err.code).toBe("registry_read_failed");
+      expect(err.exitCode).toBe(EXIT_STORAGE);
+    });
+  });
+
+  describe("updateSite", () => {
+    it("PATCHes /api/site/{slug} with body { teams }", async () => {
+      const row = {
+        slug: "blog",
+        teams: ["news-editors", "platform"],
+        createdAt: "t",
+        updatedAt: "t2",
+        createdBy: "alice",
+      };
+      const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, row));
+      const client = createProxyClient({
+        baseUrl,
+        getAuthToken,
+        fetch: fetchMock,
+      });
+      const r = await client.updateSite({
+        slug: "blog",
+        teams: ["news-editors", "platform"],
+      });
+      const init = getInit(fetchMock.mock.calls[0]);
+      expect(getUrl(fetchMock.mock.calls[0])).toBe(
+        "https://uploads.freecode.camp/api/site/blog",
+      );
+      expect(init.method).toBe("PATCH");
+      expect(init.headers["Content-Type"]).toBe("application/json");
+      expect(JSON.parse(init.body as string)).toEqual({
+        teams: ["news-editors", "platform"],
+      });
+      expect(r.teams).toEqual(["news-editors", "platform"]);
+    });
+
+    it("URL-encodes slug path segment", async () => {
+      const fetchMock = vi.fn().mockResolvedValue(
+        jsonResponse(200, {
+          slug: "x",
+          teams: ["staff"],
+          createdAt: "t",
+          updatedAt: "t",
+          createdBy: "u",
+        }),
+      );
+      const client = createProxyClient({
+        baseUrl,
+        getAuthToken,
+        fetch: fetchMock,
+      });
+      await client.updateSite({ slug: "a b", teams: ["staff"] });
+      expect(getUrl(fetchMock.mock.calls[0])).toBe(
+        "https://uploads.freecode.camp/api/site/a%20b",
+      );
+    });
+
+    it("throws ProxyError on 404 not_found", async () => {
+      const fetchMock = vi.fn().mockResolvedValue(
+        jsonResponse(404, {
+          error: { code: "not_found", message: "site is not registered" },
+        }),
+      );
+      const client = createProxyClient({
+        baseUrl,
+        getAuthToken,
+        fetch: fetchMock,
+      });
+      const err = (await client
+        .updateSite({ slug: "ghost", teams: ["staff"] })
+        .catch((e: unknown) => e)) as ProxyError;
+      expect(err.status).toBe(404);
+      expect(err.code).toBe("not_found");
+    });
+  });
+
+  describe("deleteSite", () => {
+    it("DELETEs /api/site/{slug} and returns void on 204", async () => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValue(new Response(null, { status: 204 }));
+      const client = createProxyClient({
+        baseUrl,
+        getAuthToken,
+        fetch: fetchMock,
+      });
+      const r = await client.deleteSite({ slug: "blog" });
+      expect(getUrl(fetchMock.mock.calls[0])).toBe(
+        "https://uploads.freecode.camp/api/site/blog",
+      );
+      expect(getInit(fetchMock.mock.calls[0]).method).toBe("DELETE");
+      expect(r).toBeUndefined();
+    });
+
+    it("URL-encodes slug path segment", async () => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValue(new Response(null, { status: 204 }));
+      const client = createProxyClient({
+        baseUrl,
+        getAuthToken,
+        fetch: fetchMock,
+      });
+      await client.deleteSite({ slug: "a b" });
+      expect(getUrl(fetchMock.mock.calls[0])).toBe(
+        "https://uploads.freecode.camp/api/site/a%20b",
+      );
+    });
+
+    it("throws ProxyError on 404 not_found", async () => {
+      const fetchMock = vi.fn().mockResolvedValue(
+        jsonResponse(404, {
+          error: { code: "not_found", message: "site is not registered" },
+        }),
+      );
+      const client = createProxyClient({
+        baseUrl,
+        getAuthToken,
+        fetch: fetchMock,
+      });
+      const err = (await client
+        .deleteSite({ slug: "ghost" })
+        .catch((e: unknown) => e)) as ProxyError;
+      expect(err.status).toBe(404);
+      expect(err.code).toBe("not_found");
+    });
+
+    it("throws ProxyError on 403 user_unauthorized", async () => {
+      const fetchMock = vi.fn().mockResolvedValue(
+        jsonResponse(403, {
+          error: { code: "user_unauthorized", message: "not staff" },
+        }),
+      );
+      const client = createProxyClient({
+        baseUrl,
+        getAuthToken,
+        fetch: fetchMock,
+      });
+      const err = (await client
+        .deleteSite({ slug: "blog" })
+        .catch((e: unknown) => e)) as ProxyError;
+      expect(err.exitCode).toBe(EXIT_CREDENTIALS);
+    });
+  });
 });

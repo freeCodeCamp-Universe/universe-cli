@@ -10,7 +10,7 @@ import {
  *
  * Mirrors the routes defined in
  * `~/DEV/fCC/artemis/internal/server/server.go` and the request /
- * response shapes from `internal/handler/{deploy,site,whoami}.go`.
+ * response shapes from `internal/handler/{deploy,site,site_register,whoami}.go`.
  *
  *   GET    /api/whoami                                — GitHub bearer
  *   POST   /api/deploy/init                           — GitHub bearer
@@ -19,6 +19,10 @@ import {
  *   GET    /api/site/{site}/deploys                   — GitHub bearer
  *   POST   /api/site/{site}/promote                   — GitHub bearer
  *   POST   /api/site/{site}/rollback                  — GitHub bearer
+ *   POST   /api/site/register                         — staff (RegistryAuthzTeam)
+ *   GET    /api/sites                                 — GitHub bearer
+ *   PATCH  /api/site/{slug}                           — staff (RegistryAuthzTeam)
+ *   DELETE /api/site/{slug}                           — staff (RegistryAuthzTeam)
  *
  * The user-bearer paths read their token via the supplied `getAuthToken`
  * resolver (priority chain lives in `lib/identity.ts`). The deploy-JWT
@@ -88,6 +92,33 @@ export interface AliasResponse {
   deployId: string;
 }
 
+/**
+ * Canonical registry row returned by /api/site/register, /api/sites,
+ * and PATCH /api/site/{slug}. Mirrors `handler.SiteRow` in artemis.
+ * Timestamps are ISO-8601 strings (RFC3339Nano on the wire).
+ */
+export interface SiteRow {
+  slug: string;
+  teams: string[];
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
+}
+
+export interface RegisterSiteRequest {
+  slug: string;
+  teams?: string[];
+}
+
+export interface UpdateSiteRequest {
+  slug: string;
+  teams: string[];
+}
+
+export interface DeleteSiteRequest {
+  slug: string;
+}
+
 export interface ProxyClient {
   whoami(): Promise<WhoAmIResponse>;
   deployInit(req: DeployInitRequest): Promise<DeployInitResponse>;
@@ -96,6 +127,10 @@ export interface ProxyClient {
   siteDeploys(req: { site: string }): Promise<DeploySummary[]>;
   sitePromote(req: { site: string }): Promise<AliasResponse>;
   siteRollback(req: { site: string; to: string }): Promise<AliasResponse>;
+  registerSite(req: RegisterSiteRequest): Promise<SiteRow>;
+  listSites(): Promise<SiteRow[]>;
+  updateSite(req: UpdateSiteRequest): Promise<SiteRow>;
+  deleteSite(req: DeleteSiteRequest): Promise<void>;
 }
 
 /**
@@ -310,6 +345,56 @@ export function createProxyClient(cfg: ProxyClientConfig): ProxyClient {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ to: req.to }),
+      });
+    },
+
+    async registerSite(req) {
+      const body: Record<string, unknown> = { slug: req.slug };
+      if (req.teams && req.teams.length > 0) {
+        body.teams = req.teams;
+      }
+      return call<SiteRow>(`${base}/api/site/register`, {
+        method: "POST",
+        headers: {
+          Authorization: await userBearer(),
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+    },
+
+    async listSites() {
+      return call<SiteRow[]>(`${base}/api/sites`, {
+        method: "GET",
+        headers: {
+          Authorization: await userBearer(),
+          Accept: "application/json",
+        },
+      });
+    },
+
+    async updateSite(req) {
+      const url = `${base}/api/site/${encodeURIComponent(req.slug)}`;
+      return call<SiteRow>(url, {
+        method: "PATCH",
+        headers: {
+          Authorization: await userBearer(),
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ teams: req.teams }),
+      });
+    },
+
+    async deleteSite(req) {
+      const url = `${base}/api/site/${encodeURIComponent(req.slug)}`;
+      return call<void>(url, {
+        method: "DELETE",
+        headers: {
+          Authorization: await userBearer(),
+          Accept: "application/json",
+        },
       });
     },
   };
