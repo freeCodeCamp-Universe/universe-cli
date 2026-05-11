@@ -97,6 +97,19 @@ jobs:
           args: --tag v${{ needs.preflight.outputs.version }} --unreleased
         env:
           OUTPUT: /tmp/new-section.md
+      - name: Fallback when git-cliff body is empty
+        if: inputs.notes == ''
+        run: |
+          # cliff emits just the heading when no feat/fix commits exist since
+          # the last tag (e.g. a docs-only patch). Synthesise a generic body
+          # so the GitHub Release page isn't blank.
+          if ! grep -qE '^### ' /tmp/new-section.md; then
+            DATE=$(date -u +%Y-%m-%d)
+            {
+              printf '## [%s] - %s\n\n' "$VERSION" "$DATE"
+              printf 'Maintenance release. See the commit log for details.\n'
+            } > /tmp/new-section.md
+          fi
       - name: Render changelog section from notes input
         if: inputs.notes != ''
         run: |
@@ -114,6 +127,7 @@ jobs:
           awk '
             !inserted && /^## \[[0-9]/ {
               while ((getline line < "/tmp/new-section.md") > 0) print line
+              print ""
               inserted=1
             }
             { print }
@@ -255,8 +269,9 @@ jobs:
             /^## \[/ { flag=0 }
             flag
           ' CHANGELOG.md > RELEASE_NOTES.md
-          if [ ! -s RELEASE_NOTES.md ]; then
-            echo "ERROR: No CHANGELOG.md section found for version $VERSION_PATTERN" >&2
+          # Reject whitespace-only bodies — they make the GitHub Release blank.
+          if ! grep -q '[^[:space:]]' RELEASE_NOTES.md; then
+            echo "ERROR: CHANGELOG.md section for version $VERSION_PATTERN is empty or whitespace-only" >&2
             exit 1
           fi
       # G2 — flag prereleases so the GitHub UI badges them and `latest
