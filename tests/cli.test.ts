@@ -174,13 +174,13 @@ describe("top-level error handling", () => {
     run(["node", "universe", "static", "deploy"]);
     await new Promise((resolve) => setTimeout(resolve, 50));
 
-    expect(mockExitWithCode).toHaveBeenCalledWith(
+    expect(mockExitWithCode).toHaveBeenCalledWith(EXIT_CONFIG);
+    expect(mockExitWithCode).not.toHaveBeenCalledWith(EXIT_USAGE);
+    // outputError carries the user-facing message; exitWithCode just exits.
+    expect(mockOutputError).toHaveBeenCalledWith(
+      expect.objectContaining({ command: "deploy" }),
       EXIT_CONFIG,
       "bad platform.yaml",
-    );
-    expect(mockExitWithCode).not.toHaveBeenCalledWith(
-      EXIT_USAGE,
-      expect.anything(),
     );
   });
 
@@ -191,7 +191,9 @@ describe("top-level error handling", () => {
     run(["node", "universe", "static", "deploy"]);
     await new Promise((resolve) => setTimeout(resolve, 50));
 
-    expect(mockExitWithCode).toHaveBeenCalledWith(
+    expect(mockExitWithCode).toHaveBeenCalledWith(EXIT_USAGE);
+    expect(mockOutputError).toHaveBeenCalledWith(
+      expect.objectContaining({ command: "deploy" }),
       EXIT_USAGE,
       "mystery failure",
     );
@@ -241,7 +243,9 @@ describe("top-level error handling", () => {
     run(["node", "universe", "login"]);
     await new Promise((resolve) => setTimeout(resolve, 50));
 
-    expect(mockExitWithCode).toHaveBeenCalledWith(
+    expect(mockExitWithCode).toHaveBeenCalledWith(EXIT_CONFIG);
+    expect(mockOutputError).toHaveBeenCalledWith(
+      expect.objectContaining({ command: "login" }),
       EXIT_CONFIG,
       "missing client id",
     );

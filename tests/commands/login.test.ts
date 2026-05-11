@@ -152,7 +152,8 @@ describe("login command", () => {
     });
     await expect(login({ json: false }, deps)).rejects.toThrow("__exit__");
     expect(deps.runDeviceFlow).not.toHaveBeenCalled();
-    expect(deps.exit).toHaveBeenCalledWith(18, expect.any(String));
+    expect(deps.exit).toHaveBeenCalledWith(18);
+    expect(deps.logError).toHaveBeenCalledWith(expect.any(String));
   });
 
   it("overwrites existing token when --force passed", async () => {
@@ -170,8 +171,8 @@ describe("login command", () => {
     });
     await expect(login({ json: false }, deps)).rejects.toThrow("__exit__");
     expect(deps.saveToken).not.toHaveBeenCalled();
-    expect(deps.exit).toHaveBeenCalledWith(
-      12,
+    expect(deps.exit).toHaveBeenCalledWith(12);
+    expect(deps.logError).toHaveBeenCalledWith(
       expect.stringContaining("denied"),
     );
   });

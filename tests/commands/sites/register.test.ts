@@ -87,8 +87,8 @@ describe("sites register command", () => {
     await expect(register({ json: false, slug: "" }, deps)).rejects.toThrow(
       "__exit__",
     );
-    expect(deps.exit).toHaveBeenCalledWith(
-      10,
+    expect(deps.exit).toHaveBeenCalledWith(10);
+    expect(deps.logError).toHaveBeenCalledWith(
       expect.stringMatching(/slug is required/i),
     );
   });
@@ -100,8 +100,8 @@ describe("sites register command", () => {
     await expect(register({ json: false, slug: "blog" }, deps)).rejects.toThrow(
       "__exit__",
     );
-    expect(deps.exit).toHaveBeenCalledWith(
-      12,
+    expect(deps.exit).toHaveBeenCalledWith(12);
+    expect(deps.logError).toHaveBeenCalledWith(
       expect.stringMatching(/login|identity/i),
     );
   });
@@ -129,8 +129,8 @@ describe("sites register command", () => {
     await expect(register({ json: false, slug: "blog" }, deps)).rejects.toThrow(
       "__exit__",
     );
-    expect(deps.exit).toHaveBeenCalledWith(
-      10,
+    expect(deps.exit).toHaveBeenCalledWith(10);
+    expect(deps.logError).toHaveBeenCalledWith(
       expect.stringContaining("already_exists"),
     );
   });

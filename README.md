@@ -76,10 +76,10 @@ universe static ls [--site <site>]
 Static-app registry (namespaced under `sites`, staff-only writes):
 
 ```sh
-universe sites register <slug> [--team=<name>...]   # create new entry
-universe sites ls                                   # list every site
-universe sites update <slug> --team=<name>...       # replace teams
-universe sites rm <slug>                            # delete entry
+universe sites register <slug> [--team=<name>...]   # create new entry (staff)
+universe sites ls [--mine]                          # list every site, or only yours
+universe sites update <slug> --team=<name>...       # replace teams (staff)
+universe sites rm <slug>                            # delete entry (staff)
 ```
 
 All commands support `--json` for CI integration.

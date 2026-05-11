@@ -71,7 +71,7 @@ describe("whoami command", () => {
     expect(await cfg.getAuthToken()).toBe("ghp_x");
   });
 
-  it("emits success envelope in JSON mode (login + sites + source)", async () => {
+  it("emits success envelope in JSON mode (login + count + source, no list)", async () => {
     const stdout: string[] = [];
     const writeSpy = vi
       .spyOn(process.stdout, "write")
@@ -88,18 +88,25 @@ describe("whoami command", () => {
     expect(env.command).toBe("whoami");
     expect(env.success).toBe(true);
     expect(env.login).toBe("alice");
-    expect(env.authorizedSites).toEqual(["news", "certifications"]);
+    expect(env.authorizedSitesCount).toBe(2);
     expect(env.identitySource).toBe("env_GITHUB_TOKEN");
+    // Regression: the full site list belongs in `sites ls --mine`, not
+    // in the identity envelope. See deploy preflight + whoami split.
+    expect(env.authorizedSites).toBeUndefined();
   });
 
-  it("prints login + sites + source in text mode", async () => {
+  it("prints identity + count + pointer in text mode (no inline list)", async () => {
     const deps = mkDeps();
     await whoami({ json: false }, deps);
     const msg = deps.logSuccess.mock.calls[0]?.[0] ?? "";
     expect(msg).toContain("alice");
-    expect(msg).toContain("news");
-    expect(msg).toContain("certifications");
     expect(msg).toContain("env_GITHUB_TOKEN");
+    expect(msg).toContain("Authorized for 2 sites");
+    expect(msg).toContain("universe sites ls --mine");
+    // Site slugs themselves must NOT appear in whoami output — they live
+    // in `sites ls --mine` to keep whoami readable at staff scale.
+    expect(msg).not.toContain("news");
+    expect(msg).not.toContain("certifications");
   });
 
   it("errors with EXIT_CREDENTIALS when identity chain returns null", async () => {
@@ -108,8 +115,8 @@ describe("whoami command", () => {
     });
     await expect(whoami({ json: false }, deps)).rejects.toThrow("__exit__");
     expect(deps.createProxyClient).not.toHaveBeenCalled();
-    expect(deps.exit).toHaveBeenCalledWith(
-      12,
+    expect(deps.exit).toHaveBeenCalledWith(12);
+    expect(deps.logError).toHaveBeenCalledWith(
       expect.stringMatching(/login|identity/i),
     );
   });
@@ -123,8 +130,8 @@ describe("whoami command", () => {
       }),
     });
     await expect(whoami({ json: false }, deps)).rejects.toThrow("__exit__");
-    expect(deps.exit).toHaveBeenCalledWith(
-      12,
+    expect(deps.exit).toHaveBeenCalledWith(12);
+    expect(deps.logError).toHaveBeenCalledWith(
       expect.stringContaining("bad token"),
     );
   });

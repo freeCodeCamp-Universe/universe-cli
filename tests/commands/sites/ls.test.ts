@@ -98,8 +98,8 @@ describe("sites ls command", () => {
       resolveIdentity: vi.fn().mockResolvedValue(null),
     });
     await expect(ls({ json: false }, deps)).rejects.toThrow("__exit__");
-    expect(deps.exit).toHaveBeenCalledWith(
-      12,
+    expect(deps.exit).toHaveBeenCalledWith(12);
+    expect(deps.logError).toHaveBeenCalledWith(
       expect.stringMatching(/login|identity/i),
     );
   });
@@ -116,8 +116,8 @@ describe("sites ls command", () => {
       createProxyClient: vi.fn().mockReturnValue(proxy),
     });
     await expect(ls({ json: false }, deps)).rejects.toThrow("__exit__");
-    expect(deps.exit).toHaveBeenCalledWith(
-      13,
+    expect(deps.exit).toHaveBeenCalledWith(13);
+    expect(deps.logError).toHaveBeenCalledWith(
       expect.stringContaining("registry_read_failed"),
     );
   });

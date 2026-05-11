@@ -59,8 +59,8 @@ describe("sites update command", () => {
     await expect(
       update({ json: false, slug: "", team: "staff" }, deps),
     ).rejects.toThrow("__exit__");
-    expect(deps.exit).toHaveBeenCalledWith(
-      10,
+    expect(deps.exit).toHaveBeenCalledWith(10);
+    expect(deps.logError).toHaveBeenCalledWith(
       expect.stringMatching(/slug is required/i),
     );
   });
@@ -70,8 +70,8 @@ describe("sites update command", () => {
     await expect(update({ json: false, slug: "blog" }, deps)).rejects.toThrow(
       "__exit__",
     );
-    expect(deps.exit).toHaveBeenCalledWith(
-      10,
+    expect(deps.exit).toHaveBeenCalledWith(10);
+    expect(deps.logError).toHaveBeenCalledWith(
       expect.stringMatching(/--team is required/i),
     );
   });
@@ -81,8 +81,8 @@ describe("sites update command", () => {
     await expect(
       update({ json: false, slug: "blog", team: "" }, deps),
     ).rejects.toThrow("__exit__");
-    expect(deps.exit).toHaveBeenCalledWith(
-      10,
+    expect(deps.exit).toHaveBeenCalledWith(10);
+    expect(deps.logError).toHaveBeenCalledWith(
       expect.stringMatching(/--team is required/i),
     );
   });
@@ -124,8 +124,8 @@ describe("sites update command", () => {
     await expect(
       update({ json: false, slug: "ghost", team: "staff" }, deps),
     ).rejects.toThrow("__exit__");
-    expect(deps.exit).toHaveBeenCalledWith(
-      10,
+    expect(deps.exit).toHaveBeenCalledWith(10);
+    expect(deps.logError).toHaveBeenCalledWith(
       expect.stringContaining("not_found"),
     );
   });

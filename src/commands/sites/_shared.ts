@@ -13,7 +13,7 @@ export interface SitesCommandDeps {
   createProxyClient?: (cfg: ProxyClientConfig) => ProxyClient;
   logSuccess?: (msg: string) => void;
   logError?: (msg: string) => void;
-  exit?: (code: number, message?: string) => never;
+  exit?: (code: number) => never;
 }
 
 export function emitJson(envelope: object): void {

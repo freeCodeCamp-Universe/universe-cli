@@ -55,6 +55,6 @@ export async function rm(
     } else {
       error(message);
     }
-    exit(code, message);
+    exit(code);
   }
 }

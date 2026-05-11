@@ -31,7 +31,7 @@ export interface PromoteDeps {
   createProxyClient?: (cfg: ProxyClientConfig) => ProxyClient;
   logSuccess?: (msg: string) => void;
   logError?: (msg: string) => void;
-  exit?: (code: number, message?: string) => never;
+  exit?: (code: number) => never;
 }
 
 const defaultReadPlatformYaml = async (cwd: string): Promise<string> => {
@@ -135,6 +135,6 @@ export async function promote(
     } else {
       error(message);
     }
-    exit(code, message);
+    exit(code);
   }
 }

@@ -109,8 +109,8 @@ describe("promote command", () => {
       resolveIdentity: vi.fn().mockResolvedValue(null),
     });
     await expect(promote({ json: false }, deps)).rejects.toThrow("__exit__");
-    expect(deps.exit).toHaveBeenCalledWith(
-      12,
+    expect(deps.exit).toHaveBeenCalledWith(12);
+    expect(deps.logError).toHaveBeenCalledWith(
       expect.stringMatching(/login|identity/i),
     );
   });
@@ -122,8 +122,8 @@ describe("promote command", () => {
       readPlatformYaml: vi.fn().mockRejectedValue(err),
     });
     await expect(promote({ json: false }, deps)).rejects.toThrow("__exit__");
-    expect(deps.exit).toHaveBeenCalledWith(
-      11,
+    expect(deps.exit).toHaveBeenCalledWith(11);
+    expect(deps.logError).toHaveBeenCalledWith(
       expect.stringMatching(/platform\.yaml/i),
     );
   });
@@ -137,8 +137,8 @@ describe("promote command", () => {
       createProxyClient: vi.fn().mockReturnValue(proxy),
     });
     await expect(promote({ json: false }, deps)).rejects.toThrow("__exit__");
-    expect(deps.exit).toHaveBeenCalledWith(
-      13,
+    expect(deps.exit).toHaveBeenCalledWith(13);
+    expect(deps.logError).toHaveBeenCalledWith(
       expect.stringContaining("no preview alias"),
     );
   });
@@ -152,8 +152,8 @@ describe("promote command", () => {
       createProxyClient: vi.fn().mockReturnValue(proxy),
     });
     await expect(promote({ json: false }, deps)).rejects.toThrow("__exit__");
-    expect(deps.exit).toHaveBeenCalledWith(
-      12,
+    expect(deps.exit).toHaveBeenCalledWith(12);
+    expect(deps.logError).toHaveBeenCalledWith(
       expect.stringContaining("no team"),
     );
   });

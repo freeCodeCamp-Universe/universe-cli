@@ -153,8 +153,8 @@ describe("ls command", () => {
       resolveIdentity: vi.fn().mockResolvedValue(null),
     });
     await expect(ls({ json: false }, deps)).rejects.toThrow("__exit__");
-    expect(deps.exit).toHaveBeenCalledWith(
-      12,
+    expect(deps.exit).toHaveBeenCalledWith(12);
+    expect(deps.logError).toHaveBeenCalledWith(
       expect.stringMatching(/login|identity/i),
     );
   });
@@ -166,8 +166,8 @@ describe("ls command", () => {
       readPlatformYaml: vi.fn().mockRejectedValue(err),
     });
     await expect(ls({ json: false }, deps)).rejects.toThrow("__exit__");
-    expect(deps.exit).toHaveBeenCalledWith(
-      11,
+    expect(deps.exit).toHaveBeenCalledWith(11);
+    expect(deps.logError).toHaveBeenCalledWith(
       expect.stringMatching(/site|platform\.yaml/i),
     );
   });

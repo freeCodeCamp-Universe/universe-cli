@@ -109,21 +109,16 @@ describe("exitWithCode", () => {
     expect(exitSpy).toHaveBeenCalledWith(11);
   });
 
-  it("writes message to stderr when provided", () => {
+  // Regression: exitWithCode used to accept a `message` arg and write it
+  // to stderr, which double-printed every error path (pretty render +
+  // raw dump). Callers now own user-facing output exclusively. See
+  // src/output/exit-codes.ts docstring.
+  it("never writes to stderr", () => {
     vi.spyOn(process, "exit").mockImplementation((() => {}) as never);
     const stderrSpy = vi
       .spyOn(process.stderr, "write")
       .mockImplementation(() => true);
-    exitWithCode(12, "credential error");
-    expect(stderrSpy).toHaveBeenCalledWith("credential error\n");
-  });
-
-  it("does not write to stderr when no message provided", () => {
-    vi.spyOn(process, "exit").mockImplementation((() => {}) as never);
-    const stderrSpy = vi
-      .spyOn(process.stderr, "write")
-      .mockImplementation(() => true);
-    exitWithCode(0);
+    exitWithCode(12);
     expect(stderrSpy).not.toHaveBeenCalled();
   });
 });

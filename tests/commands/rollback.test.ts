@@ -95,7 +95,8 @@ describe("rollback command", () => {
     await expect(
       rollback({ json: false, to: undefined }, deps),
     ).rejects.toThrow("__exit__");
-    expect(deps.exit).toHaveBeenCalledWith(10, expect.stringMatching(/--to/i));
+    expect(deps.exit).toHaveBeenCalledWith(10);
+    expect(deps.logError).toHaveBeenCalledWith(expect.stringMatching(/--to/i));
   });
 
   it("errors with EXIT_CREDENTIALS when identity chain returns null", async () => {
@@ -105,8 +106,8 @@ describe("rollback command", () => {
     await expect(rollback({ json: false, to: "x" }, deps)).rejects.toThrow(
       "__exit__",
     );
-    expect(deps.exit).toHaveBeenCalledWith(
-      12,
+    expect(deps.exit).toHaveBeenCalledWith(12);
+    expect(deps.logError).toHaveBeenCalledWith(
       expect.stringMatching(/login|identity/i),
     );
   });
@@ -126,8 +127,8 @@ describe("rollback command", () => {
     await expect(
       rollback({ json: false, to: "ancient" }, deps),
     ).rejects.toThrow("__exit__");
-    expect(deps.exit).toHaveBeenCalledWith(
-      13,
+    expect(deps.exit).toHaveBeenCalledWith(13);
+    expect(deps.logError).toHaveBeenCalledWith(
       expect.stringContaining("no longer exists"),
     );
   });

@@ -32,7 +32,7 @@ export interface LsDeps {
   logSuccess?: (msg: string) => void;
   logInfo?: (msg: string) => void;
   logError?: (msg: string) => void;
-  exit?: (code: number, message?: string) => never;
+  exit?: (code: number) => never;
 }
 
 const defaultReadPlatformYaml = async (cwd: string): Promise<string> => {
@@ -164,6 +164,6 @@ export async function ls(options: LsOptions, deps: LsDeps = {}): Promise<void> {
     } else {
       error(message);
     }
-    exit(code, message);
+    exit(code);
   }
 }

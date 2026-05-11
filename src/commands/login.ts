@@ -25,7 +25,7 @@ export interface LoginDeps {
   logSuccess?: (msg: string) => void;
   logInfo?: (msg: string) => void;
   logError?: (msg: string) => void;
-  exit?: (code: number, message?: string) => never;
+  exit?: (code: number) => never;
 }
 
 const DEFAULT_SCOPE = "read:org user:email";
@@ -69,7 +69,7 @@ export async function login(
       } else {
         error(msg);
       }
-      exit(EXIT_CONFIRM, msg);
+      exit(EXIT_CONFIRM);
       return;
     }
   }
@@ -113,7 +113,7 @@ export async function login(
     } else {
       error(message);
     }
-    exit(EXIT_CREDENTIALS, message);
+    exit(EXIT_CREDENTIALS);
     return;
   }
 

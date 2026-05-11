@@ -196,8 +196,8 @@ describe("deploy command (proxy plane)", () => {
       });
       await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
       expect(deps.runBuild).not.toHaveBeenCalled();
-      expect(deps.exit).toHaveBeenCalledWith(
-        12,
+      expect(deps.exit).toHaveBeenCalledWith(12);
+      expect(deps.logError).toHaveBeenCalledWith(
         expect.stringMatching(/login|identity/i),
       );
     });
@@ -209,8 +209,8 @@ describe("deploy command (proxy plane)", () => {
         readPlatformYaml: vi.fn().mockRejectedValue(err),
       });
       await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
-      expect(deps.exit).toHaveBeenCalledWith(
-        11,
+      expect(deps.exit).toHaveBeenCalledWith(11);
+      expect(deps.logError).toHaveBeenCalledWith(
         expect.stringMatching(/platform\.yaml/i),
       );
     });
@@ -221,8 +221,8 @@ describe("deploy command (proxy plane)", () => {
         readPlatformYaml: vi.fn().mockResolvedValue(v1),
       });
       await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
-      expect(deps.exit).toHaveBeenCalledWith(
-        11,
+      expect(deps.exit).toHaveBeenCalledWith(11);
+      expect(deps.logError).toHaveBeenCalledWith(
         expect.stringMatching(/v1|migration/i),
       );
     });
@@ -233,7 +233,8 @@ describe("deploy command (proxy plane)", () => {
         readPlatformYaml: vi.fn().mockResolvedValue(bad),
       });
       await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
-      expect(deps.exit).toHaveBeenCalledWith(11, expect.any(String));
+      expect(deps.exit).toHaveBeenCalledWith(11);
+      expect(deps.logError).toHaveBeenCalledWith(expect.any(String));
     });
   });
 
@@ -252,17 +253,19 @@ describe("deploy command (proxy plane)", () => {
       expect(proxy.whoami).toHaveBeenCalledTimes(1);
       expect(deps.runBuild).not.toHaveBeenCalled();
       expect(proxy.deployInit).not.toHaveBeenCalled();
-      // Exit credentials with helpful body: login, authorized list, runbook URL.
-      expect(deps.exit).toHaveBeenCalledWith(
-        12,
-        expect.stringContaining("my-site"),
-      );
-      const exitMsg = deps.exit.mock.calls[0]?.[1] as string;
-      expect(exitMsg).toContain("freeCodeCamp-bot");
-      expect(exitMsg).toContain("other-site");
-      expect(exitMsg).toContain(
+      // Exit credentials with helpful body: site, login, sites-mine
+      // pointer (not the full list — see whoami split), runbook URL.
+      expect(deps.exit).toHaveBeenCalledWith(12);
+      const errMsg = (deps.logError.mock.calls[0]?.[0] as string) ?? "";
+      expect(errMsg).toContain("my-site");
+      expect(errMsg).toContain("freeCodeCamp-bot");
+      expect(errMsg).toContain("universe sites ls --mine");
+      expect(errMsg).toContain(
         "freeCodeCamp/infra/blob/main/docs/runbooks/01-deploy-new-constellation-site.md",
       );
+      // Regression: the full authorizedSites list must NOT appear in
+      // the deploy preflight error.
+      expect(errMsg).not.toContain("other-site");
     });
 
     it("proceeds when site IS in authorizedSites (default happy fixture)", async () => {
@@ -343,8 +346,8 @@ describe("deploy command (proxy plane)", () => {
         }),
       });
       await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
-      expect(deps.exit).toHaveBeenCalledWith(
-        19,
+      expect(deps.exit).toHaveBeenCalledWith(19);
+      expect(deps.logError).toHaveBeenCalledWith(
         expect.stringMatching(/partial|failed/i),
       );
       const proxy = deps.createProxyClient.mock.results[0]?.value as ReturnType<
@@ -364,8 +367,8 @@ describe("deploy command (proxy plane)", () => {
         createProxyClient: vi.fn().mockReturnValue(proxy),
       });
       await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
-      expect(deps.exit).toHaveBeenCalledWith(
-        12,
+      expect(deps.exit).toHaveBeenCalledWith(12);
+      expect(deps.logError).toHaveBeenCalledWith(
         expect.stringContaining("no team"),
       );
     });
@@ -379,8 +382,8 @@ describe("deploy command (proxy plane)", () => {
         createProxyClient: vi.fn().mockReturnValue(proxy),
       });
       await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
-      expect(deps.exit).toHaveBeenCalledWith(
-        13,
+      expect(deps.exit).toHaveBeenCalledWith(13);
+      expect(deps.logError).toHaveBeenCalledWith(
         expect.stringContaining("missing"),
       );
     });

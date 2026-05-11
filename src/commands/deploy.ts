@@ -53,7 +53,7 @@ export interface DeployDeps {
   logInfo?: (msg: string) => void;
   logWarn?: (msg: string) => void;
   logError?: (msg: string) => void;
-  exit?: (code: number, message?: string) => never;
+  exit?: (code: number) => never;
 }
 
 const defaultReadPlatformYaml = async (cwd: string): Promise<string> => {
@@ -157,21 +157,18 @@ export async function deploy(
       rethrowProxy("whoami preflight failed", err);
     }
     if (!me.authorizedSites.includes(config.site)) {
-      const sitesLine =
-        me.authorizedSites.length > 0
-          ? me.authorizedSites.join(", ")
-          : "(no sites authorized)";
       throw new CredentialError(
         [
           `Site '${config.site}' is not registered for your GitHub identity.`,
           ``,
-          `  You are:           ${me.login}`,
-          `  Authorized sites:  ${sitesLine}`,
+          `  You are:  ${me.login}`,
           ``,
           `Likely causes (most common first):`,
           `  1. Platform admin has not added '${config.site}' to artemis`,
           `     'config/sites.yaml' yet (one-time, per site).`,
           `  2. You are not in any GitHub team listed for '${config.site}'.`,
+          ``,
+          `Run \`universe sites ls --mine\` to see your authorized sites.`,
           ``,
           `Runbook:`,
           `  https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/01-deploy-new-constellation-site.md`,
@@ -305,6 +302,6 @@ export async function deploy(
     } else {
       error(message);
     }
-    exit(code, message);
+    exit(code);
   }
 }

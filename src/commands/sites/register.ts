@@ -67,6 +67,6 @@ export async function register(
     } else {
       error(message);
     }
-    exit(code, message);
+    exit(code);
   }
 }

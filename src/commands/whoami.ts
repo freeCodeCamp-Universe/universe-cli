@@ -20,7 +20,7 @@ export interface WhoAmIDeps {
   env?: NodeJS.ProcessEnv;
   logSuccess?: (msg: string) => void;
   logError?: (msg: string) => void;
-  exit?: (code: number, message?: string) => never;
+  exit?: (code: number) => never;
 }
 
 const DEFAULT_PROXY_URL = "https://uploads.freecode.camp";
@@ -49,7 +49,7 @@ export async function whoami(
     } else {
       error(msg);
     }
-    exit(EXIT_CREDENTIALS, msg);
+    exit(EXIT_CREDENTIALS);
     return;
   }
 
@@ -61,24 +61,25 @@ export async function whoami(
 
   try {
     const result = await client.whoami();
+    const count = result.authorizedSites.length;
     if (options.json) {
       emitJson(
         buildEnvelope("whoami", true, {
           login: result.login,
-          authorizedSites: result.authorizedSites,
           identitySource: identity.source,
+          authorizedSitesCount: count,
         }),
       );
     } else {
-      const sites =
-        result.authorizedSites.length > 0
-          ? result.authorizedSites.join(", ")
-          : "(no sites authorized)";
+      const sitesLine =
+        count === 0
+          ? "Authorized for 0 sites."
+          : `Authorized for ${count} site${count === 1 ? "" : "s"} — run \`universe sites ls --mine\``;
       success(
         [
           `Logged in as: ${result.login}`,
-          `Authorized sites: ${sites}`,
           `Identity source: ${identity.source}`,
+          sitesLine,
         ].join("\n"),
       );
     }
@@ -95,6 +96,6 @@ export async function whoami(
     } else {
       error(message);
     }
-    exit(exitCode, message);
+    exit(exitCode);
   }
 }

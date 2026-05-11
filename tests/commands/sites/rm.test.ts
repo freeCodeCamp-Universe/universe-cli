@@ -47,8 +47,8 @@ describe("sites rm command", () => {
     await expect(rm({ json: false, slug: "" }, deps)).rejects.toThrow(
       "__exit__",
     );
-    expect(deps.exit).toHaveBeenCalledWith(
-      10,
+    expect(deps.exit).toHaveBeenCalledWith(10);
+    expect(deps.logError).toHaveBeenCalledWith(
       expect.stringMatching(/slug is required/i),
     );
   });
@@ -87,8 +87,8 @@ describe("sites rm command", () => {
     await expect(rm({ json: false, slug: "ghost" }, deps)).rejects.toThrow(
       "__exit__",
     );
-    expect(deps.exit).toHaveBeenCalledWith(
-      10,
+    expect(deps.exit).toHaveBeenCalledWith(10);
+    expect(deps.logError).toHaveBeenCalledWith(
       expect.stringContaining("not_found"),
     );
   });
@@ -107,8 +107,8 @@ describe("sites rm command", () => {
     await expect(rm({ json: false, slug: "blog" }, deps)).rejects.toThrow(
       "__exit__",
     );
-    expect(deps.exit).toHaveBeenCalledWith(
-      12,
+    expect(deps.exit).toHaveBeenCalledWith(12);
+    expect(deps.logError).toHaveBeenCalledWith(
       expect.stringContaining("user_unauthorized"),
     );
   });

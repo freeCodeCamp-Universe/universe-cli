@@ -7,15 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.5.0] - 2026-05-10
+## [0.5.0] - 2026-05-11
 
-Static-apps registry consumer. The artemis proxy gained four new
-endpoints (`POST /api/site/register`, `GET /api/sites`,
+Static-apps registry consumer + output UX hardening. The artemis proxy
+gained four new endpoints (`POST /api/site/register`, `GET /api/sites`,
 `PATCH /api/site/{slug}`, `DELETE /api/site/{slug}`) replacing the
 git-tracked `artemis/config/sites.yaml` ops loop with a Valkey-backed
-registry. This release wires the CLI to those endpoints.
+registry. This release wires the CLI to those endpoints and fixes two
+v0.4-era output bugs surfaced during smoke testing.
 
-This is a non-breaking release. All v0.4 commands behave unchanged.
+This is a non-breaking release for the v0.4 happy paths. The `whoami`
+envelope shape changed — see **Changed** below if you parse it in CI.
 
 ### Added
 
@@ -26,10 +28,13 @@ This is a non-breaking release. All v0.4 commands behave unchanged.
     `/api/site/register`. `--team` accepts repeated flags or
     comma-separated values; omitted → server defaults to
     `[RegistryAuthzTeam]` (typically `staff`). Staff-only.
-  - `universe sites ls [--json]` — GET `/api/sites`. Open to any
-    GitHub bearer (no special team membership required). Renders a
+  - `universe sites ls [--json] [--mine]` — GET `/api/sites`. Open to
+    any GitHub bearer (no special team membership required). Renders a
     plain text table (slug / teams / created-by / created-at) or a
-    `{count, sites[]}` JSON envelope.
+    `{count, scope, sites[]}` JSON envelope. `--mine` intersects with
+    the caller's authorized sites (client-side filter against
+    `/api/whoami`) for "what can I deploy" queries that don't dump the
+    full org-wide registry.
   - `universe sites update <slug> --team=<name>...` — PATCH
     `/api/site/{slug}`. `--team` is required with at least one entry;
     CLI rejects empty with `EXIT_USAGE` before round-tripping. Staff
@@ -45,6 +50,29 @@ This is a non-breaking release. All v0.4 commands behave unchanged.
 - `src/commands/sites/_shared.ts` — `parseTeamsFlag` helper, identity
   resolution, and shared `SitesCommandDeps` interface so all four
   commands share one wiring pattern.
+
+### Changed
+
+- **`whoami` envelope no longer enumerates `authorizedSites`.** The JSON
+  envelope now exposes `authorizedSitesCount` (number) instead of
+  `authorizedSites` (array); the pretty output prints the count plus a
+  pointer to `universe sites ls --mine`. Inlining the full list does
+  not scale to staff who belong to dozens of teams. **JSON consumers
+  reading the old `authorizedSites` array must switch to
+  `sites ls --mine --json`.**
+- **Deploy preflight error** (`site is not registered for your GitHub
+identity`) no longer dumps the full authorized list — instructs the
+  caller to run `sites ls --mine` instead. Same hint placement, far
+  shorter message.
+
+### Fixed
+
+- **Duplicate error output on every non-`--json` failure.** Each
+  command's catch path called both `log.error(message)` (clack pretty)
+  and `exitWithCode(code, message)`, and the latter unconditionally
+  re-wrote `message` to stderr — surfacing every error twice (decorated
+  - raw). `exitWithCode` now drops the message arg and only exits;
+    callers retain ownership of user-facing output.
 
 ### Notes
 

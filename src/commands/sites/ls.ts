@@ -6,6 +6,8 @@ import { emitJson, setupClient, type SitesCommandDeps } from "./_shared.js";
 
 export interface SitesLsOptions {
   json: boolean;
+  /** When true, intersect the registry with the caller's authorized sites. */
+  mine?: boolean;
 }
 
 function formatTable(rows: SiteRow[]): string {
@@ -36,12 +38,21 @@ export async function ls(
 
   try {
     const { client } = await setupClient(deps);
-    const rows = await client.listSites();
+    let rows = await client.listSites();
+    let scope: "all" | "mine" = "all";
+
+    if (options.mine) {
+      const me = await client.whoami();
+      const allowed = new Set(me.authorizedSites);
+      rows = rows.filter((r) => allowed.has(r.slug));
+      scope = "mine";
+    }
 
     if (options.json) {
       emitJson(
         buildEnvelope(command, true, {
           count: rows.length,
+          scope,
           sites: rows,
         }),
       );
@@ -55,6 +66,6 @@ export async function ls(
     } else {
       error(message);
     }
-    exit(code, message);
+    exit(code);
   }
 }

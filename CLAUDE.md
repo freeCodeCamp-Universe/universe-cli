@@ -18,5 +18,9 @@ never leave the cluster.
 - **Internal conventions** — [`CONTRIBUTING.md`](CONTRIBUTING.md) §Internal
   conventions: test layout, exit codes, platform.yaml schema, identity
   resolution, binary publish flow, release pipeline.
-- **Project runbooks** — [`docs/FLIGHT-MANUAL.md`](docs/FLIGHT-MANUAL.md),
-  [`docs/STAFF-GUIDE.md`](docs/STAFF-GUIDE.md), [`docs/RELEASING.md`](docs/RELEASING.md).
+- **Operator index** — [`docs/README.md`](docs/README.md) maps the three
+  workflows (use, build, release) + architecture + cross-repo runbooks.
+  Most-used leaves: [`docs/STAFF-GUIDE.md`](docs/STAFF-GUIDE.md)
+  (deploy / promote / rollback walkthrough),
+  [`docs/RELEASING.md`](docs/RELEASING.md) (cut a CLI release),
+  [`docs/platform-yaml.md`](docs/platform-yaml.md) (config schema).

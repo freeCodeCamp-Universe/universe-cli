@@ -22,7 +22,7 @@ function handleActionError(command: string, json: boolean, err: unknown): void {
   const message = err instanceof Error ? err.message : "unknown error";
   const code = err instanceof CliError ? err.exitCode : EXIT_USAGE;
   outputError(ctx, code, message);
-  exitWithCode(code, message);
+  exitWithCode(code);
 }
 
 /**
@@ -79,11 +79,18 @@ export function run(argv = process.argv) {
       );
 
     sitesCli
-      .command("ls", "List every registered site")
+      .command("ls", "List sites in the registry")
       .option("--json", "Output as JSON")
-      .action(async (flags: { json?: boolean }) => {
+      .option(
+        "--mine",
+        "Filter to sites your GitHub identity is authorized for",
+      )
+      .action(async (flags: { json?: boolean; mine?: boolean }) => {
         try {
-          await sitesLs({ json: flags.json ?? false });
+          await sitesLs({
+            json: flags.json ?? false,
+            mine: flags.mine ?? false,
+          });
         } catch (err: unknown) {
           handleActionError("sites ls", flags.json ?? false, err);
         }

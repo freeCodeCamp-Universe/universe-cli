@@ -16,15 +16,20 @@ pnpm build         # tsup → dist/
 
 A husky pre-commit hook runs `pnpm lint` and `pnpm test` on every commit.
 
-See the [Flight Manual](docs/FLIGHT-MANUAL.md) for the full build, test, and
-credential setup runbook.
+Build output: `dist/index.js` (ESM, for `node` / Bun consumers) and
+`dist/index.cjs` (CJS, used by the SEA binary). If `pnpm build` fails,
+run `pnpm tsc --noEmit` first to isolate TypeScript errors from tsup
+bundling, then check that `tsup.config.ts` still points at
+`src/index.ts`.
 
 ## Proposing Changes
 
 1. Open an issue first for anything beyond a small fix so we can align on scope.
 2. Fork the repository and create a topic branch.
 3. Keep changes focused. Include tests for new behavior and update the docs
-   that describe the affected surface (README, Staff Guide, or Flight Manual).
+   that describe the affected surface — `README.md` (CLI surface),
+   `docs/STAFF-GUIDE.md` (user walkthrough), or `docs/platform-yaml.md`
+   (schema). Cross-cutting conventions go in §Internal conventions below.
 4. Run `pnpm lint`, `pnpm test`, and `pnpm tsc --noEmit` before opening a pull
    request.
 5. Open a pull request against `main` and describe the change, the motivation,
@@ -52,7 +57,7 @@ By participating you agree to uphold it.
 ## Internal conventions
 
 - **Test layout is `tests/**`, not co-located.** Mirrors `src/`. Pre-pivot RFC
-  text prescribing `src/*.test.ts` was a doc bug, now archaeology.
+text prescribing `src/\*.test.ts` was a doc bug, now archaeology.
 - **Exit codes are stable contracts.** `src/output/exit-codes.ts` is the
   single export point; callers must import constants, never hard-code
   integers. `EXIT_OUTPUT_DIR (14)`, `EXIT_ALIAS (16)`,

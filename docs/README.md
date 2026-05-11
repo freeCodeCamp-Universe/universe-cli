@@ -1,31 +1,57 @@
-# Universe CLI Design Notes (Session Archive)
+# Universe CLI — Operator Docs
 
-This folder preserves the full planning and design work from the static deploy CLI discovery session so there is no context loss across sessions.
+Pick a workflow.
 
-Files:
+| I want to…                                                           | Start here                              |
+| -------------------------------------------------------------------- | --------------------------------------- |
+| **Use the CLI** to deploy / promote / rollback a static site         | [STAFF-GUIDE.md](STAFF-GUIDE.md)        |
+| **Understand the architecture** — where the CLI sits in the platform | [§Architecture](#architecture) (below)  |
+| **Build & test the CLI** locally                                     | [`CONTRIBUTING.md`](../CONTRIBUTING.md) |
+| **Cut a release** of the CLI                                         | [RELEASING.md](RELEASING.md)            |
+| **Write `platform.yaml`** for a site                                 | [platform-yaml.md](platform-yaml.md)    |
 
-- `docs/00-source-inputs.md`: Source context captured from the session (ADR, user stories, Vite context, repo shape).
-- `docs/01-tooling-research-and-recommendations.md`: Tooling research outcomes and rationale.
-- `docs/02-static-cli-spec-v0.2.md`: Detailed functional and technical spec (locked decisions included).
-- `docs/03-engineering-backlog.md`: Ticket-ready backlog with acceptance checks and test coverage.
-- `docs/04-static-cli-spec-v0.3.md`: Implementation kickoff spec version. This is now the canonical source of truth for future work.
-- `docs/99-session-handoff.md`: Session continuity guide for next implementation sessions.
+## Architecture
 
-Locked decisions from this session:
+The CLI is the staff-facing client for the **artemis** deploy proxy. It
+holds no infrastructure credentials — R2 admin keys live inside the
+cluster, behind artemis at `uploads.freecode.camp`.
 
-- Deploy target: static build output (default `dist/`) to S3-compatible storage.
-- Most users are expected to use Vite-based static projects (including MPA).
-- Git dirty tree behavior: soft fail (warning only).
-- Missing git hash behavior: hard fail unless `--force`.
-- Credential fallback includes named rclone remote, default `gxy-static`.
+```
+┌──────────────────┐   GitHub identity   ┌────────────┐   R2 admin key   ┌─────┐
+│  universe (CLI)  │ ──────────────────► │  artemis   │ ───────────────► │ R2  │
+│  staff laptop /  │   (5-slot chain)    │  proxy     │   (cluster only) │     │
+│  CI / Woodpecker │ ◄────────────────── │ uploads.   │ ◄─────────────── │     │
+└──────────────────┘   deploy session    │ freecode.  │                  └─────┘
+                       (short-lived JWT) │ camp       │
+                                         └────────────┘
+                                                ▲
+                                                │ site → team map
+                                                │ (Valkey-backed registry)
+                                                ▼
+                                         ┌────────────┐
+                                         │ GitHub org │
+                                         │ team check │
+                                         └────────────┘
+```
 
-Canonical workflow moving forward:
+**Authoritative design docs** (in the Universe repo — read-only here):
 
-- Read `docs/04-static-cli-spec-v0.3.md` first.
-- Treat `docs/02-static-cli-spec-v0.2.md` as immutable baseline archive.
-- Use `docs/03-engineering-backlog.md` as implementation task map.
+- [ADR-016 — Deploy proxy](https://github.com/freeCodeCamp-Universe/Universe/blob/main/decisions/016-deploy-proxy.md)
+  — CLI ↔ artemis contract, identity priority chain, per-site
+  authorization, deploy-session JWT scope, R2 layout.
+- [Universe ARCHI-DIAGRAM](https://github.com/freeCodeCamp-Universe/Universe/blob/main/ARCHI-DIAGRAM.md)
+  — galaxy topology + request / storage / auth flows.
 
-Current implementation status:
+**Cross-repo runbooks** (artemis-side, owned by the infra team):
 
-- The shipped CLI currently implements `universe static deploy`, `universe static promote`, and `universe static rollback`.
-- `docs/04-static-cli-spec-v0.3.md` also describes planned commands that are not shipped yet.
+- [`fCC/infra/docs/runbooks/02-deploy-artemis-service.md`](https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/02-deploy-artemis-service.md)
+  — bring up / upgrade artemis on `gxy-cassiopeia`.
+- [`fCC/infra/docs/runbooks/03-artemis-postdeploy-check.md`](https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/03-artemis-postdeploy-check.md)
+  — E2E verification after any artemis chart change.
+
+## Field notes
+
+Operational findings from building this CLI live upstream at
+[`Universe/spike/field-notes/archive/2026-05-10/universe-cli.md`](https://github.com/freeCodeCamp-Universe/Universe/blob/main/spike/field-notes/archive/2026-05-10/universe-cli.md)
+(frozen 2026-05-10). New findings should go to that team's current
+field-notes surface — not into this repo.
