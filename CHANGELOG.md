@@ -61,12 +61,16 @@ envelope shape changed — see **Changed** below if you parse it in CI.
   reading the old `authorizedSites` array must switch to
   `sites ls --mine --json`.**
 - **Deploy preflight error** (`site is not registered for your GitHub
-identity`) is now self-contained: inlines the caller's authorized
-  sites, surfaces a "Did you mean?" hint (case-insensitive substring,
-  Damerau-Levenshtein ≤2 fallback) when the typo is close to a
-  registered slug, and names the admin remediation commands
-  (`universe sites register …` / `universe sites update …`,
-  staff-gated) directly in the body. No external runbook redirect.
+identity`) reworked for self-contained recovery: surfaces a "Did you
+  mean?" hint (case-insensitive substring, Damerau-Levenshtein ≤ 2
+  fallback) when the typo is close to a registered slug, and names the
+  admin remediation commands (`universe sites register …` /
+  `universe sites update …`, staff-gated) directly in the body.
+  Authorized-list rendering is scale-aware: inline when the caller's
+  authorized count is ≤ 10, otherwise the count plus a
+  `universe sites ls --mine` redirect (matches the `whoami` split
+  above). Did-you-mean stays inline regardless of size — it's the
+  primary typo-recovery surface. No external runbook redirect.
 
 ### Fixed
 

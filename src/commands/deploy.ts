@@ -110,17 +110,30 @@ function rethrowProxy(prefix: string, err: unknown): never {
 }
 
 /**
+ * Cap on how many authorized slugs to render inline in the preflight
+ * error body. Above this, the message shows the count + a one-line
+ * `sites ls --mine` redirect — staff in broad teams (e.g. `staff` on
+ * a registry with hundreds of slugs) would otherwise see a wall of
+ * text. Did-you-mean stays inline regardless of size; it's the
+ * primary typo-recovery surface.
+ */
+const PREFLIGHT_INLINE_LIST_CAP = 10;
+
+/**
  * Formats the `site '<slug>' is not registered` preflight error.
  *
- * The body is self-contained: did-you-mean hint, inline authorized
- * list, and the registry-CLI commands an admin would run to fix it.
- * No external runbook redirect — operators with a shell get
- * everything inline.
+ * Body shape:
+ *   - Did-you-mean hint when the attempted slug is close to an
+ *     authorized one (substring / Damerau-Levenshtein ≤ 2). Always
+ *     inline; it's the primary recovery surface for typos.
+ *   - Three likely-cause lines naming the registry-CLI remediation
+ *     (`universe sites register/update …`), staff-gated.
+ *   - Authorized set: inline list when count ≤ `PREFLIGHT_INLINE_LIST_CAP`,
+ *     otherwise count + `universe sites ls --mine` redirect.
  *
- * Empty `authorized` collapses to a shorter "no sites yet" body —
- * suggesting a typo is misleading when the user has no comparison
- * set, and the cause is structurally "you haven't been added
- * anywhere yet".
+ * No external runbook redirect. Empty `authorized` collapses to a
+ * shorter "no sites yet" body — suggesting a typo is misleading
+ * when the user has no comparison set.
  */
 function formatUnauthorizedSiteError(a: {
   attempted: string;
@@ -160,9 +173,19 @@ function formatUnauthorizedSiteError(a: {
     `    3. You are not in any team authorized for '${a.attempted}'.`,
     `       Admin (staff): universe sites update ${a.attempted} --team +<your-team>`,
     ``,
-    `  Your authorized sites (${a.authorized.length}):`,
-    ...[...a.authorized].sort().map((s) => `    - ${s}`),
   );
+
+  if (a.authorized.length <= PREFLIGHT_INLINE_LIST_CAP) {
+    lines.push(
+      `  Your authorized sites (${a.authorized.length}):`,
+      ...[...a.authorized].sort().map((s) => `    - ${s}`),
+    );
+  } else {
+    lines.push(
+      `  You have ${a.authorized.length} authorized sites — too many to inline.`,
+      `  Run \`universe sites ls --mine\` to inspect the full list.`,
+    );
+  }
 
   return lines.join("\n");
 }

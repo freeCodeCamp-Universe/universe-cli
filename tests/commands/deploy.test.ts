@@ -315,6 +315,52 @@ describe("deploy command (proxy plane)", () => {
       expect(errMsg).not.toContain("Your authorized sites (0)");
     });
 
+    it("suppresses the inline list above the scale threshold (>10 entries)", async () => {
+      // Staff member belongs to a team granting access to dozens of sites
+      // (the production reality at fCC scale). Dumping the full list
+      // produces a wall of text. Cap at 10 inline; redirect for the rest.
+      const big = Array.from({ length: 25 }, (_, i) => `site-${i}`);
+      const proxy = mkProxy();
+      proxy.whoami.mockResolvedValue({
+        login: "raisedadead",
+        authorizedSites: big,
+      });
+      const deps = mkDeps({
+        readPlatformYaml: vi.fn().mockResolvedValue("site: typo-slug\n"),
+        createProxyClient: vi.fn().mockReturnValue(proxy),
+      });
+      await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
+      const errMsg = (deps.logError.mock.calls[0]?.[0] as string) ?? "";
+      // Count + redirect surfaced; no individual entries dumped.
+      expect(errMsg).toContain("25 authorized sites");
+      expect(errMsg).toContain("universe sites ls --mine");
+      expect(errMsg).not.toContain("- site-0");
+      expect(errMsg).not.toContain("- site-24");
+    });
+
+    it("still shows a did-you-mean hint when the list is suppressed", async () => {
+      // Scale should not blunt the typo-recovery surface: did-you-mean
+      // is the primary fix path and stays inline regardless of size.
+      const big = [
+        "hello-universe",
+        ...Array.from({ length: 24 }, (_, i) => `noise-${i}`),
+      ];
+      const proxy = mkProxy();
+      proxy.whoami.mockResolvedValue({
+        login: "raisedadead",
+        authorizedSites: big,
+      });
+      const deps = mkDeps({
+        readPlatformYaml: vi.fn().mockResolvedValue("site: hello-universe-1\n"),
+        createProxyClient: vi.fn().mockReturnValue(proxy),
+      });
+      await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
+      const errMsg = (deps.logError.mock.calls[0]?.[0] as string) ?? "";
+      expect(errMsg).toContain("Did you mean: hello-universe?");
+      expect(errMsg).toContain("universe sites ls --mine");
+      expect(errMsg).not.toContain("- noise-0");
+    });
+
     it("proceeds when site IS in authorizedSites (default happy fixture)", async () => {
       const deps = mkDeps();
       await deploy({ json: false }, deps);
