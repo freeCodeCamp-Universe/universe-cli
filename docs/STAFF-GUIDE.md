@@ -63,7 +63,7 @@ deploy:
     - ".env*"
 ```
 
-Full field reference, validation rules, and v0.3 → v0.4 migration: [`platform-yaml.md`](platform-yaml.md).
+Full field reference and validation rules: [`platform-yaml.md`](platform-yaml.md).
 
 If your site is brand new and not yet in the registry, a staff member with `sites register` permission needs to register the slug — see [Staff: site registry](#staff-site-registry) below.
 
@@ -190,7 +190,6 @@ If `universe whoami` shows a different identity than expected, the most common c
 | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `Already logged in. …` from `universe login` | You already have a stored token. Run `universe logout` first, or pass `--force` to replace.                                                                                                                                                                                                                                                                                          |
 | `Site '<slug>' is not registered …`          | The error body inlines the recovery: a "Did you mean?" hint if your `platform.yaml` `site:` is close to a registered slug, plus the `universe sites register …` / `universe sites update …` commands a staff member would run. If the slug is registered but you're not authorized, ask any `staff` member to add your team via `universe sites update <slug> --team=…,<your-team>`. |
-| `platform.yaml v1 detected`                  | Your config still uses the pre-v0.4 schema (`name`, `r2`, `bucket`, `stack`, `domain`). See [`platform-yaml.md` §Migration](platform-yaml.md#migration-v03--v04).                                                                                                                                                                                                                    |
 | `not a git repository`                       | The CLI stamps deploy ids with a git sha. Initialize git in the project, or run from inside one.                                                                                                                                                                                                                                                                                     |
 | Wrong identity resolved                      | Run `universe whoami` to see which slot fired. Unset `GITHUB_TOKEN` if you didn't intend it.                                                                                                                                                                                                                                                                                         |
 
