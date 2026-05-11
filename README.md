@@ -2,11 +2,15 @@
 
 Static site deployment for the freeCodeCamp Universe platform.
 
-> v0.4 routes every deploy through the **artemis** proxy at
+> Every deploy routes through the **artemis** proxy at
 > `uploads.freecode.camp`. Staff hold only a `platform.yaml` and a
-> GitHub identity — the proxy holds the R2 credentials. See
+> GitHub identity — the proxy holds the R2 admin credentials. The
+> site → teams registry is Valkey-backed and mutated by the
+> `universe sites …` subcommands (staff-gated writes; reads open to
+> any GitHub bearer). See
 > [Universe ADR-016](https://github.com/freeCodeCamp-Universe/Universe/blob/main/decisions/016-deploy-proxy.md)
-> for the full design.
+> for the full design and [`docs/STAFF-GUIDE.md`](docs/STAFF-GUIDE.md)
+> for the end-to-end onboarding walkthrough.
 
 ## Install
 
@@ -60,7 +64,7 @@ Top-level (cross-cutting):
 ```sh
 universe login            # GitHub OAuth device flow → ~/.config/universe-cli/token
 universe logout           # delete stored token
-universe whoami           # echo current login + authorized sites
+universe whoami           # echo current login + authorized-sites count
 universe --version        # CLI version
 ```
 
@@ -73,13 +77,13 @@ universe static rollback --to <deployId>
 universe static ls [--site <site>]
 ```
 
-Static-app registry (namespaced under `sites`, staff-only writes):
+Static-app registry (namespaced under `sites`, staff-gated writes):
 
 ```sh
-universe sites register <slug> [--team=<name>...]   # create new entry (staff)
-universe sites ls [--mine]                          # list every site, or only yours
-universe sites update <slug> --team=<name>...       # replace teams (staff)
-universe sites rm <slug>                            # delete entry (staff)
+universe sites ls [--mine]                          # list registered sites; `--mine` filters to your authorized set
+universe sites register <slug> [--team=<name>...]   # create new entry (staff; defaults --team to staff)
+universe sites update <slug> --team=<name>...       # replace teams list (staff)
+universe sites rm <slug>                            # delete entry (staff; R2 deploy bytes untouched)
 ```
 
 All commands support `--json` for CI integration.
@@ -108,37 +112,57 @@ Every site has a `platform.yaml` at its repo root. Minimal valid file:
 site: my-site
 ```
 
-Full reference (every field, defaults, validation rules, v0.3 → v0.4
-migration): [`docs/platform-yaml.md`](docs/platform-yaml.md).
+Full schema reference (every field, defaults, validation rules):
+[`docs/platform-yaml.md`](docs/platform-yaml.md).
 
 No credential fields. The proxy holds the R2 admin key; the CLI never
 reads or writes one.
 
 ## Common flows
 
+Staff onboarding + deploy lifecycle:
+
 ```sh
 # 1. Authenticate (laptop, first time)
 universe login
 
-# 2. Deploy to preview
-universe static deploy
-
-# 3. Inspect identity + authorized sites
+# 2. Identity + how many sites you can deploy to
 universe whoami
 
-# 4. List recent deploys for the current site
+# 3. List your authorized sites (intersects registry with your GH teams)
+universe sites ls --mine
+
+# 4. From your site repo: deploy to preview (reads ./platform.yaml)
+universe static deploy
+
+# 5. Inspect recent deploys for the current site
 universe static ls
 
-# 5. Promote current preview to production
+# 6. Promote preview to production
 universe static promote
 
-# 6. Roll production back to a past deploy
+# 7. Roll production back to a past deploy
 universe static rollback --to 20260427-141522-abc1234
+```
+
+Registry admin (staff team only — gated server-side by artemis's
+`REGISTRY_AUTHZ_TEAM`, default `staff`):
+
+```sh
+# Register a new site (defaults --team to staff)
+universe sites register hello-universe --team bots,staff
+
+# Add or replace the teams list on an existing site
+universe sites update hello-universe --team bots,staff,curriculum
+
+# Delete a site from the registry (R2 bytes age out via cleanup cron)
+universe sites rm hello-universe
 ```
 
 CI (GitHub Actions) — set `permissions: id-token: write` and rely on
 slot 2 (GHA OIDC) of the identity chain, or pass `$GITHUB_TOKEN`
-explicitly.
+explicitly. Full operator walkthrough:
+[`docs/STAFF-GUIDE.md`](docs/STAFF-GUIDE.md).
 
 ## Environment overrides
 
