@@ -96,8 +96,9 @@ The CLI resolves a GitHub identity in this order — first match wins:
 
 The proxy validates whatever it receives via GitHub `GET /user`, then
 authorizes against the registry server-side (Valkey-backed; the
-git-tracked `sites.yaml` was retired in artemis `feat/valkey-registry`).
-Run `universe whoami` to see which slot resolved.
+`sites_yaml` backend was retired in artemis `f115198`). Run
+`universe whoami` to see which slot resolved; inspect the sites you
+can deploy to with `universe sites ls --mine`.
 
 ## Configuration (`platform.yaml`)
 
