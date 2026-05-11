@@ -130,19 +130,15 @@ The proxy points production at that deploy id. The old production deploy remains
 
 ### Deploy from CI (GitHub Actions)
 
-GitHub Actions can authenticate two ways:
+Pass `$GITHUB_TOKEN` explicitly — it's slot 1 of the identity chain:
 
-1. **OIDC (preferred when artemis supports it)** — set `permissions: id-token: write` on the job. Currently, the proxy doesn't validate GHA OIDC tokens yet, so for now use option 2.
+```yaml
+- run: universe static deploy --promote --json
+  env:
+    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+```
 
-1. **`$GITHUB_TOKEN`** — pass the workflow-issued token explicitly:
-
-   ```yaml
-   - run: universe static deploy --promote --json
-     env:
-       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-   ```
-
-   `--promote` finalizes as production directly, which is the usual CI shape when your branch is `main`.
+`--promote` finalizes as production directly, which is the usual CI shape when your branch is `main`. An OIDC slot will return once artemis grows an OIDC verifier.
 
 ### Use a non-prod proxy (staging)
 
@@ -181,12 +177,12 @@ universe sites rm <slug>                                # delete entry (R2 bytes
 The CLI resolves a GitHub identity in this order — first match wins:
 
 1. `$GITHUB_TOKEN` / `$GH_TOKEN`
-1. GitHub Actions OIDC (proxy doesn't validate this yet — falls through)
-1. Woodpecker OIDC (placeholder, deferred)
 1. `gh auth token` (laptop with `gh` installed)
 1. Device-flow stored token at `~/.config/universe-cli/token`
 
-If `universe whoami` shows a different identity than expected, the most common cause is an env var (slot 1) overriding your laptop login (slot 5). Unset `GITHUB_TOKEN` for that shell or use a fresh terminal.
+GHA OIDC and Woodpecker OIDC slots were dropped in v0.4 — artemis validates bearers via GitHub `GET /user`, which only accepts user-scoped tokens. The slots will return once artemis grows an OIDC verifier. CI runners must pass `$GITHUB_TOKEN` explicitly.
+
+If `universe whoami` shows a different identity than expected, the most common cause is an env var (slot 1) overriding your laptop login (slot 3). Unset `GITHUB_TOKEN` for that shell or use a fresh terminal.
 
 ## When something breaks
 

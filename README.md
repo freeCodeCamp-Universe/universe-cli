@@ -88,10 +88,10 @@ All commands support `--json` for CI integration.
 The CLI resolves a GitHub identity in this order — first match wins:
 
 1. `$GITHUB_TOKEN` / `$GH_TOKEN` env (CI explicit)
-1. GHA OIDC (`$ACTIONS_ID_TOKEN_REQUEST_URL` + `$ACTIONS_ID_TOKEN_REQUEST_TOKEN`)
-1. Woodpecker OIDC env (deferred — placeholder slot)
 1. `gh auth token` shell-out (laptop with `gh` installed)
 1. Device-flow stored token at `~/.config/universe-cli/token`
+
+GHA OIDC and Woodpecker OIDC slots were dropped in v0.4: artemis validates bearers via GitHub `GET /user`, which only accepts user-scoped tokens. CI runners must export `$GITHUB_TOKEN` explicitly. The slots will return once artemis grows an OIDC verifier.
 
 The proxy validates whatever it receives via GitHub `GET /user`, then authorizes against the registry server-side (Valkey-backed; the `sites_yaml` backend was retired in artemis `f115198`). Run `universe whoami` to see which slot resolved; inspect the sites you can deploy to with `universe sites ls --mine`.
 
@@ -147,7 +147,7 @@ universe sites update hello-universe --team bots,staff,curriculum
 universe sites rm hello-universe
 ```
 
-CI (GitHub Actions) — set `permissions: id-token: write` and rely on slot 2 (GHA OIDC) of the identity chain, or pass `$GITHUB_TOKEN` explicitly. Full operator walkthrough: [`docs/STAFF-GUIDE.md`](docs/STAFF-GUIDE.md).
+CI (GitHub Actions) — pass `$GITHUB_TOKEN` explicitly (slot 1). The OIDC slot will return once artemis grows an OIDC verifier. Full operator walkthrough: [`docs/STAFF-GUIDE.md`](docs/STAFF-GUIDE.md).
 
 ## Environment overrides
 

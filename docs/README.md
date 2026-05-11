@@ -17,7 +17,7 @@ The CLI is the staff-facing client for the **artemis** deploy proxy. It holds no
 ```
 ┌──────────────────┐   GitHub identity   ┌────────────┐   R2 admin key   ┌─────┐
 │  universe (CLI)  │ ──────────────────► │  artemis   │ ───────────────► │ R2  │
-│  staff laptop /  │   (5-slot chain)    │  proxy     │   (cluster only) │     │
+│  staff laptop /  │   (3-slot chain)    │  proxy     │   (cluster only) │     │
 │  CI / Woodpecker │ ◄────────────────── │ uploads.   │ ◄─────────────── │     │
 └──────────────────┘   deploy session    │ freecode.  │                  └─────┘
                        (short-lived JWT) │ camp       │
