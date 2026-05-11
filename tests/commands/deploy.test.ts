@@ -239,33 +239,80 @@ describe("deploy command (proxy plane)", () => {
   });
 
   describe("preflight authorization (whoami)", () => {
-    it("calls whoami before runBuild and short-circuits when site not authorized", async () => {
+    it("short-circuits BEFORE build when site not authorized", async () => {
       const proxy = mkProxy();
       proxy.whoami.mockResolvedValue({
         login: "freeCodeCamp-bot",
-        authorizedSites: ["other-site"],
+        authorizedSites: ["other-site", "another-site"],
       });
       const deps = mkDeps({
         createProxyClient: vi.fn().mockReturnValue(proxy),
       });
       await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
-      // whoami called BEFORE the slow build step.
       expect(proxy.whoami).toHaveBeenCalledTimes(1);
       expect(deps.runBuild).not.toHaveBeenCalled();
       expect(proxy.deployInit).not.toHaveBeenCalled();
-      // Exit credentials with helpful body: site, login, sites-mine
-      // pointer (not the full list — see whoami split), runbook URL.
       expect(deps.exit).toHaveBeenCalledWith(12);
       const errMsg = (deps.logError.mock.calls[0]?.[0] as string) ?? "";
       expect(errMsg).toContain("my-site");
       expect(errMsg).toContain("freeCodeCamp-bot");
-      expect(errMsg).toContain("universe sites ls --mine");
-      expect(errMsg).toContain(
-        "freeCodeCamp/infra/blob/main/docs/runbooks/01-deploy-new-constellation-site.md",
-      );
-      // Regression: the full authorizedSites list must NOT appear in
-      // the deploy preflight error.
-      expect(errMsg).not.toContain("other-site");
+      // Inline authorized list — no redirect to a second command.
+      expect(errMsg).toContain("Your authorized sites (2)");
+      expect(errMsg).toContain("- another-site");
+      expect(errMsg).toContain("- other-site");
+      expect(errMsg).not.toContain("universe sites ls --mine");
+      // Registry-CLI remediation shown inline (replaces sites.yaml PR flow).
+      expect(errMsg).toContain("universe sites register my-site");
+      // Self-contained — no runbook URL, no reference to the retired yaml.
+      expect(errMsg).not.toContain("docs/runbooks");
+      expect(errMsg).not.toContain("https://github.com/freeCodeCamp/infra");
+      expect(errMsg).not.toContain("sites.yaml");
+    });
+
+    it("includes a did-you-mean hint when the typo is close to a registered slug", async () => {
+      const proxy = mkProxy();
+      proxy.whoami.mockResolvedValue({
+        login: "raisedadead",
+        authorizedSites: ["hello-universe", "gomoku", "test"],
+      });
+      const deps = mkDeps({
+        readPlatformYaml: vi.fn().mockResolvedValue("site: hello-universe-1\n"),
+        createProxyClient: vi.fn().mockReturnValue(proxy),
+      });
+      await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
+      const errMsg = (deps.logError.mock.calls[0]?.[0] as string) ?? "";
+      expect(errMsg).toContain("Did you mean: hello-universe?");
+    });
+
+    it("omits did-you-mean when no candidate is close enough", async () => {
+      const proxy = mkProxy();
+      proxy.whoami.mockResolvedValue({
+        login: "raisedadead",
+        authorizedSites: ["gomoku", "test"],
+      });
+      const deps = mkDeps({
+        readPlatformYaml: vi.fn().mockResolvedValue("site: forum\n"),
+        createProxyClient: vi.fn().mockReturnValue(proxy),
+      });
+      await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
+      const errMsg = (deps.logError.mock.calls[0]?.[0] as string) ?? "";
+      expect(errMsg).not.toContain("Did you mean");
+    });
+
+    it("handles empty authorized-sites list with a distinct message", async () => {
+      const proxy = mkProxy();
+      proxy.whoami.mockResolvedValue({
+        login: "newhire",
+        authorizedSites: [],
+      });
+      const deps = mkDeps({
+        createProxyClient: vi.fn().mockReturnValue(proxy),
+      });
+      await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
+      const errMsg = (deps.logError.mock.calls[0]?.[0] as string) ?? "";
+      expect(errMsg).toContain("authorized for no sites");
+      expect(errMsg).not.toContain("Did you mean");
+      expect(errMsg).not.toContain("Your authorized sites (0)");
     });
 
     it("proceeds when site IS in authorizedSites (default happy fixture)", async () => {

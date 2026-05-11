@@ -22,6 +22,7 @@ import {
   parsePlatformYaml,
   type PlatformYamlV2,
 } from "../lib/platform-yaml.js";
+import { suggest } from "../lib/similarity.js";
 import {
   createProxyClient as defaultCreateProxyClient,
   ProxyError,
@@ -108,6 +109,64 @@ function rethrowProxy(prefix: string, err: unknown): never {
   throw new StorageError(`${prefix}: ${String(err)}`);
 }
 
+/**
+ * Formats the `site '<slug>' is not registered` preflight error.
+ *
+ * The body is self-contained: did-you-mean hint, inline authorized
+ * list, and the registry-CLI commands an admin would run to fix it.
+ * No external runbook redirect — operators with a shell get
+ * everything inline.
+ *
+ * Empty `authorized` collapses to a shorter "no sites yet" body —
+ * suggesting a typo is misleading when the user has no comparison
+ * set, and the cause is structurally "you haven't been added
+ * anywhere yet".
+ */
+function formatUnauthorizedSiteError(a: {
+  attempted: string;
+  login: string;
+  authorized: readonly string[];
+}): string {
+  const lines: string[] = [
+    `Site '${a.attempted}' is not registered for your GitHub identity.`,
+    ``,
+    `  You are:  ${a.login}`,
+    ``,
+  ];
+
+  if (a.authorized.length === 0) {
+    lines.push(
+      `  Your identity is authorized for no sites yet.`,
+      ``,
+      `  Likely causes:`,
+      `    1. The '${a.attempted}' slug is not registered.`,
+      `       Admin (staff): universe sites register ${a.attempted} --team <team>`,
+      `    2. You are not in any team listed on any registered site.`,
+      `       Admin (staff): universe sites update <slug> --team +<your-team>`,
+    );
+    return lines.join("\n");
+  }
+
+  const hint = suggest(a.attempted, a.authorized);
+  if (hint) {
+    lines.push(`  Did you mean: ${hint}?`, ``);
+  }
+
+  lines.push(
+    `  Likely causes (most common first):`,
+    `    1. Typo in platform.yaml \`site:\` — check the spelling above.`,
+    `    2. The '${a.attempted}' slug is not registered yet.`,
+    `       Admin (staff): universe sites register ${a.attempted} --team <team>`,
+    `    3. You are not in any team authorized for '${a.attempted}'.`,
+    `       Admin (staff): universe sites update ${a.attempted} --team +<your-team>`,
+    ``,
+    `  Your authorized sites (${a.authorized.length}):`,
+    ...[...a.authorized].sort().map((s) => `    - ${s}`),
+  );
+
+  return lines.join("\n");
+}
+
 export async function deploy(
   options: DeployOptions,
   deps: DeployDeps = {},
@@ -158,21 +217,11 @@ export async function deploy(
     }
     if (!me.authorizedSites.includes(config.site)) {
       throw new CredentialError(
-        [
-          `Site '${config.site}' is not registered for your GitHub identity.`,
-          ``,
-          `  You are:  ${me.login}`,
-          ``,
-          `Likely causes (most common first):`,
-          `  1. Platform admin has not added '${config.site}' to artemis`,
-          `     'config/sites.yaml' yet (one-time, per site).`,
-          `  2. You are not in any GitHub team listed for '${config.site}'.`,
-          ``,
-          `Run \`universe sites ls --mine\` to see your authorized sites.`,
-          ``,
-          `Runbook:`,
-          `  https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/01-deploy-new-constellation-site.md`,
-        ].join("\n"),
+        formatUnauthorizedSiteError({
+          attempted: config.site,
+          login: me.login,
+          authorized: me.authorizedSites,
+        }),
       );
     }
 

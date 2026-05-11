@@ -61,9 +61,12 @@ envelope shape changed — see **Changed** below if you parse it in CI.
   reading the old `authorizedSites` array must switch to
   `sites ls --mine --json`.**
 - **Deploy preflight error** (`site is not registered for your GitHub
-identity`) no longer dumps the full authorized list — instructs the
-  caller to run `sites ls --mine` instead. Same hint placement, far
-  shorter message.
+identity`) is now self-contained: inlines the caller's authorized
+  sites, surfaces a "Did you mean?" hint (case-insensitive substring,
+  Damerau-Levenshtein ≤2 fallback) when the typo is close to a
+  registered slug, and names the admin remediation commands
+  (`universe sites register …` / `universe sites update …`,
+  staff-gated) directly in the body. No external runbook redirect.
 
 ### Fixed
 
