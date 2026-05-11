@@ -75,6 +75,9 @@ jobs:
         with:
           ref: main
           token: ${{ secrets.GITHUB_TOKEN }}
+          # git-cliff walks the commit graph back to the last tag.
+          fetch-depth: 0
+          fetch-tags: true
       - uses: pnpm/action-setup@b307475762933b98ed359c036b0e51f26b63b74b
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
@@ -86,20 +89,36 @@ jobs:
           if [ "$CURRENT" != "$VERSION" ]; then
             pnpm version "$VERSION" --no-git-tag-version
           fi
-      - name: Ensure CHANGELOG section
+      - name: Render changelog section from git-cliff
+        if: inputs.notes == ''
+        uses: orhun/git-cliff-action@f50e11560dce63f7c33227798f90b924471a88b5
+        with:
+          config: cliff.toml
+          args: --tag v${{ needs.preflight.outputs.version }} --unreleased
+        env:
+          OUTPUT: /tmp/new-section.md
+      - name: Render changelog section from notes input
+        if: inputs.notes != ''
         run: |
-          if ! grep -qE "^## \[${VERSION//./\\.}\]" CHANGELOG.md; then
-            DATE=$(date -u +%Y-%m-%d)
-            BODY="${NOTES:-Release $VERSION}"
-            awk -v v="$VERSION" -v d="$DATE" -v b="$BODY" '
-              !inserted && /^## \[/ {
-                printf "## [%s] - %s\n\n%s\n\n", v, d, b
-                inserted=1
-              }
-              { print }
-            ' CHANGELOG.md > CHANGELOG.md.new
-            mv CHANGELOG.md.new CHANGELOG.md
+          DATE=$(date -u +%Y-%m-%d)
+          {
+            printf '## [%s] - %s\n\n' "$VERSION" "$DATE"
+            printf '%s\n' "$NOTES"
+          } > /tmp/new-section.md
+      - name: Insert section into CHANGELOG.md
+        run: |
+          if grep -qE "^## \[${VERSION//./\\.}\]" CHANGELOG.md; then
+            echo "CHANGELOG already has ## [$VERSION]; leaving untouched."
+            exit 0
           fi
+          awk '
+            !inserted && /^## \[[0-9]/ {
+              while ((getline line < "/tmp/new-section.md") > 0) print line
+              inserted=1
+            }
+            { print }
+          ' CHANGELOG.md > CHANGELOG.md.new
+          mv CHANGELOG.md.new CHANGELOG.md
       - name: Commit and push
         id: commit
         run: |
