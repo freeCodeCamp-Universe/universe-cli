@@ -2,16 +2,6 @@
 
 Static site deployment for the freeCodeCamp Universe platform.
 
-> Every deploy routes through the **artemis** proxy at
-> `uploads.freecode.camp`. Staff hold only a `platform.yaml` and a
-> GitHub identity — the proxy holds the R2 admin credentials. The
-> site → teams registry is Valkey-backed and mutated by the
-> `universe sites …` subcommands (staff-gated writes; reads open to
-> any GitHub bearer). See
-> [Universe ADR-016](https://github.com/freeCodeCamp-Universe/Universe/blob/main/decisions/016-deploy-proxy.md)
-> for the full design and [`docs/STAFF-GUIDE.md`](docs/STAFF-GUIDE.md)
-> for the end-to-end onboarding walkthrough.
-
 ## Install
 
 ### npm
@@ -27,29 +17,34 @@ universe <command>
 
 ### Binary
 
-Download the latest binary from [Releases](../../releases):
+<details>
+  <summary>
+    Download the latest binary from [Releases](../../releases):
+  </summary>
 
-```sh
-# macOS (Apple Silicon)
-gh release download --repo freeCodeCamp-Universe/universe-cli --pattern "universe-darwin-arm64"
-chmod +x universe-darwin-arm64
-sudo mv universe-darwin-arm64 /usr/local/bin/universe
+  ```sh
+    # macOS (Apple Silicon)
+    gh release download --repo freeCodeCamp-Universe/universe-cli --pattern "universe-darwin-arm64"
+    chmod +x universe-darwin-arm64
+    sudo mv universe-darwin-arm64 /usr/local/bin/universe
 
-# macOS (Intel)
-gh release download --repo freeCodeCamp-Universe/universe-cli --pattern "universe-darwin-amd64"
-chmod +x universe-darwin-amd64
-sudo mv universe-darwin-amd64 /usr/local/bin/universe
+    # macOS (Intel)
+    gh release download --repo freeCodeCamp-Universe/universe-cli --pattern "universe-darwin-amd64"
+    chmod +x universe-darwin-amd64
+    sudo mv universe-darwin-amd64 /usr/local/bin/universe
 
-# Linux x64
-gh release download --repo freeCodeCamp-Universe/universe-cli --pattern "universe-linux-amd64"
-chmod +x universe-linux-amd64
-sudo mv universe-linux-amd64 /usr/local/bin/universe
+    # Linux x64
+    gh release download --repo freeCodeCamp-Universe/universe-cli --pattern "universe-linux-amd64"
+    chmod +x universe-linux-amd64
+    sudo mv universe-linux-amd64 /usr/local/bin/universe
 
-# Linux ARM64
-gh release download --repo freeCodeCamp-Universe/universe-cli --pattern "universe-linux-arm64"
-chmod +x universe-linux-arm64
-sudo mv universe-linux-arm64 /usr/local/bin/universe
-```
+    # Linux ARM64
+    gh release download --repo freeCodeCamp-Universe/universe-cli --pattern "universe-linux-arm64"
+    chmod +x universe-linux-arm64
+    sudo mv universe-linux-arm64 /usr/local/bin/universe
+  ```
+
+</details>
 
 Verify:
 
@@ -177,17 +172,3 @@ The shipped binary embeds the `freeCodeCamp` GitHub OAuth App client id
 out of the box for staff. Fork operators and self-hosted mirror tenants
 set `UNIVERSE_GH_CLIENT_ID` to their own OAuth App's id — env value
 wins when set.
-
-## Development
-
-```sh
-pnpm install
-pnpm test          # vitest
-pnpm typecheck     # tsc --noEmit
-pnpm lint          # oxlint
-pnpm build         # tsup → dist/
-```
-
-## Releasing
-
-See [docs/RELEASING.md](docs/RELEASING.md).

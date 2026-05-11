@@ -15,9 +15,6 @@ never leave the cluster.
 - **Authoritative spec** — [`~/DEV/fCC-U/Universe/decisions/016-deploy-proxy.md`](../Universe/decisions/016-deploy-proxy.md)
   (ADR-016). Defines CLI ↔ artemis contract, identity priority chain, and
   per-site authorization model.
-- **Internal conventions** — [`CONTRIBUTING.md`](CONTRIBUTING.md) §Internal
-  conventions: test layout, exit codes, platform.yaml schema, identity
-  resolution, binary publish flow, release pipeline.
 - **Operator index** — [`docs/README.md`](docs/README.md) maps the three
   workflows (use, build, release) + architecture + cross-repo runbooks.
   Most-used leaves: [`docs/STAFF-GUIDE.md`](docs/STAFF-GUIDE.md)

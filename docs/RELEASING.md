@@ -2,6 +2,16 @@
 
 Releases are manual — you decide when to cut one.
 
+## Developing
+
+```sh
+pnpm install
+pnpm lint          # oxlint
+pnpm test          # vitest run
+pnpm tsc --noEmit  # typecheck
+pnpm build         # tsup → dist/
+```
+
 ## Prerequisites
 
 - **npm Trusted Publisher** — the `@freecodecamp/universe-cli` package on npm must have GitHub Actions configured as a trusted publisher (Owner: `freeCodeCamp-Universe`, Repository: `universe-cli`, Workflow: `release.yml`). Configure at https://www.npmjs.com/package/@freecodecamp/universe-cli/access.

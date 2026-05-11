@@ -163,8 +163,7 @@ GitHub Actions can authenticate two ways:
 
 1. **OIDC (preferred when artemis supports it)** — set
    `permissions: id-token: write` on the job. Currently, the proxy
-   doesn't validate GHA OIDC tokens yet (see CONTRIBUTING §Internal
-   conventions), so for now use option 2.
+   doesn't validate GHA OIDC tokens yet, so for now use option 2.
 2. **`$GITHUB_TOKEN`** — pass the workflow-issued token explicitly:
 
    ```yaml
