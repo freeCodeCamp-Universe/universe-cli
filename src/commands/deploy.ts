@@ -206,9 +206,10 @@ export async function deploy(
     });
 
     // 4. Preflight authorization. Catches the most common staff-side
-    // failure (`site_unauthorized`) BEFORE running the build, and points
-    // at the registration runbook so the user knows the ask: "platform
-    // admin must add the site to artemis sites.yaml". One GET; cheap.
+    // failure (`site_unauthorized`) BEFORE running the build, and
+    // surfaces the registry-CLI remediation inline (typo hint +
+    // authorized list + `universe sites register/update` commands).
+    // One GET; cheap.
     let me;
     try {
       me = await client.whoami();
