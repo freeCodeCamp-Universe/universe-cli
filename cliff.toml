@@ -1,0 +1,58 @@
+# git-cliff configuration for universe-cli.
+# Emits Keep-a-Changelog–shaped sections from Conventional Commits.
+# Used by `.github/workflows/release.yml` to auto-generate CHANGELOG bodies.
+
+[changelog]
+# Existing CHANGELOG.md already owns the `# Changelog` header + intro.
+# git-cliff only emits per-release sections; --prepend slots them under the header.
+header = ""
+
+body = """
+{% if version -%}
+## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+{% else -%}
+## [Unreleased]
+{% endif -%}
+{% for group, commits in commits | group_by(attribute="group") %}
+
+### {{ group | upper_first }}
+
+{% for commit in commits -%}
+- {{ commit.message | split(pat="\n") | first | trim }}{% if commit.scope %} ({{ commit.scope }}){% endif %}
+{% endfor -%}
+{% endfor %}\n
+"""
+
+footer = ""
+trim = true
+
+[git]
+conventional_commits = true
+# Hide non-conventional commits from the rendered output (release-noise filter).
+filter_unconventional = true
+# Sort newest-first within a group so the most recent fix is at the top.
+sort_commits = "newest"
+# Disable topological ordering — we ship from a linear main.
+topo_order = false
+
+commit_parsers = [
+  { message = "^feat", group = "Added" },
+  { message = "^fix", group = "Fixed" },
+  { message = "^perf", group = "Changed" },
+  { message = "^refactor", group = "Changed" },
+  { message = "^build", group = "Changed" },
+  { message = "^deps", group = "Changed" },
+  { message = "^revert", group = "Removed" },
+  { message = "^chore", skip = true },
+  { message = "^docs", skip = true },
+  { message = "^test", skip = true },
+  { message = "^ci", skip = true },
+  { message = "^style", skip = true },
+]
+
+[bump]
+# 0.x lives below 1.0; feats bumping minor would break the "patches only for
+# non-feature work" stance. Keep all bumps as patches under 1.0 unless the
+# operator types an explicit MAJOR.MINOR.PATCH.
+features_always_bump_minor = false
+breaking_always_bump_major = false
