@@ -1,10 +1,8 @@
 # `platform.yaml` — schema reference
 
-`platform.yaml` lives at the repo root and tells `universe static deploy` what
-to build and how to deploy. It is the **only** config the CLI reads.
+`platform.yaml` lives at the repo root and tells `universe static deploy` what to build and how to deploy. It is the **only** config the CLI reads.
 
-This document covers schema **v2** (CLI v0.4+). For the v0.3 → v0.4
-migration delta, see [Migration](#migration-v03--v04).
+This document covers schema **v2** (CLI v0.4+). For the v0.3 → v0.4 migration delta, see [Migration](#migration-v03--v04).
 
 > **Locked by:** [Universe ADR-016 §`platform.yaml` schema](https://github.com/freeCodeCamp-Universe/Universe/blob/main/decisions/016-deploy-proxy.md), Sprint 2026-04-26 DECISIONS Q9–Q15.
 
@@ -14,8 +12,7 @@ migration delta, see [Migration](#migration-v03--v04).
 site: my-site
 ```
 
-That is a complete, valid file. The site builds with no build step (you
-ship pre-built artifacts) and uploads `dist/` to the preview channel.
+That is a complete, valid file. The site builds with no build step (you ship pre-built artifacts) and uploads `dist/` to the preview channel.
 
 ## Full example
 
@@ -39,8 +36,7 @@ deploy:
 
 ### `site` (required, string)
 
-Becomes the public URL: `<site>.freecode.camp` (production) and
-`<site>.preview.freecode.camp` (preview).
+Becomes the public URL: `<site>.freecode.camp` (production) and `<site>.preview.freecode.camp` (preview).
 
 **Validation rules** (carry-forward from D19 + D37):
 
@@ -85,13 +81,11 @@ Omit `deploy:` entirely to take all defaults.
 
 ## Strict validation
 
-The schema is **strict**: unknown keys at any level are rejected. This
-catches accidental v1 fragments and typos (`bukcet:`, `Site:`) up-front.
+The schema is **strict**: unknown keys at any level are rejected. This catches accidental v1 fragments and typos (`bukcet:`, `Site:`) up-front.
 
 ## v1 detection (migration safety net)
 
-Any of these v1 markers at the root produce a clear migration error
-pointing at this document:
+Any of these v1 markers at the root produce a clear migration error pointing at this document:
 
 | v1 marker | Why removed in v2                                            |
 | --------- | ------------------------------------------------------------ |
@@ -150,17 +144,11 @@ site: my-site
 
 ### Identity / authz
 
-v0.4 removes per-site team declarations from `platform.yaml`. The
-deploy proxy enforces team membership server-side via the static
-site → team map (Q11). To request access to a site, contact the
-infra team — the map lives in the proxy config, not in your repo.
+v0.4 removes per-site team declarations from `platform.yaml`. The deploy proxy enforces team membership server-side via the static site → team map (Q11). To request access to a site, contact the infra team — the map lives in the proxy config, not in your repo.
 
 ### Credentials
 
-You no longer need R2 tokens. `universe login` exchanges your
-GitHub identity for a deploy session at the proxy
-(`uploads.freecode.camp`). See the [Staff Guide](STAFF-GUIDE.md) for
-the v0.4 onboarding flow.
+You no longer need R2 tokens. `universe login` exchanges your GitHub identity for a deploy session at the proxy (`uploads.freecode.camp`). See the [Staff Guide](STAFF-GUIDE.md) for the v0.4 onboarding flow.
 
 ## See also
 

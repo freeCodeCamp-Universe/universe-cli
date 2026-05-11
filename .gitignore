@@ -6,3 +6,6 @@ coverage/
 .beads/
 .dolt/
 *.db
+
+# dossier: internal scratchpad theater tooling
+.scratchpad/

@@ -22,27 +22,27 @@ universe <command>
     Download the latest binary from [Releases](../../releases):
   </summary>
 
-  ```sh
-    # macOS (Apple Silicon)
-    gh release download --repo freeCodeCamp-Universe/universe-cli --pattern "universe-darwin-arm64"
-    chmod +x universe-darwin-arm64
-    sudo mv universe-darwin-arm64 /usr/local/bin/universe
+```sh
+  # macOS (Apple Silicon)
+  gh release download --repo freeCodeCamp-Universe/universe-cli --pattern "universe-darwin-arm64"
+  chmod +x universe-darwin-arm64
+  sudo mv universe-darwin-arm64 /usr/local/bin/universe
 
-    # macOS (Intel)
-    gh release download --repo freeCodeCamp-Universe/universe-cli --pattern "universe-darwin-amd64"
-    chmod +x universe-darwin-amd64
-    sudo mv universe-darwin-amd64 /usr/local/bin/universe
+  # macOS (Intel)
+  gh release download --repo freeCodeCamp-Universe/universe-cli --pattern "universe-darwin-amd64"
+  chmod +x universe-darwin-amd64
+  sudo mv universe-darwin-amd64 /usr/local/bin/universe
 
-    # Linux x64
-    gh release download --repo freeCodeCamp-Universe/universe-cli --pattern "universe-linux-amd64"
-    chmod +x universe-linux-amd64
-    sudo mv universe-linux-amd64 /usr/local/bin/universe
+  # Linux x64
+  gh release download --repo freeCodeCamp-Universe/universe-cli --pattern "universe-linux-amd64"
+  chmod +x universe-linux-amd64
+  sudo mv universe-linux-amd64 /usr/local/bin/universe
 
-    # Linux ARM64
-    gh release download --repo freeCodeCamp-Universe/universe-cli --pattern "universe-linux-arm64"
-    chmod +x universe-linux-arm64
-    sudo mv universe-linux-arm64 /usr/local/bin/universe
-  ```
+  # Linux ARM64
+  gh release download --repo freeCodeCamp-Universe/universe-cli --pattern "universe-linux-arm64"
+  chmod +x universe-linux-arm64
+  sudo mv universe-linux-arm64 /usr/local/bin/universe
+```
 
 </details>
 
@@ -88,16 +88,12 @@ All commands support `--json` for CI integration.
 The CLI resolves a GitHub identity in this order — first match wins:
 
 1. `$GITHUB_TOKEN` / `$GH_TOKEN` env (CI explicit)
-2. GHA OIDC (`$ACTIONS_ID_TOKEN_REQUEST_URL` + `$ACTIONS_ID_TOKEN_REQUEST_TOKEN`)
-3. Woodpecker OIDC env (deferred — placeholder slot)
-4. `gh auth token` shell-out (laptop with `gh` installed)
-5. Device-flow stored token at `~/.config/universe-cli/token`
+1. GHA OIDC (`$ACTIONS_ID_TOKEN_REQUEST_URL` + `$ACTIONS_ID_TOKEN_REQUEST_TOKEN`)
+1. Woodpecker OIDC env (deferred — placeholder slot)
+1. `gh auth token` shell-out (laptop with `gh` installed)
+1. Device-flow stored token at `~/.config/universe-cli/token`
 
-The proxy validates whatever it receives via GitHub `GET /user`, then
-authorizes against the registry server-side (Valkey-backed; the
-`sites_yaml` backend was retired in artemis `f115198`). Run
-`universe whoami` to see which slot resolved; inspect the sites you
-can deploy to with `universe sites ls --mine`.
+The proxy validates whatever it receives via GitHub `GET /user`, then authorizes against the registry server-side (Valkey-backed; the `sites_yaml` backend was retired in artemis `f115198`). Run `universe whoami` to see which slot resolved; inspect the sites you can deploy to with `universe sites ls --mine`.
 
 ## Configuration (`platform.yaml`)
 
@@ -107,11 +103,9 @@ Every site has a `platform.yaml` at its repo root. Minimal valid file:
 site: my-site
 ```
 
-Full schema reference (every field, defaults, validation rules):
-[`docs/platform-yaml.md`](docs/platform-yaml.md).
+Full schema reference (every field, defaults, validation rules): [`docs/platform-yaml.md`](docs/platform-yaml.md).
 
-No credential fields. The proxy holds the R2 admin key; the CLI never
-reads or writes one.
+No credential fields. The proxy holds the R2 admin key; the CLI never reads or writes one.
 
 ## Common flows
 
@@ -140,8 +134,7 @@ universe static promote
 universe static rollback --to 20260427-141522-abc1234
 ```
 
-Registry admin (staff team only — gated server-side by artemis's
-`REGISTRY_AUTHZ_TEAM`, default `staff`):
+Registry admin (staff team only — gated server-side by artemis's `REGISTRY_AUTHZ_TEAM`, default `staff`):
 
 ```sh
 # Register a new site (defaults --team to staff)
@@ -154,10 +147,7 @@ universe sites update hello-universe --team bots,staff,curriculum
 universe sites rm hello-universe
 ```
 
-CI (GitHub Actions) — set `permissions: id-token: write` and rely on
-slot 2 (GHA OIDC) of the identity chain, or pass `$GITHUB_TOKEN`
-explicitly. Full operator walkthrough:
-[`docs/STAFF-GUIDE.md`](docs/STAFF-GUIDE.md).
+CI (GitHub Actions) — set `permissions: id-token: write` and rely on slot 2 (GHA OIDC) of the identity chain, or pass `$GITHUB_TOKEN` explicitly. Full operator walkthrough: [`docs/STAFF-GUIDE.md`](docs/STAFF-GUIDE.md).
 
 ## Environment overrides
 
@@ -167,8 +157,4 @@ explicitly. Full operator walkthrough:
 | `UNIVERSE_GH_CLIENT_ID`     | _baked-in freeCodeCamp OAuth id_ | Override GitHub OAuth App id (fork tenants, `login` only) |
 | `GITHUB_TOKEN` / `GH_TOKEN` | —                                | Slot 1 of identity chain                                  |
 
-The shipped binary embeds the `freeCodeCamp` GitHub OAuth App client id
-(public; device flow uses no `client_secret`), so `universe login` works
-out of the box for staff. Fork operators and self-hosted mirror tenants
-set `UNIVERSE_GH_CLIENT_ID` to their own OAuth App's id — env value
-wins when set.
+The shipped binary embeds the `freeCodeCamp` GitHub OAuth App client id (public; device flow uses no `client_secret`), so `universe login` works out of the box for staff. Fork operators and self-hosted mirror tenants set `UNIVERSE_GH_CLIENT_ID` to their own OAuth App's id — env value wins when set.

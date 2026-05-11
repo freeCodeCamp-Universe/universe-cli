@@ -21,10 +21,10 @@ No npm token is required — the workflow authenticates via OIDC token exchange.
 ## How to Release
 
 1. Add a `## [X.Y.Z] - YYYY-MM-DD` section to `CHANGELOG.md` describing the release. The workflow extracts this section verbatim as the GitHub Release body and fails if the section is missing.
-2. Commit and push the CHANGELOG change to `main`.
-3. Go to **Actions** > **Release** > **Run workflow**
-4. Enter the version (e.g., `0.2.0`) — must match the CHANGELOG heading
-5. Click **Run workflow**
+1. Commit and push the CHANGELOG change to `main`.
+1. Go to **Actions** > **Release** > **Run workflow**
+1. Enter the version (e.g., `0.2.0`) — must match the CHANGELOG heading
+1. Click **Run workflow**
 
 The workflow:
 
