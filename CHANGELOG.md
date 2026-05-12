@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- End-to-end test suite covering all 11 CLI verbs against a local fake-artemis fixture. Two layers under `tests/e2e/`: in-process command-handler tests with the real `proxy-client` (sequence + behavior coverage) and a spawned-binary smoke matrix (cac dispatch + tsup-output regression guard). See `docs/README.md` §Internal conventions for extension notes.
+
+### Fixed
+
+- `static deploy --json` no longer prints the build-skipped notice or the git-dirty warning to stdout. Both `info()` and `warn()` are now gated behind `!options.json`, so machine consumers can parse stdout as a single JSON document.
+
 ## [0.5.0] - 2026-05-11
 
 Static-apps registry consumer + output UX hardening. The artemis proxy gained four new endpoints (`POST /api/site/register`, `GET /api/sites`, `PATCH /api/site/{slug}`, `DELETE /api/site/{slug}`) replacing the git-tracked `artemis/config/sites.yaml` ops loop with a Valkey-backed registry. This release wires the CLI to those endpoints and fixes two v0.4-era output bugs surfaced during smoke testing.

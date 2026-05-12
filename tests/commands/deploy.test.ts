@@ -504,10 +504,10 @@ describe("deploy command (proxy plane)", () => {
     });
   });
 
-  // B2: clack info()/warn() printed to stdout pollute the JSON envelope
-  // in --json mode, breaking machine consumers that parse stdout as one
+  // clack info()/warn() printed to stdout pollute the JSON envelope in
+  // --json mode, breaking machine consumers that parse stdout as one
   // JSON document. info()/warn() must be silent under --json.
-  describe("--json mode silences info/warn (B2 regression)", () => {
+  describe("--json mode silences info/warn", () => {
     it("does not call logInfo when build is skipped under --json", async () => {
       const deps = mkDeps({
         runBuild: vi.fn().mockResolvedValue({
