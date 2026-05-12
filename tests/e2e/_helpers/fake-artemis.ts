@@ -82,6 +82,10 @@ export interface FakeArtemisState {
     preview: Map<string, string>;
     production: Map<string, string>;
   };
+  /** PUT /api/deploy/.../upload?path=<key> returns 500 when key is in this set. */
+  uploadFailPaths: Map<string, FailureInjection>;
+  /** Next /finalize call returns this envelope (and clears the field). */
+  finalizeFailure: FailureInjection | null;
 }
 
 export interface CallLogEntry {
@@ -109,6 +113,8 @@ export async function startFakeArtemis(): Promise<FakeArtemis> {
     deploys: new Map(),
     deployJwts: new Map(),
     aliases: { preview: new Map(), production: new Map() },
+    uploadFailPaths: new Map(),
+    finalizeFailure: null,
   };
   const callLog: CallLogEntry[] = [];
 
@@ -362,6 +368,20 @@ async function handle(
       });
       return;
     }
+    const uploadFail = state.uploadFailPaths.get(filePath);
+    if (uploadFail) {
+      logAndSend(
+        callLog,
+        method,
+        path,
+        authorization,
+        body,
+        res,
+        uploadFail.status,
+        { error: { code: uploadFail.code, message: uploadFail.message } },
+      );
+      return;
+    }
     deploy.uploadedFiles.set(filePath, body);
     logAndSend(callLog, method, path, authorization, body, res, 200, {
       received: filePath,
@@ -385,6 +405,14 @@ async function handle(
     if (!deploy) {
       logAndSend(callLog, method, path, authorization, body, res, 404, {
         error: { code: "not_found", message: `deploy '${deployId}' not found` },
+      });
+      return;
+    }
+    if (state.finalizeFailure) {
+      const f = state.finalizeFailure;
+      state.finalizeFailure = null;
+      logAndSend(callLog, method, path, authorization, body, res, f.status, {
+        error: { code: f.code, message: f.message },
       });
       return;
     }
