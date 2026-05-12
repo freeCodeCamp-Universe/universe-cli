@@ -22,6 +22,20 @@ export interface TokenRecord {
   authorizedSites: string[];
 }
 
+/** Mirrors `SiteRow` in `src/lib/proxy-client.ts` (artemis registry shape). */
+export interface SiteRow {
+  slug: string;
+  teams: string[];
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
+}
+
+/** Mirrors `DeploySummary` in `src/lib/proxy-client.ts`. */
+export interface DeploySummary {
+  deployId: string;
+}
+
 /**
  * Per-route forced error. Key shape is `"<METHOD> <path>"`,
  * e.g. `"GET /api/whoami"`. When present, the route returns the
@@ -37,6 +51,8 @@ export interface FailureInjection {
 export interface FakeArtemisState {
   tokens: Map<string, TokenRecord>;
   failures: Map<string, FailureInjection>;
+  registry: Map<string, SiteRow>;
+  deploysBySite: Map<string, DeploySummary[]>;
 }
 
 export interface CallLogEntry {
@@ -57,6 +73,8 @@ export async function startFakeArtemis(): Promise<FakeArtemis> {
   const state: FakeArtemisState = {
     tokens: new Map(),
     failures: new Map(),
+    registry: new Map(),
+    deploysBySite: new Map(),
   };
   const callLog: CallLogEntry[] = [];
 
@@ -123,6 +141,40 @@ function handle(
       login: record.login,
       authorizedSites: record.authorizedSites,
     });
+    return;
+  }
+
+  const deploysMatch = /^\/api\/site\/([^/]+)\/deploys$/.exec(path);
+  if (method === "GET" && deploysMatch) {
+    const site = decodeURIComponent(deploysMatch[1]!);
+    const token = parseBearer(authorization);
+    const record = token ? state.tokens.get(token) : undefined;
+    if (!record) {
+      logAndSend(callLog, method, path, authorization, res, 401, {
+        error: { code: "unauth", message: "bad token" },
+      });
+      return;
+    }
+    if (!state.registry.has(site)) {
+      logAndSend(callLog, method, path, authorization, res, 404, {
+        error: {
+          code: "not_found",
+          message: `site '${site}' is not registered`,
+        },
+      });
+      return;
+    }
+    if (!record.authorizedSites.includes(site)) {
+      logAndSend(callLog, method, path, authorization, res, 403, {
+        error: {
+          code: "site_unauthorized",
+          message: `not authorized for site '${site}'`,
+        },
+      });
+      return;
+    }
+    const list = state.deploysBySite.get(site) ?? [];
+    logAndSend(callLog, method, path, authorization, res, 200, list);
     return;
   }
 
