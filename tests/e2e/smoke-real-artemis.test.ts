@@ -17,13 +17,16 @@ import { whoami } from "../../src/commands/whoami.js";
  *
  * Required env:
  *   UNIVERSE_E2E_REAL   — set by the `test:smoke` script; gate flag.
- *   UNIVERSE_REAL_TOKEN — GitHub token authorized for the test site.
  *   UNIVERSE_REAL_SITE  — pre-registered throwaway slug owned by the
- *                         operator (e.g. `staff-smoke`). Must already
+ *                         operator (e.g. `test-cli`). Must already
  *                         exist in the artemis registry; the smoke does
  *                         not register or delete sites.
  *
  * Optional env:
+ *   UNIVERSE_REAL_TOKEN     — GitHub token authorized for the test site.
+ *                             If unset, the identity chain falls through
+ *                             to `gh auth token` (slot 2) — no env
+ *                             extraction needed when `gh` is logged in.
  *   UNIVERSE_REAL_PROXY_URL — defaults to `https://uploads.freecode.camp`.
  *                             Set to a staging hostname to smoke-test a
  *                             non-prod artemis.
@@ -97,12 +100,13 @@ async function captureJsonRun(fn: () => Promise<void>): Promise<RunResult> {
 }
 
 function makeEnv(): NodeJS.ProcessEnv {
-  return {
+  const env: NodeJS.ProcessEnv = {
     UNIVERSE_PROXY_URL: REAL_PROXY_URL,
-    GITHUB_TOKEN: REAL_TOKEN ?? "",
     NO_COLOR: "1",
     PATH: process.env["PATH"] ?? "",
   };
+  if (REAL_TOKEN) env["GITHUB_TOKEN"] = REAL_TOKEN;
+  return env;
 }
 
 describe.skipIf(!REAL_E2E)("real-artemis smoke (opt-in)", () => {
@@ -110,9 +114,9 @@ describe.skipIf(!REAL_E2E)("real-artemis smoke (opt-in)", () => {
   const marker = `smoke-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
   beforeAll(() => {
-    if (!REAL_TOKEN || !REAL_SITE) {
+    if (!REAL_SITE) {
       throw new Error(
-        "real-artemis smoke requires UNIVERSE_REAL_TOKEN and UNIVERSE_REAL_SITE env vars",
+        "real-artemis smoke requires UNIVERSE_REAL_SITE env var (UNIVERSE_REAL_TOKEN optional if `gh auth status` is logged in)",
       );
     }
   });
