@@ -22,8 +22,21 @@ export interface TokenRecord {
   authorizedSites: string[];
 }
 
+/**
+ * Per-route forced error. Key shape is `"<METHOD> <path>"`,
+ * e.g. `"GET /api/whoami"`. When present, the route returns the
+ * error envelope verbatim instead of running normal handler logic.
+ * Mirrors the artemis error envelope (`{error: {code, message}}`).
+ */
+export interface FailureInjection {
+  status: number;
+  code: string;
+  message: string;
+}
+
 export interface FakeArtemisState {
   tokens: Map<string, TokenRecord>;
+  failures: Map<string, FailureInjection>;
 }
 
 export interface CallLogEntry {
@@ -41,7 +54,10 @@ export interface FakeArtemis {
 }
 
 export async function startFakeArtemis(): Promise<FakeArtemis> {
-  const state: FakeArtemisState = { tokens: new Map() };
+  const state: FakeArtemisState = {
+    tokens: new Map(),
+    failures: new Map(),
+  };
   const callLog: CallLogEntry[] = [];
 
   const server: Server = createServer((req, res) => {
@@ -57,15 +73,19 @@ export async function startFakeArtemis(): Promise<FakeArtemis> {
   });
 
   const addr = server.address() as AddressInfo;
+  let closed = false;
 
   return {
     url: `http://127.0.0.1:${addr.port}`,
     state,
     callLog,
-    close: () =>
-      new Promise<void>((resolve, reject) => {
+    close: () => {
+      if (closed) return Promise.resolve();
+      closed = true;
+      return new Promise<void>((resolve, reject) => {
         server.close((err) => (err ? reject(err) : resolve()));
-      }),
+      });
+    },
   };
 }
 
@@ -81,6 +101,14 @@ function handle(
     typeof req.headers["authorization"] === "string"
       ? req.headers["authorization"]
       : undefined;
+
+  const forced = state.failures.get(`${method} ${path}`);
+  if (forced) {
+    logAndSend(callLog, method, path, authorization, res, forced.status, {
+      error: { code: forced.code, message: forced.message },
+    });
+    return;
+  }
 
   if (method === "GET" && path === "/api/whoami") {
     const token = parseBearer(authorization);
