@@ -18,9 +18,10 @@ import { whoami } from "../../src/commands/whoami.js";
  * Required env:
  *   UNIVERSE_E2E_REAL   — set by the `test:smoke` script; gate flag.
  *   UNIVERSE_REAL_SITE  — pre-registered throwaway slug owned by the
- *                         operator (e.g. `test-cli`). Must already
- *                         exist in the artemis registry; the smoke does
- *                         not register or delete sites.
+ *                         operator (e.g. `test`, source repo
+ *                         `freeCodeCamp-Universe/test-universe`). Must
+ *                         already exist in the artemis registry; the
+ *                         smoke does not register or delete sites.
  *
  * Optional env:
  *   UNIVERSE_REAL_TOKEN     — GitHub token authorized for the test site.
