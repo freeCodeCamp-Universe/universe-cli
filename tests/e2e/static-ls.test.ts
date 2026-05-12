@@ -107,10 +107,12 @@ describe("static ls E2E (real proxy-client + real identity chain)", () => {
       authorizedSites: ["my-site"],
     });
     server.state.registry.set("my-site", siteRow("my-site"));
+    // Seed in ascending order (artemis-default) so the CLI's defensive
+    // sort to newest-first is observable in the envelope output.
     server.state.deploysBySite.set("my-site", [
-      { deployId: "20260301-091500-abc1234" },
-      { deployId: "20260228-120000-def5678" },
       { deployId: "20260227-080000-aaa1111" },
+      { deployId: "20260228-120000-def5678" },
+      { deployId: "20260301-091500-abc1234" },
     ]);
     env = await makeCliEnv({ proxyUrl: server.url, githubToken: token });
 
@@ -122,7 +124,11 @@ describe("static ls E2E (real proxy-client + real identity chain)", () => {
     expect(r.envelope!["site"]).toBe("my-site");
     const deploys = r.envelope!["deploys"] as Array<Record<string, unknown>>;
     expect(deploys).toHaveLength(3);
-    expect(deploys[0].deployId).toBe("20260301-091500-abc1234");
+    expect(deploys.map((d) => d.deployId)).toEqual([
+      "20260301-091500-abc1234",
+      "20260228-120000-def5678",
+      "20260227-080000-aaa1111",
+    ]);
     expect(deploys[0].timestamp).toBe("2026-03-01T09:15:00Z");
     expect(deploys[0].sha).toBe("abc1234");
 

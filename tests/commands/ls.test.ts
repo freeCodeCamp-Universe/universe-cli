@@ -172,6 +172,35 @@ describe("ls command", () => {
     );
   });
 
+  it("sorts deploys newest-first regardless of artemis-side order", async () => {
+    const proxy = mkProxy();
+    proxy.siteDeploys.mockResolvedValue([
+      { deployId: "20260101-000000-aaa1111" },
+      { deployId: "20260301-091500-bbb2222" },
+      { deployId: "20260215-120000-ccc3333" },
+    ]);
+    const deps = mkDeps({
+      createProxyClient: vi.fn().mockReturnValue(proxy),
+    });
+
+    const stdout: string[] = [];
+    const writeSpy = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation((chunk: unknown) => {
+        stdout.push(String(chunk));
+        return true;
+      });
+    await ls({ json: true }, deps);
+    writeSpy.mockRestore();
+
+    const env = JSON.parse(stdout.join("").trim());
+    expect(env.deploys.map((d: { deployId: string }) => d.deployId)).toEqual([
+      "20260301-091500-bbb2222",
+      "20260215-120000-ccc3333",
+      "20260101-000000-aaa1111",
+    ]);
+  });
+
   it("falls back to deployId-only row when format unparseable", async () => {
     const proxy = mkProxy();
     proxy.siteDeploys.mockResolvedValue([{ deployId: "weird-id" }]);

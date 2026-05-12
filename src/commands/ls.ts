@@ -139,7 +139,14 @@ export async function ls(options: LsOptions, deps: LsDeps = {}): Promise<void> {
     });
 
     const raw = await client.siteDeploys({ site });
-    const deploys = raw.map((d) => parseDeployId(d.deployId));
+    // Defensive: artemis returns ascending (oldest-first) lex order, which
+    // makes the operator-visible top-of-list the OLDEST deploy. Reverse so
+    // the newest deploy is at index 0 — the natural operator expectation
+    // and the assumption shared by every downstream consumer.
+    const sorted = [...raw].sort((a, b) =>
+      b.deployId.localeCompare(a.deployId),
+    );
+    const deploys = sorted.map((d) => parseDeployId(d.deployId));
 
     if (options.json) {
       emitJson(

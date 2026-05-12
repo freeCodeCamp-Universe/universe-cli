@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Fixed
 
 - `static deploy --json` no longer prints the build-skipped notice or the git-dirty warning to stdout. Both `info()` and `warn()` are now gated behind `!options.json`, so machine consumers can parse stdout as a single JSON document.
+- `static ls` now returns deploys newest-first. Previously artemis returned the list lexicographically ascending and the CLI did not re-sort, so the top of the list was always the OLDEST deploy. Operators reading `ls` after a successful deploy saw a stale top entry and reasonably concluded that the deploy had not landed — the most likely root cause of the "sites are not updating" reports. The CLI now sorts descending by deployId regardless of server order.
 
 ## [0.5.0] - 2026-05-11
 
