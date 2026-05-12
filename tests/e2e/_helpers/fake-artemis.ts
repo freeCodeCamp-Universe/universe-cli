@@ -60,6 +60,8 @@ export interface CallLogEntry {
   path: string;
   authorization?: string;
   status: number;
+  /** Raw request body decoded as utf-8. Empty string for GET / DELETE. */
+  body: string;
 }
 
 export interface FakeArtemis {
@@ -79,7 +81,7 @@ export async function startFakeArtemis(): Promise<FakeArtemis> {
   const callLog: CallLogEntry[] = [];
 
   const server: Server = createServer((req, res) => {
-    handle(req, res, state, callLog);
+    void handle(req, res, state, callLog);
   });
 
   await new Promise<void>((resolve, reject) => {
@@ -107,22 +109,31 @@ export async function startFakeArtemis(): Promise<FakeArtemis> {
   };
 }
 
-function handle(
+async function readBody(req: IncomingMessage): Promise<string> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of req) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks).toString("utf-8");
+}
+
+async function handle(
   req: IncomingMessage,
   res: ServerResponse,
   state: FakeArtemisState,
   callLog: CallLogEntry[],
-): void {
+): Promise<void> {
   const method = req.method ?? "GET";
   const path = req.url ?? "";
   const authorization =
     typeof req.headers["authorization"] === "string"
       ? req.headers["authorization"]
       : undefined;
+  const body = await readBody(req);
 
   const forced = state.failures.get(`${method} ${path}`);
   if (forced) {
-    logAndSend(callLog, method, path, authorization, res, forced.status, {
+    logAndSend(callLog, method, path, authorization, body, res, forced.status, {
       error: { code: forced.code, message: forced.message },
     });
     return;
@@ -132,12 +143,12 @@ function handle(
     const token = parseBearer(authorization);
     const record = token ? state.tokens.get(token) : undefined;
     if (!record) {
-      logAndSend(callLog, method, path, authorization, res, 401, {
+      logAndSend(callLog, method, path, authorization, body, res, 401, {
         error: { code: "unauth", message: "bad token" },
       });
       return;
     }
-    logAndSend(callLog, method, path, authorization, res, 200, {
+    logAndSend(callLog, method, path, authorization, body, res, 200, {
       login: record.login,
       authorizedSites: record.authorizedSites,
     });
@@ -148,13 +159,13 @@ function handle(
     const token = parseBearer(authorization);
     const record = token ? state.tokens.get(token) : undefined;
     if (!record) {
-      logAndSend(callLog, method, path, authorization, res, 401, {
+      logAndSend(callLog, method, path, authorization, body, res, 401, {
         error: { code: "unauth", message: "bad token" },
       });
       return;
     }
     const rows = Array.from(state.registry.values());
-    logAndSend(callLog, method, path, authorization, res, 200, rows);
+    logAndSend(callLog, method, path, authorization, body, res, 200, rows);
     return;
   }
 
@@ -164,13 +175,13 @@ function handle(
     const token = parseBearer(authorization);
     const record = token ? state.tokens.get(token) : undefined;
     if (!record) {
-      logAndSend(callLog, method, path, authorization, res, 401, {
+      logAndSend(callLog, method, path, authorization, body, res, 401, {
         error: { code: "unauth", message: "bad token" },
       });
       return;
     }
     if (!state.registry.has(site)) {
-      logAndSend(callLog, method, path, authorization, res, 404, {
+      logAndSend(callLog, method, path, authorization, body, res, 404, {
         error: {
           code: "not_found",
           message: `site '${site}' is not registered`,
@@ -179,7 +190,7 @@ function handle(
       return;
     }
     if (!record.authorizedSites.includes(site)) {
-      logAndSend(callLog, method, path, authorization, res, 403, {
+      logAndSend(callLog, method, path, authorization, body, res, 403, {
         error: {
           code: "site_unauthorized",
           message: `not authorized for site '${site}'`,
@@ -188,11 +199,62 @@ function handle(
       return;
     }
     const list = state.deploysBySite.get(site) ?? [];
-    logAndSend(callLog, method, path, authorization, res, 200, list);
+    logAndSend(callLog, method, path, authorization, body, res, 200, list);
     return;
   }
 
-  logAndSend(callLog, method, path, authorization, res, 404, {
+  if (method === "POST" && path === "/api/site/register") {
+    const token = parseBearer(authorization);
+    const record = token ? state.tokens.get(token) : undefined;
+    if (!record) {
+      logAndSend(callLog, method, path, authorization, body, res, 401, {
+        error: { code: "unauth", message: "bad token" },
+      });
+      return;
+    }
+    let parsed: { slug?: string; teams?: string[] };
+    try {
+      parsed = JSON.parse(body) as typeof parsed;
+    } catch {
+      logAndSend(callLog, method, path, authorization, body, res, 400, {
+        error: { code: "bad_request", message: "invalid JSON body" },
+      });
+      return;
+    }
+    const slug = typeof parsed.slug === "string" ? parsed.slug.trim() : "";
+    if (slug.length === 0) {
+      logAndSend(callLog, method, path, authorization, body, res, 400, {
+        error: { code: "bad_request", message: "slug is required" },
+      });
+      return;
+    }
+    if (state.registry.has(slug)) {
+      logAndSend(callLog, method, path, authorization, body, res, 409, {
+        error: {
+          code: "already_exists",
+          message: `site '${slug}' is already registered`,
+        },
+      });
+      return;
+    }
+    const teams =
+      Array.isArray(parsed.teams) && parsed.teams.length > 0
+        ? parsed.teams
+        : ["staff"];
+    const now = "2026-05-12T00:00:00Z";
+    const row: SiteRow = {
+      slug,
+      teams,
+      createdAt: now,
+      updatedAt: now,
+      createdBy: record.login,
+    };
+    state.registry.set(slug, row);
+    logAndSend(callLog, method, path, authorization, body, res, 201, row);
+    return;
+  }
+
+  logAndSend(callLog, method, path, authorization, body, res, 404, {
     error: { code: "not_found", message: `no route: ${method} ${path}` },
   });
 }
@@ -209,12 +271,13 @@ function logAndSend(
   method: string,
   path: string,
   authorization: string | undefined,
+  requestBody: string,
   res: ServerResponse,
   status: number,
-  body: unknown,
+  responseBody: unknown,
 ): void {
-  callLog.push({ method, path, authorization, status });
+  callLog.push({ method, path, authorization, status, body: requestBody });
   res.statusCode = status;
   res.setHeader("content-type", "application/json");
-  res.end(JSON.stringify(body));
+  res.end(JSON.stringify(responseBody));
 }
