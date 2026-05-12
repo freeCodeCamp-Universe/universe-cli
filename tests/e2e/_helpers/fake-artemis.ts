@@ -453,6 +453,101 @@ async function handle(
     return;
   }
 
+  const promoteMatch = /^\/api\/site\/([^/]+)\/promote$/.exec(path);
+  if (method === "POST" && promoteMatch) {
+    const site = decodeURIComponent(promoteMatch[1]!);
+    const token = parseBearer(authorization);
+    const record = token ? state.tokens.get(token) : undefined;
+    if (!record) {
+      logAndSend(callLog, method, path, authorization, body, res, 401, {
+        error: { code: "unauth", message: "bad token" },
+      });
+      return;
+    }
+    if (!record.authorizedSites.includes(site)) {
+      logAndSend(callLog, method, path, authorization, body, res, 403, {
+        error: {
+          code: "site_unauthorized",
+          message: `not authorized for site '${site}'`,
+        },
+      });
+      return;
+    }
+    const previewId = state.aliases.preview.get(site);
+    if (!previewId) {
+      logAndSend(callLog, method, path, authorization, body, res, 404, {
+        error: {
+          code: "no_preview",
+          message: `no preview deploy to promote for '${site}'`,
+        },
+      });
+      return;
+    }
+    state.aliases.production.set(site, previewId);
+    logAndSend(callLog, method, path, authorization, body, res, 200, {
+      url: `https://${site}.freecode.camp`,
+      deployId: previewId,
+    });
+    return;
+  }
+
+  const rollbackMatch = /^\/api\/site\/([^/]+)\/rollback$/.exec(path);
+  if (method === "POST" && rollbackMatch) {
+    const site = decodeURIComponent(rollbackMatch[1]!);
+    const token = parseBearer(authorization);
+    const record = token ? state.tokens.get(token) : undefined;
+    if (!record) {
+      logAndSend(callLog, method, path, authorization, body, res, 401, {
+        error: { code: "unauth", message: "bad token" },
+      });
+      return;
+    }
+    if (!record.authorizedSites.includes(site)) {
+      logAndSend(callLog, method, path, authorization, body, res, 403, {
+        error: {
+          code: "site_unauthorized",
+          message: `not authorized for site '${site}'`,
+        },
+      });
+      return;
+    }
+    let parsed: { to?: string };
+    try {
+      parsed = JSON.parse(body) as typeof parsed;
+    } catch {
+      logAndSend(callLog, method, path, authorization, body, res, 400, {
+        error: { code: "bad_request", message: "invalid JSON body" },
+      });
+      return;
+    }
+    const to = typeof parsed.to === "string" ? parsed.to : "";
+    if (!to) {
+      logAndSend(callLog, method, path, authorization, body, res, 400, {
+        error: { code: "bad_request", message: "to is required" },
+      });
+      return;
+    }
+    const knownDeployIds = new Set<string>(
+      (state.deploysBySite.get(site) ?? []).map((d) => d.deployId),
+    );
+    if (state.deploys.has(to)) knownDeployIds.add(to);
+    if (!knownDeployIds.has(to)) {
+      logAndSend(callLog, method, path, authorization, body, res, 404, {
+        error: {
+          code: "not_found",
+          message: `deploy '${to}' not found for site '${site}'`,
+        },
+      });
+      return;
+    }
+    state.aliases.production.set(site, to);
+    logAndSend(callLog, method, path, authorization, body, res, 200, {
+      url: `https://${site}.freecode.camp`,
+      deployId: to,
+    });
+    return;
+  }
+
   const slugRouteMatch = /^\/api\/site\/([^/]+)$/.exec(path);
   if (slugRouteMatch && (method === "PATCH" || method === "DELETE")) {
     const slug = decodeURIComponent(slugRouteMatch[1]!);
