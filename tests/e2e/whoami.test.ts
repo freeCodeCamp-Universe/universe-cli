@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { whoami } from "../../src/commands/whoami.js";
 import { type FakeArtemis, startFakeArtemis } from "./_helpers/fake-artemis.js";
 import { type CliEnv, makeCliEnv } from "./_helpers/cli-env.js";
+import { runBinary } from "./_helpers/spawn-cli.js";
 
 interface CapturedExit {
   code?: number;
@@ -168,4 +169,40 @@ describe("whoami E2E (real proxy-client + real identity chain)", () => {
 
     expect(server.callLog).toHaveLength(0);
   });
+});
+
+describe("whoami binary smoke (spawned dist/index.js)", () => {
+  let server: FakeArtemis;
+  let env: CliEnv;
+
+  beforeEach(async () => {
+    server = await startFakeArtemis();
+  });
+
+  afterEach(async () => {
+    await env?.cleanup();
+    await server.close();
+  });
+
+  it("boots dist binary, hits real /api/whoami, prints success envelope", async () => {
+    const token = "ghp_smoke_token";
+    server.state.tokens.set(token, {
+      login: "alice",
+      authorizedSites: ["news"],
+    });
+    env = await makeCliEnv({ proxyUrl: server.url, githubToken: token });
+
+    const r = await runBinary(["whoami", "--json"], env.env);
+
+    expect(r.exitCode).toBe(0);
+    const envelope = JSON.parse(r.stdout.trim()) as Record<string, unknown>;
+    expect(envelope["command"]).toBe("whoami");
+    expect(envelope["success"]).toBe(true);
+    expect(envelope["login"]).toBe("alice");
+    expect(envelope["authorizedSitesCount"]).toBe(1);
+
+    expect(server.callLog).toHaveLength(1);
+    expect(server.callLog[0].path).toBe("/api/whoami");
+    expect(server.callLog[0].authorization).toBe(`Bearer ${token}`);
+  }, 120_000);
 });
