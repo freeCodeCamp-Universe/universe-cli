@@ -251,7 +251,7 @@ export async function deploy(
 
     // 5. Git state (informational).
     const git = gitState();
-    if (git.dirty) {
+    if (git.dirty && !options.json) {
       warn(
         "git working tree is dirty — uncommitted changes will not be reflected.",
       );
@@ -265,7 +265,7 @@ export async function deploy(
       cwd,
       outputDir,
     });
-    if (buildResult.skipped) {
+    if (buildResult.skipped && !options.json) {
       info("build.command not set — using pre-built output.");
     }
     const resolvedOutputDir = buildResult.outputDir;

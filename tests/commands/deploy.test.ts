@@ -503,4 +503,42 @@ describe("deploy command (proxy plane)", () => {
       expect(cfg.baseUrl).toBe("https://staging.example");
     });
   });
+
+  // B2: clack info()/warn() printed to stdout pollute the JSON envelope
+  // in --json mode, breaking machine consumers that parse stdout as one
+  // JSON document. info()/warn() must be silent under --json.
+  describe("--json mode silences info/warn (B2 regression)", () => {
+    it("does not call logInfo when build is skipped under --json", async () => {
+      const deps = mkDeps({
+        runBuild: vi.fn().mockResolvedValue({
+          skipped: true,
+          outputDir: "/proj/dist",
+        }),
+      });
+      await deploy({ json: true }, deps);
+      expect(deps.logInfo).not.toHaveBeenCalled();
+    });
+
+    it("does not call logWarn when git is dirty under --json", async () => {
+      const deps = mkDeps({
+        getGitState: vi.fn().mockReturnValue({
+          hash: "abc1234567",
+          dirty: true,
+        }),
+      });
+      await deploy({ json: true }, deps);
+      expect(deps.logWarn).not.toHaveBeenCalled();
+    });
+
+    it("still calls logWarn when git is dirty under non-JSON mode", async () => {
+      const deps = mkDeps({
+        getGitState: vi.fn().mockReturnValue({
+          hash: "abc1234567",
+          dirty: true,
+        }),
+      });
+      await deploy({ json: false }, deps);
+      expect(deps.logWarn).toHaveBeenCalledTimes(1);
+    });
+  });
 });
