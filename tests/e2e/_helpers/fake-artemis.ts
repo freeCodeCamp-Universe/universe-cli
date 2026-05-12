@@ -37,6 +37,29 @@ export interface DeploySummary {
 }
 
 /**
+ * One in-flight or completed deploy session.
+ *
+ * `expectedFiles` is the manifest declared at /init. `uploadedFiles`
+ * is what actually arrived via PUT /upload — a finalize-time mismatch
+ * lets the fixture model `verify_failed` (422) without ad-hoc state.
+ */
+export interface DeployRecord {
+  deployId: string;
+  site: string;
+  sha: string;
+  expectedFiles: string[];
+  uploadedFiles: Map<string, string>;
+  finalized: boolean;
+  mode?: "preview" | "production";
+}
+
+export interface DeployJwtRecord {
+  deployId: string;
+  site: string;
+  login: string;
+}
+
+/**
  * Per-route forced error. Key shape is `"<METHOD> <path>"`,
  * e.g. `"GET /api/whoami"`. When present, the route returns the
  * error envelope verbatim instead of running normal handler logic.
@@ -53,6 +76,12 @@ export interface FakeArtemisState {
   failures: Map<string, FailureInjection>;
   registry: Map<string, SiteRow>;
   deploysBySite: Map<string, DeploySummary[]>;
+  deploys: Map<string, DeployRecord>;
+  deployJwts: Map<string, DeployJwtRecord>;
+  aliases: {
+    preview: Map<string, string>;
+    production: Map<string, string>;
+  };
 }
 
 export interface CallLogEntry {
@@ -77,6 +106,9 @@ export async function startFakeArtemis(): Promise<FakeArtemis> {
     failures: new Map(),
     registry: new Map(),
     deploysBySite: new Map(),
+    deploys: new Map(),
+    deployJwts: new Map(),
+    aliases: { preview: new Map(), production: new Map() },
   };
   const callLog: CallLogEntry[] = [];
 
@@ -251,6 +283,145 @@ async function handle(
     };
     state.registry.set(slug, row);
     logAndSend(callLog, method, path, authorization, body, res, 201, row);
+    return;
+  }
+
+  if (method === "POST" && path === "/api/deploy/init") {
+    const token = parseBearer(authorization);
+    const record = token ? state.tokens.get(token) : undefined;
+    if (!record) {
+      logAndSend(callLog, method, path, authorization, body, res, 401, {
+        error: { code: "unauth", message: "bad token" },
+      });
+      return;
+    }
+    let parsed: { site?: string; sha?: string; files?: string[] };
+    try {
+      parsed = JSON.parse(body) as typeof parsed;
+    } catch {
+      logAndSend(callLog, method, path, authorization, body, res, 400, {
+        error: { code: "bad_request", message: "invalid JSON body" },
+      });
+      return;
+    }
+    const site = typeof parsed.site === "string" ? parsed.site : "";
+    const sha = typeof parsed.sha === "string" ? parsed.sha : "";
+    if (!site || !sha) {
+      logAndSend(callLog, method, path, authorization, body, res, 400, {
+        error: { code: "bad_request", message: "site and sha are required" },
+      });
+      return;
+    }
+    if (!record.authorizedSites.includes(site)) {
+      logAndSend(callLog, method, path, authorization, body, res, 403, {
+        error: {
+          code: "site_unauthorized",
+          message: `not authorized for site '${site}'`,
+        },
+      });
+      return;
+    }
+    const stamp = "20260512-120000";
+    const shortSha = sha.slice(0, 7);
+    const deployId = `${stamp}-${shortSha}`;
+    const jwt = `eyJ.fake.${deployId}`;
+    const expectedFiles = Array.isArray(parsed.files) ? parsed.files : [];
+    state.deploys.set(deployId, {
+      deployId,
+      site,
+      sha,
+      expectedFiles,
+      uploadedFiles: new Map(),
+      finalized: false,
+    });
+    state.deployJwts.set(jwt, { deployId, site, login: record.login });
+    logAndSend(callLog, method, path, authorization, body, res, 200, {
+      deployId,
+      jwt,
+      expiresAt: "2026-05-12T13:00:00Z",
+    });
+    return;
+  }
+
+  const uploadMatch = /^\/api\/deploy\/([^/]+)\/upload\?path=(.+)$/.exec(path);
+  if (method === "PUT" && uploadMatch) {
+    const deployId = decodeURIComponent(uploadMatch[1]!);
+    const filePath = decodeURIComponent(uploadMatch[2]!);
+    const jwt = parseBearer(authorization);
+    const jwtRecord = jwt ? state.deployJwts.get(jwt) : undefined;
+    if (!jwtRecord || jwtRecord.deployId !== deployId) {
+      logAndSend(callLog, method, path, authorization, body, res, 401, {
+        error: { code: "unauth", message: "deploy jwt invalid for this id" },
+      });
+      return;
+    }
+    const deploy = state.deploys.get(deployId);
+    if (!deploy) {
+      logAndSend(callLog, method, path, authorization, body, res, 404, {
+        error: { code: "not_found", message: `deploy '${deployId}' not found` },
+      });
+      return;
+    }
+    deploy.uploadedFiles.set(filePath, body);
+    logAndSend(callLog, method, path, authorization, body, res, 200, {
+      received: filePath,
+      key: `site/${deploy.site}/deploys/${deployId}/${filePath}`,
+    });
+    return;
+  }
+
+  const finalizeMatch = /^\/api\/deploy\/([^/]+)\/finalize$/.exec(path);
+  if (method === "POST" && finalizeMatch) {
+    const deployId = decodeURIComponent(finalizeMatch[1]!);
+    const jwt = parseBearer(authorization);
+    const jwtRecord = jwt ? state.deployJwts.get(jwt) : undefined;
+    if (!jwtRecord || jwtRecord.deployId !== deployId) {
+      logAndSend(callLog, method, path, authorization, body, res, 401, {
+        error: { code: "unauth", message: "deploy jwt invalid for this id" },
+      });
+      return;
+    }
+    const deploy = state.deploys.get(deployId);
+    if (!deploy) {
+      logAndSend(callLog, method, path, authorization, body, res, 404, {
+        error: { code: "not_found", message: `deploy '${deployId}' not found` },
+      });
+      return;
+    }
+    let parsed: { mode?: string; files?: string[] };
+    try {
+      parsed = JSON.parse(body) as typeof parsed;
+    } catch {
+      logAndSend(callLog, method, path, authorization, body, res, 400, {
+        error: { code: "bad_request", message: "invalid JSON body" },
+      });
+      return;
+    }
+    const mode = parsed.mode === "production" ? "production" : "preview";
+    const files = Array.isArray(parsed.files) ? parsed.files : [];
+    const missing = files.filter((f) => !deploy.uploadedFiles.has(f));
+    if (missing.length > 0) {
+      logAndSend(callLog, method, path, authorization, body, res, 422, {
+        error: {
+          code: "verify_failed",
+          message: `deploy is missing expected files: ${missing.join(", ")}`,
+        },
+      });
+      return;
+    }
+    deploy.finalized = true;
+    deploy.mode = mode;
+    state.aliases[mode].set(deploy.site, deployId);
+    const list = state.deploysBySite.get(deploy.site) ?? [];
+    list.unshift({ deployId });
+    state.deploysBySite.set(deploy.site, list);
+    const subdomain =
+      mode === "preview" ? `${deploy.site}.preview` : deploy.site;
+    logAndSend(callLog, method, path, authorization, body, res, 200, {
+      url: `https://${subdomain}.freecode.camp`,
+      deployId,
+      mode,
+    });
     return;
   }
 
