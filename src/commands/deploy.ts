@@ -338,7 +338,7 @@ export async function deploy(
       const sizeKB = (uploadResult.totalSize / 1024).toFixed(1);
       const nextLine =
         mode === "preview"
-          ? "Next: universe static promote"
+          ? `Next: universe static promote --from ${finalizeResult.deployId}`
           : "Promoted to production.";
       success(
         [
