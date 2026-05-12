@@ -83,6 +83,42 @@ async function runDeploy(
   return { captured, envelope };
 }
 
+interface TextRunResult {
+  captured: CapturedExit;
+  successes: string[];
+  warns: string[];
+  errors: string[];
+}
+
+async function runDeployText(
+  env: NodeJS.ProcessEnv,
+  cwd: string,
+  options: { promote: boolean },
+): Promise<TextRunResult> {
+  const captured: CapturedExit = {};
+  const successes: string[] = [];
+  const warns: string[] = [];
+  const errors: string[] = [];
+  try {
+    await deploy(
+      { json: false, ...options },
+      {
+        cwd,
+        env,
+        exit: makeExit(captured),
+        logSuccess: (m: string) => successes.push(m),
+        logInfo: vi.fn(),
+        logWarn: (m: string) => warns.push(m),
+        logError: (m: string) => errors.push(m),
+        getGitState: () => ({ hash: "deadbeefcafe1234", dirty: false }),
+      },
+    );
+  } catch (err) {
+    if (!(err instanceof Error) || !("__exit__" in err)) throw err;
+  }
+  return { captured, successes, warns, errors };
+}
+
 async function makeProject(opts: {
   site: string;
   files: Record<string, string>;
@@ -175,6 +211,37 @@ describe("static deploy --promote E2E (alpha trip-wire for B1)", () => {
       /\/api\/site\/[^/]+\/promote$/.test(c.path),
     );
     expect(promoteCalls).toHaveLength(0);
+  });
+
+  it("--promote non-JSON success surfaces 'Preview alias unchanged.' (B6 divergence flag)", async () => {
+    const site = "my-site-text";
+    server.state.tokens.set(token, {
+      login: "alice",
+      authorizedSites: [site],
+    });
+    server.state.registry.set(site, {
+      slug: site,
+      teams: ["staff"],
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-01T00:00:00Z",
+      createdBy: "alice",
+    });
+    env = await makeCliEnv({ proxyUrl: server.url, githubToken: token });
+
+    const project = await makeProject({
+      site,
+      files: { "index.html": "<html>prod text</html>" },
+    });
+    projects.push(project);
+
+    const r = await runDeployText(env.env, project.dir, { promote: true });
+
+    expect(r.captured.code).toBeUndefined();
+    expect(r.errors).toEqual([]);
+    expect(r.successes).toHaveLength(1);
+    const out = r.successes[0];
+    expect(out).toContain("Promoted to production.");
+    expect(out).toContain("Preview alias unchanged.");
   });
 
   it("--promote without flag (preview default) leaves production alias untouched", async () => {

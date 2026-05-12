@@ -339,7 +339,7 @@ export async function deploy(
       const nextLine =
         mode === "preview"
           ? `Next: universe static promote --from ${finalizeResult.deployId}`
-          : "Promoted to production.";
+          : "Promoted to production.\nPreview alias unchanged.";
       success(
         [
           `Deployed ${finalizeResult.deployId}`,

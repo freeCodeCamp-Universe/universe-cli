@@ -118,15 +118,21 @@ export async function promote(
         }),
       );
     } else {
-      success(
-        [
-          `Promoted ${result.deployId} to production`,
-          ``,
-          `  Site:        ${config.site}`,
-          `  Deploy:      ${result.deployId}`,
-          `  Production:  ${result.url}`,
-        ].join("\n"),
-      );
+      const lines = [
+        `Promoted ${result.deployId} to production`,
+        ``,
+        `  Site:        ${config.site}`,
+        `  Deploy:      ${result.deployId}`,
+        `  Production:  ${result.url}`,
+      ];
+      if (options.from) {
+        // --from routes through siteRollback, which rewrites only the
+        // production alias; preview body is whatever the last
+        // finalize(preview) wrote. Surface the divergence so the
+        // operator knows preview is now lagging prod.
+        lines.push(``, "Preview alias unchanged.");
+      }
+      success(lines.join("\n"));
     }
   } catch (err) {
     const { code, message } = wrapProxyError("promote", err);

@@ -59,6 +59,37 @@ async function runPromote(
   return { captured, envelope };
 }
 
+interface TextRunResult {
+  captured: CapturedExit;
+  successes: string[];
+  errors: string[];
+}
+
+async function runPromoteText(
+  env: NodeJS.ProcessEnv,
+  cwd: string,
+  options: { from?: string },
+): Promise<TextRunResult> {
+  const captured: CapturedExit = {};
+  const successes: string[] = [];
+  const errors: string[] = [];
+  try {
+    await promote(
+      { json: false, ...options },
+      {
+        cwd,
+        env,
+        exit: makeExit(captured),
+        logSuccess: (m: string) => successes.push(m),
+        logError: (m: string) => errors.push(m),
+      },
+    );
+  } catch (err) {
+    if (!(err instanceof Error) || !("__exit__" in err)) throw err;
+  }
+  return { captured, successes, errors };
+}
+
 async function makeProject(
   site: string,
 ): Promise<{ dir: string; cleanup: () => Promise<void> }> {
@@ -141,6 +172,23 @@ describe("static promote E2E", () => {
     expect(server.callLog[0].method).toBe("POST");
     expect(server.callLog[0].path).toBe(`/api/site/${site}/rollback`);
     expect(JSON.parse(server.callLog[0].body)).toEqual({ to: targetId });
+  });
+
+  it("promote --from <id> non-JSON success surfaces 'Preview alias unchanged.' (B7 divergence flag)", async () => {
+    const targetId = "20251010-090000-ccc3333";
+    server.state.deploysBySite.set(site, [{ deployId: targetId }]);
+    env = await makeCliEnv({ proxyUrl: server.url, githubToken: token });
+    const project = await makeProject(site);
+    projects.push(project);
+
+    const r = await runPromoteText(env.env, project.dir, { from: targetId });
+
+    expect(r.captured.code).toBeUndefined();
+    expect(r.errors).toEqual([]);
+    expect(r.successes).toHaveLength(1);
+    const out = r.successes[0];
+    expect(out).toContain(`Promoted ${targetId} to production`);
+    expect(out).toContain("Preview alias unchanged.");
   });
 
   it("promote --from unknown id exits EXIT_USAGE on 404", async () => {
