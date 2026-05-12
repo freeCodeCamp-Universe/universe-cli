@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Added
 
 - End-to-end test suite covering all 11 CLI verbs against a local fake-artemis fixture. Two layers under `tests/e2e/`: in-process command-handler tests with the real `proxy-client` (sequence + behavior coverage) and a spawned-binary smoke matrix (cac dispatch + tsup-output regression guard). See `docs/README.md` §Internal conventions for extension notes.
+- Opt-in real-artemis smoke via `pnpm test:smoke` (`tests/e2e/smoke-real-artemis.test.ts`). Gated on `UNIVERSE_E2E_REAL=1`; reads `UNIVERSE_REAL_TOKEN` and `UNIVERSE_REAL_SITE` from env. Asserts the production-alias closed loop by fetching the public URL post-deploy and matching a freshly-deployed marker — the diagnostic test for "sites not updating" reports.
 
 ### Fixed
 

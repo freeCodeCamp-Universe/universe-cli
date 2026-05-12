@@ -4,6 +4,7 @@
   "main": "dist/index.js",
   "scripts": {
     "test": "vitest run",
+    "test:smoke": "UNIVERSE_E2E_REAL=1 vitest run tests/e2e/smoke-real-artemis.test.ts",
     "build": "tsup",
     "lint": "oxlint src tests",
     "typecheck": "tsc --noEmit",
