@@ -254,6 +254,62 @@ async function handle(
     return;
   }
 
+  const slugRouteMatch = /^\/api\/site\/([^/]+)$/.exec(path);
+  if (slugRouteMatch && (method === "PATCH" || method === "DELETE")) {
+    const slug = decodeURIComponent(slugRouteMatch[1]!);
+    const token = parseBearer(authorization);
+    const record = token ? state.tokens.get(token) : undefined;
+    if (!record) {
+      logAndSend(callLog, method, path, authorization, body, res, 401, {
+        error: { code: "unauth", message: "bad token" },
+      });
+      return;
+    }
+    const existing = state.registry.get(slug);
+    if (!existing) {
+      logAndSend(callLog, method, path, authorization, body, res, 404, {
+        error: {
+          code: "not_found",
+          message: `site '${slug}' is not registered`,
+        },
+      });
+      return;
+    }
+    if (method === "PATCH") {
+      let parsed: { teams?: unknown };
+      try {
+        parsed = JSON.parse(body) as typeof parsed;
+      } catch {
+        logAndSend(callLog, method, path, authorization, body, res, 400, {
+          error: { code: "bad_request", message: "invalid JSON body" },
+        });
+        return;
+      }
+      if (!Array.isArray(parsed.teams) || parsed.teams.length === 0) {
+        logAndSend(callLog, method, path, authorization, body, res, 400, {
+          error: {
+            code: "bad_request",
+            message: "teams must be a non-empty array",
+          },
+        });
+        return;
+      }
+      const updated: SiteRow = {
+        ...existing,
+        teams: parsed.teams as string[],
+        updatedAt: "2026-05-12T12:00:00Z",
+      };
+      state.registry.set(slug, updated);
+      logAndSend(callLog, method, path, authorization, body, res, 200, updated);
+      return;
+    }
+    state.registry.delete(slug);
+    res.statusCode = 204;
+    res.end();
+    callLog.push({ method, path, authorization, status: 204, body });
+    return;
+  }
+
   logAndSend(callLog, method, path, authorization, body, res, 404, {
     error: { code: "not_found", message: `no route: ${method} ${path}` },
   });
