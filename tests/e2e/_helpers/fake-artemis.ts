@@ -144,6 +144,20 @@ function handle(
     return;
   }
 
+  if (method === "GET" && path === "/api/sites") {
+    const token = parseBearer(authorization);
+    const record = token ? state.tokens.get(token) : undefined;
+    if (!record) {
+      logAndSend(callLog, method, path, authorization, res, 401, {
+        error: { code: "unauth", message: "bad token" },
+      });
+      return;
+    }
+    const rows = Array.from(state.registry.values());
+    logAndSend(callLog, method, path, authorization, res, 200, rows);
+    return;
+  }
+
   const deploysMatch = /^\/api\/site\/([^/]+)\/deploys$/.exec(path);
   if (method === "GET" && deploysMatch) {
     const site = decodeURIComponent(deploysMatch[1]!);
