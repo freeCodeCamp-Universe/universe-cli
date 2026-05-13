@@ -16,6 +16,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `static deploy --json` no longer prints the build-skipped notice or the git-dirty warning to stdout. Both `info()` and `warn()` are now gated behind `!options.json`, so machine consumers can parse stdout as a single JSON document.
 - `static ls` now returns deploys newest-first. Previously artemis returned the list lexicographically ascending and the CLI did not re-sort, so the top of the list was always the OLDEST deploy. Operators reading `ls` after a successful deploy saw a stale top entry and reasonably concluded that the deploy had not landed — the most likely root cause of the "sites are not updating" reports. The CLI now sorts descending by deployId regardless of server order.
 
+
+## [0.5.1] - 2026-05-13
+
+
+### Fixed
+
+- warn on prod-only alias divergence (static)
+- pin --from <id> in preview next-hint (deploy)
+- sort deploys newest-first (ls)
+- silence info+warn under --json (B2) (deploy)
+
+
+
 ## [0.5.0] - 2026-05-11
 
 Static-apps registry consumer + output UX hardening. The artemis proxy gained four new endpoints (`POST /api/site/register`, `GET /api/sites`, `PATCH /api/site/{slug}`, `DELETE /api/site/{slug}`) replacing the git-tracked `artemis/config/sites.yaml` ops loop with a Valkey-backed registry. This release wires the CLI to those endpoints and fixes two v0.4-era output bugs surfaced during smoke testing.
