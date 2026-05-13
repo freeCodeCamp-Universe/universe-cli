@@ -123,11 +123,20 @@ describe("static rollback E2E", () => {
 
     expect(server.state.aliases.production.get(site)).toBe(oldId);
 
-    expect(server.callLog).toHaveLength(1);
-    const call = server.callLog[0];
+    // G3 CAS pre-flight: GET alias/production then POST /rollback with
+    // {to, expectedCurrent}.
+    expect(server.callLog).toHaveLength(2);
+    expect(server.callLog[0]).toMatchObject({
+      method: "GET",
+      path: `/api/site/${site}/alias/production`,
+    });
+    const call = server.callLog[1];
     expect(call.method).toBe("POST");
     expect(call.path).toBe(`/api/site/${site}/rollback`);
-    expect(JSON.parse(call.body)).toEqual({ to: oldId });
+    expect(JSON.parse(call.body)).toEqual({
+      to: oldId,
+      expectedCurrent: currentId,
+    });
   });
 
   it("missing --to → EXIT_USAGE before any HTTP call", async () => {

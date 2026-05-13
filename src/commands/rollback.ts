@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { log } from "@clack/prompts";
+import { confirm, isCancel, log } from "@clack/prompts";
 import { ConfigError, CredentialError, UsageError } from "../errors.js";
 import { DEFAULT_PROXY_URL } from "../lib/constants.js";
 import { resolveIdentity as defaultResolveIdentity } from "../lib/identity.js";
@@ -9,6 +9,7 @@ import {
   type PlatformYamlV2,
 } from "../lib/platform-yaml.js";
 import {
+  AliasDriftError,
   createProxyClient as defaultCreateProxyClient,
   wrapProxyError,
   type ProxyClient,
@@ -31,7 +32,14 @@ export interface RollbackDeps {
   logSuccess?: (msg: string) => void;
   logError?: (msg: string) => void;
   exit?: (code: number) => never;
+  promptConfirm?: (msg: string) => Promise<boolean>;
 }
+
+const defaultPromptConfirm = async (msg: string): Promise<boolean> => {
+  const r = await confirm({ message: msg, initialValue: false });
+  if (isCancel(r)) return false;
+  return r === true;
+};
 
 const defaultReadPlatformYaml = async (cwd: string): Promise<string> => {
   return readFile(resolve(cwd, "platform.yaml"), "utf-8");
@@ -76,6 +84,7 @@ export async function rollback(
   const success = deps.logSuccess ?? ((s: string) => log.success(s));
   const error = deps.logError ?? ((s: string) => log.error(s));
   const exit = deps.exit ?? exitWithCode;
+  const promptConfirm = deps.promptConfirm ?? defaultPromptConfirm;
 
   try {
     if (!options.to || options.to.trim().length === 0) {
@@ -99,10 +108,38 @@ export async function rollback(
       getAuthToken: () => identity.token,
     });
 
-    const result = await client.siteRollback({
+    const to = options.to.trim();
+    // G3 CAS pre-flight: read production alias for expectedCurrent.
+    const prod = await client.getAlias({
       site: config.site,
-      to: options.to.trim(),
+      mode: "production",
     });
+    const initialExpected = prod?.deployId ?? "";
+    let result: { url: string; deployId: string };
+    try {
+      result = await client.siteRollback({
+        site: config.site,
+        to,
+        expectedCurrent: initialExpected,
+      });
+    } catch (err) {
+      if (!(err instanceof AliasDriftError)) throw err;
+      // V4: single-shot retry on non-JSON only. JSON path falls through
+      // to outer catch which renders the envelope with `current`.
+      if (options.json) throw err;
+      error(
+        `drift: production moved to ${err.current}, expected ${initialExpected}`,
+      );
+      const ok = await promptConfirm(
+        `Retry rollback with expectedCurrent='${err.current}'?`,
+      );
+      if (!ok) throw err;
+      result = await client.siteRollback({
+        site: config.site,
+        to,
+        expectedCurrent: err.current,
+      });
+    }
 
     if (options.json) {
       emitJson(
@@ -127,7 +164,14 @@ export async function rollback(
   } catch (err) {
     const { code, message } = wrapProxyError("rollback", err);
     if (options.json) {
-      emitJson(buildErrorEnvelope("rollback", code, message));
+      const envelope = buildErrorEnvelope("rollback", code, message);
+      if (err instanceof AliasDriftError) {
+        // V3 additive: top-level `current` so scripted callers can
+        // branch + supply a fresh expectedCurrent on next attempt.
+        emitJson({ ...envelope, current: err.current });
+      } else {
+        emitJson(envelope);
+      }
     } else {
       error(message);
     }

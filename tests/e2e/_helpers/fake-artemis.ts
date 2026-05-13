@@ -599,7 +599,7 @@ async function handle(
       });
       return;
     }
-    let parsed: { to?: string };
+    let parsed: { to?: string; expectedCurrent?: string };
     try {
       parsed = JSON.parse(body) as typeof parsed;
     } catch {
@@ -614,6 +614,21 @@ async function handle(
         error: { code: "bad_request", message: "to is required" },
       });
       return;
+    }
+    // CAS guard (G3): if client supplied expectedCurrent, verify match.
+    if (parsed.expectedCurrent !== undefined) {
+      const currentProd = state.aliases.production.get(site) ?? "";
+      if (currentProd !== parsed.expectedCurrent) {
+        logAndSend(callLog, method, path, authorization, body, res, 409, {
+          error: {
+            code: "alias_drift",
+            message: `production alias is '${currentProd}', expected '${parsed.expectedCurrent}'`,
+          },
+          site,
+          current: currentProd,
+        });
+        return;
+      }
     }
     const knownDeployIds = new Set<string>(
       (state.deploysBySite.get(site) ?? []).map((d) => d.deployId),
