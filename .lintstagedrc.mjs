@@ -4,7 +4,7 @@ import picomatch from "picomatch";
 const removeFilesFolder = (files) => {
   const cwd = process.cwd();
   const relativePaths = files.map((file) => path.relative(cwd, file));
-  const matcher = picomatch(["files/**"]);
+  const matcher = picomatch(["src/commands/create/layer-composition/files/**", "scripts/**"]);
   return relativePaths.filter((f) => !matcher(f));
 };
 

@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { generateLayerFiles } from "../../../../../scripts/generate-layer-files.mjs";
 
-const LAYERS_SUBDIR = join("src", "commands", "create", "layer-composition", "layers");
+const LAYERS_SUBDIR = "layers";
 
 interface FolderOpts {
   extraFiles?: Record<string, string>;
@@ -136,7 +136,7 @@ describe(generateLayerFiles, () => {
     );
 
     await expect(generateLayerFiles(root)).rejects.toThrow(
-      'runtime.json entry "node" has no folder at files/runtime/node/',
+      `runtime.json entry "node" has no folder at ${root}/files/runtime/node/`,
     );
   });
 
@@ -176,7 +176,7 @@ describe(generateLayerFiles, () => {
     await makeFolder(root, "runtime", "node");
 
     await expect(generateLayerFiles(root)).rejects.toThrow(
-      'runtime.json entry "missing" has no folder at files/runtime/missing/',
+      `runtime.json entry "missing" has no folder at ${root}/files/runtime/missing/`,
     );
 
     const result = await readJson(root, "runtime.json");

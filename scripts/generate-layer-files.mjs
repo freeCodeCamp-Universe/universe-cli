@@ -11,7 +11,10 @@ const LAYER_TYPE_MAP = [
   ["database.json", "database"],
 ];
 
-const defaultRoot = () => resolve(fileURLToPath(import.meta.url), "..", "..");
+const defaultBaseDir = () => resolve(fileURLToPath(import.meta.url), "..", "..",     "src",
+    "commands",
+    "create",
+    "layer-composition");
 
 /**
  * @param {string} base
@@ -58,9 +61,9 @@ const orderObjectKeys = (obj) => {
  * @param {string} [projectRoot]
  * @returns {Promise<void>}
  */
-const generateLayerFiles = async (projectRoot = defaultRoot()) => {
-  const filesBase = join(projectRoot, "files");
-  const layersDir = join(projectRoot, "src", "commands", "create", "layer-composition", "layers");
+const generateLayerFiles = async (baseDir = defaultBaseDir()) => {
+  const filesBase = join(baseDir, "files");
+  const layersDir = join(baseDir, "layers");
 
   const layerResults = await Promise.all(
     LAYER_TYPE_MAP.map(async ([jsonFile, typeName]) => {
@@ -101,19 +104,25 @@ const generateLayerFiles = async (projectRoot = defaultRoot()) => {
 
           if (!hasGitkeep && !hasJson) {
             errors.push(
-              `files/${typeName}/${subdir}/ has no .gitkeep and no entry in ${jsonFile}. Add the JSON entry or remove the folder`,
+              `${filesBase}/${typeName}/${subdir}/ has no .gitkeep and no entry in ${jsonFile}. Add the JSON entry or remove the folder`,
             );
           } else if (!hasGitkeep) {
-            errors.push(`files/${typeName}/${subdir}/ is missing a .gitkeep. Please add one`);
+            errors.push(
+              `${filesBase}/${typeName}/${subdir}/ is missing a .gitkeep. Please add one`,
+            );
           } else if (!hasJson) {
-            errors.push(`files/${typeName}/${subdir}/ has no entry in ${jsonFile}`);
+            errors.push(
+              `${filesBase}/${typeName}/${subdir}/ has no entry in ${jsonFile}`,
+            );
           }
         }),
       );
 
       for (const key of jsonKeys) {
         if (!subdirSet.has(key)) {
-          errors.push(`${jsonFile} entry "${key}" has no folder at files/${typeName}/${key}/`);
+          errors.push(
+            `${jsonFile} entry "${key}" has no folder at ${filesBase}/${typeName}/${key}/`,
+          );
         }
       }
 
@@ -140,7 +149,11 @@ const generateLayerFiles = async (projectRoot = defaultRoot()) => {
           }
         }),
       );
-      await writeFile(jsonPath, `${JSON.stringify(orderObjectKeys(json), null, 2)}\n`, "utf-8");
+      await writeFile(
+        jsonPath,
+        `${JSON.stringify(orderObjectKeys(json), null, 2)}\n`,
+        "utf-8",
+      );
     }),
   );
 };
