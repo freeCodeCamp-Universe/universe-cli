@@ -1,18 +1,8 @@
 # Releasing
 
-Releases are manual — you trigger the workflow when you decide it's time. Patch versions auto-increment from `package.json`; feature and major bumps require operator input.
+For release maintainers cutting a new `@freecodecamp/universe-cli` version. Build / test commands and pre-commit gates live in [`README.md`](README.md) under "Build & test".
 
-## Developing
-
-```sh
-pnpm install
-pnpm lint          # oxlint
-pnpm test          # vitest run
-pnpm tsc --noEmit  # typecheck
-pnpm build         # tsup → dist/
-```
-
-`pre-commit` (husky) runs lint + typecheck + test on every commit, so the same gates fire locally and in CI.
+Releases are manual — trigger the workflow when ready. Patch versions auto-increment from `package.json`; feature and major bumps require operator input.
 
 ## Prerequisites
 
@@ -58,14 +48,5 @@ The CHANGELOG section is generated from Conventional Commits since the last `v*`
 | Linux ARM64         | `universe-linux-arm64`  |
 
 Each binary is a Node SEA (Single Executable Application) — no Node.js install required at runtime. macOS binaries are ad-hoc codesigned.
-
-## Local tag (escape hatch)
-
-If GitHub Actions is unavailable:
-
-```sh
-git tag v0.2.0
-git push origin v0.2.0
-```
 
 Then build locally (`pnpm build` then the SEA steps from `release.yml`) and attach the binaries to the GitHub Release by hand. npm publish via Trusted Publisher will not work outside Actions — defer to the next time the workflow runs.

@@ -1,18 +1,17 @@
-# Universe CLI — Operator Docs
+# universe-cli — Project Overview
 
-Pick a workflow.
+Read this when you change CLI code. Other entry points:
 
-| I want to…                                                           | Start here                             |
-| -------------------------------------------------------------------- | -------------------------------------- |
-| **Use the CLI** to deploy / promote / rollback a static site         | [STAFF-GUIDE.md](STAFF-GUIDE.md)       |
-| **Understand the architecture** — where the CLI sits in the platform | [§Architecture](#architecture) (below) |
-| **Build & test the CLI** locally                                     | [RELEASING.md](RELEASING.md)           |
-| **Cut a release** of the CLI                                         | [RELEASING.md](RELEASING.md)           |
-| **Write `platform.yaml`** for a site                                 | [platform-yaml.md](platform-yaml.md)   |
+- Root [`README.md`](../README.md) — install + CLI surface + env overrides.
+- [`STAFF-GUIDE.md`](STAFF-GUIDE.md) — staff deploy / promote / rollback walkthrough.
+- [`platform-yaml.md`](platform-yaml.md) — `platform.yaml` schema reference.
+- [`RELEASING.md`](RELEASING.md) — cutting a release.
+
+## What it is
+
+TypeScript CLI for the freeCodeCamp Universe platform. Identity-only client — carries a GitHub bearer to **artemis** (`uploads.freecode.camp`), which owns the R2 admin credentials and the site registry. The CLI holds no infrastructure secrets.
 
 ## Architecture
-
-The CLI is the staff-facing client for the **artemis** deploy proxy. It holds no infrastructure credentials — R2 admin keys live inside the cluster, behind artemis at `uploads.freecode.camp`.
 
 ```
 ┌──────────────────┐   GitHub identity   ┌────────────┐   R2 admin key   ┌─────┐
@@ -32,30 +31,61 @@ The CLI is the staff-facing client for the **artemis** deploy proxy. It holds no
                                          └────────────┘
 ```
 
-**Authoritative design docs** (in the Universe repo — read-only here):
+## Upstream specs (read-only here)
 
-- [ADR-016 — Deploy proxy](https://github.com/freeCodeCamp-Universe/Universe/blob/main/decisions/016-deploy-proxy.md) — CLI ↔ artemis contract, identity priority chain, per-site authorization, deploy-session JWT scope, R2 layout.
+- [ADR-016 — Deploy proxy](https://github.com/freeCodeCamp-Universe/Universe/blob/main/decisions/016-deploy-proxy.md) — CLI ↔ artemis contract, identity chain, per-site authorization, deploy-session JWT scope, R2 layout.
 - [Universe ARCHI-DIAGRAM](https://github.com/freeCodeCamp-Universe/Universe/blob/main/ARCHI-DIAGRAM.md) — galaxy topology + request / storage / auth flows.
 
-**Cross-repo runbooks** (artemis-side, owned by the infra team):
+## Cross-repo runbooks (infra team owns)
 
-- [`fCC/infra/docs/runbooks/02-deploy-artemis-service.md`](https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/02-deploy-artemis-service.md) — bring up / upgrade artemis on `gxy-cassiopeia`.
-- [`fCC/infra/docs/runbooks/03-artemis-postdeploy-check.md`](https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/03-artemis-postdeploy-check.md) — E2E verification after any artemis chart change.
+- [`02-deploy-artemis-service.md`](https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/02-deploy-artemis-service.md) — bring up / upgrade artemis on `gxy-cassiopeia`.
+- [`03-artemis-postdeploy-check.md`](https://github.com/freeCodeCamp/infra/blob/main/docs/runbooks/03-artemis-postdeploy-check.md) — E2E verification after any artemis chart change.
 
-## Field notes
+## Repo layout
 
-Operational findings from building this CLI live upstream at [`Universe/spike/field-notes/archive/2026-05-10/universe-cli.md`](https://github.com/freeCodeCamp-Universe/Universe/blob/main/spike/field-notes/archive/2026-05-10/universe-cli.md) (frozen 2026-05-10). New findings should go to that team's current field-notes surface — not into this repo.
+```
+src/
+  cli.ts              # cac entry + command wiring
+  errors.ts           # typed error envelope
+  index.ts            # bin entry → cli.ts
+  commands/           # per-verb handlers (deploy, promote, rollback, ls, login, …)
+  deploy/             # upload pipeline (tar, ignore, progress)
+  lib/                # platform-yaml, identity, proxy-client, constants
+  output/             # exit-codes, JSON envelopes, terminal formatters
+tests/
+  e2e/                # in-process fake-artemis + spawned-binary smoke
+  commands/ deploy/ lib/ output/   # unit, mirrors src/
+dist/                 # tsup output (ESM index.js + CJS index.cjs for SEA)
+```
+
+## Build & test
+
+```sh
+pnpm install
+pnpm lint            # oxlint
+pnpm test            # vitest run
+pnpm typecheck       # tsc --noEmit
+pnpm build           # tsup → dist/
+pnpm test:smoke      # opt-in: real-artemis smoke against uploads.freecode.camp
+```
+
+`pre-commit` (husky) runs lint + typecheck + test on every commit. Node 24+ required.
 
 ## Internal conventions
 
-- **Test layout is `tests/**`, not co-located.** Mirrors `src/{commands,deploy,lib,output}`. The pre-pivot RFC prescribing `src/*.test.ts` was a doc bug — now archaeology.
-- **Exit codes are stable contracts.** `src/output/exit-codes.ts` is the single export point; callers import constants, never hard-code integers. `EXIT_OUTPUT_DIR (14)`, `EXIT_ALIAS (16)`, and `EXIT_DEPLOY_NOT_FOUND (17)` are defined but have no command consumer today; `tests/output/exit-codes.test.ts` pins the integer values so the slots stay reserved.
-- **Site-name validation is D19-constrained:** lowercase letters, digits, and single hyphens; 1–63 chars; no leading, trailing, or consecutive hyphens. See `src/lib/platform-yaml.schema.ts` `SITE_NAME_PATTERN`.
-- **`platform.yaml` is v2 only.** Schema in `src/lib/platform-yaml.schema.ts` (`{site, build?, deploy}`). v1 fragments (`name`, `r2`, `bucket`, `rclone_remote`, `region`, `stack`, `domain`, `static`) trigger an explicit migration error in `src/lib/platform-yaml.ts`.
-- **Config precedence:** CLI flags > env > `platform.yaml` defaults. Recognized env: `UNIVERSE_PROXY_URL` (default `https://uploads.freecode.camp`) and `UNIVERSE_GH_CLIENT_ID` (overrides `DEFAULT_GH_CLIENT_ID`). No `UNIVERSE_STATIC_*` vars.
-- **Identity resolution is a 3-slot priority chain** (ADR-016 Q10, post-F7), implemented in `src/lib/identity.ts`: `$GITHUB_TOKEN` / `$GH_TOKEN` → `gh auth token` → device-flow stored token at `~/.config/universe-cli/token` (mode 0600). GHA OIDC and Woodpecker OIDC slots were dropped in v0.4 — artemis validates bearers via GitHub `GET /user`, which only accepts user-scoped tokens. Re-add when artemis grows an OIDC verifier.
-- **No secrets, no `.env` reads** anywhere in the CLI. Credentials come from the identity chain (env / `gh` / device-flow) or the `UNIVERSE_PROXY_URL` env var, never disk.
-- **Binaries published two ways.** npm tarball ships `dist/` (ESM `index.js` for `node`/Bun consumers + CJS `index.cjs` for SEA), `README.md`, and `LICENSE` (see `package.json` `files`). SEA artifacts (`sea-config.json` consumes `dist/index.cjs`; `entitlements.plist` + ad-hoc `codesign` on macOS) build the four-platform signed binaries attached to GitHub Releases.
-- **Release flow is OIDC-only.** `Actions → Release` workflow_dispatch publishes to npm via Trusted Publisher (`freeCodeCamp-Universe/universe-cli/release.yml`). No `NPM_TOKEN`. Prerelease versions (`*-alpha.*`, `*-beta.*`, `*-rc.*`) publish under a non-`latest` dist-tag; `release.yml` derives `--tag` from the version string.
-- **E2E test layer lives at `tests/e2e/`** and runs in the existing `pnpm test` gate. Two layers share `tests/e2e/_helpers/`: an in-process layer that calls command handlers (`deploy({...}, deps)`) with the **real** `proxy-client` against a stateful `fake-artemis.ts` (`http.createServer` mirroring the 11 routes from `src/lib/proxy-client.ts:11-25`), and a spawned-binary smoke matrix (`binary-smoke.test.ts`) that boots `dist/index.js` once via `beforeAll` to catch ESM-loader / tsup-output / `__VERSION__` / cac-dispatch regressions. The harness wires through `UNIVERSE_PROXY_URL` (premise-checked: comment in `src/lib/constants.ts:22`) and a per-test `mkdtemp` `XDG_CONFIG_HOME` so tests stay parallel-safe. Add a verb: copy `tests/e2e/whoami.test.ts` as a template; extend `fake-artemis.ts` with the route the verb hits.
-- **Real-artemis smoke is opt-in via `pnpm test:smoke`.** `tests/e2e/smoke-real-artemis.test.ts` is gated on `UNIVERSE_E2E_REAL=1` (set only by the script) and points the real `proxy-client` at `UNIVERSE_REAL_PROXY_URL` (default `https://uploads.freecode.camp`). Required env: `UNIVERSE_REAL_SITE` (a pre-registered throwaway slug — the smoke does NOT register/delete sites). Optional env: `UNIVERSE_REAL_TOKEN` (a GitHub token authorized for the test site; if absent, the identity chain falls through to `gh auth token` so no env extraction is needed when `gh` is logged in). The canonical fixture source is `freeCodeCamp-Universe/test-universe` (slug `test`, served at `test.freecode.camp`); the smoke writes its own tmp marker files at runtime — no on-disk fixture is read. The 4 tests cover `whoami`, `static ls`, `static deploy` (preview), and `static deploy --promote` — the last one fetches the public URL with cache busting and asserts the response body contains a freshly-deployed marker, which is the closed-loop test for the "sites not updating" complaint. Run example: `UNIVERSE_REAL_SITE=test pnpm test:smoke`.
+- **Tests live under `tests/**`**, mirroring `src/{commands,deploy,lib,output}`. Never co-located.
+- **Exit codes are a stable contract.** Defined in `src/output/exit-codes.ts`; callers import constants, never integers.
+- **Site-name validation:** lowercase letters, digits, single hyphens; 1–63 chars; no leading/trailing/consecutive hyphens. Source: `SITE_NAME_PATTERN` in `src/lib/platform-yaml.schema.ts`.
+- **`platform.yaml` schema** lives in `src/lib/platform-yaml.schema.ts` (`{site, build?, deploy}`). Strict — unknown keys reject.
+- **Config precedence:** CLI flags > env > `platform.yaml` defaults. Recognized env: `UNIVERSE_PROXY_URL`, `UNIVERSE_GH_CLIENT_ID`.
+- **Identity is a 3-slot priority chain** in `src/lib/identity.ts`: `$GITHUB_TOKEN` / `$GH_TOKEN` → `gh auth token` → device-flow token at `~/.config/universe-cli/token` (mode 0600). artemis validates bearers via GitHub `GET /user`.
+- **No secrets, no `.env` reads.** Credentials come from the identity chain or `UNIVERSE_PROXY_URL`, never disk.
+- **npm tarball ships `dist/` + `README.md` + `LICENSE`** (see `package.json` `files`). SEA artifacts (`sea-config.json` + `entitlements.plist` + ad-hoc `codesign` on macOS) build the four-platform signed binaries attached to GitHub Releases.
+- **Release is OIDC-only.** `Actions → Release` publishes to npm via Trusted Publisher. No `NPM_TOKEN`. Prereleases (`*-alpha.*`, `*-beta.*`, `*-rc.*`) publish under a non-`latest` dist-tag.
+- **E2E layer at `tests/e2e/`** runs inside `pnpm test`. Two slices share `tests/e2e/_helpers/`: in-process tests call command handlers (`deploy({...}, deps)`) with the real `proxy-client` against a stateful `fake-artemis.ts` (`http.createServer` mirroring proxy routes); a spawned-binary smoke (`binary-smoke.test.ts`) boots `dist/index.js` once via `beforeAll` to catch ESM-loader / tsup / cac regressions. Per-test `mkdtemp` `XDG_CONFIG_HOME` keeps runs parallel-safe. Add a verb: copy `tests/e2e/whoami.test.ts` and extend `fake-artemis.ts` with the route it hits.
+- **`pnpm test:smoke`** runs `tests/e2e/smoke-real-artemis.test.ts` against the live proxy. Gated on `UNIVERSE_E2E_REAL=1` (set by the script). Required: `UNIVERSE_REAL_SITE` (pre-registered slug — smoke does NOT register/delete). Optional: `UNIVERSE_REAL_TOKEN` (else falls through to `gh auth token`). Default proxy `https://uploads.freecode.camp`; override via `UNIVERSE_REAL_PROXY_URL`. Covers `whoami`, `static ls`, `static deploy` (preview), `static deploy --promote` — the last fetches the public URL with cache busting and asserts a freshly-deployed marker. Run: `UNIVERSE_REAL_SITE=test pnpm test:smoke`.
+
+## Where to file work
+
+- **Bugs / features** — [GitHub issues](https://github.com/freeCodeCamp-Universe/universe-cli/issues).
+- **CLI ↔ artemis contract changes** — open an ADR amendment upstream (ADR-016). Do not extend in this repo.

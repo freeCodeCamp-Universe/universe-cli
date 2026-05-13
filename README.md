@@ -19,7 +19,7 @@ universe <command>
 
 <details>
   <summary>
-    Download the latest binary from [Releases](../../releases):
+    Download the latest binary from <a href="https://github.com/freeCodeCamp-Universe/universe-cli/releases">Releases</a>:
   </summary>
 
 ```sh
@@ -91,9 +91,7 @@ The CLI resolves a GitHub identity in this order — first match wins:
 1. `gh auth token` shell-out (laptop with `gh` installed)
 1. Device-flow stored token at `~/.config/universe-cli/token`
 
-GHA OIDC and Woodpecker OIDC slots were dropped in v0.4: artemis validates bearers via GitHub `GET /user`, which only accepts user-scoped tokens. CI runners must export `$GITHUB_TOKEN` explicitly. The slots will return once artemis grows an OIDC verifier.
-
-The proxy validates whatever it receives via GitHub `GET /user`, then authorizes against the registry server-side (Valkey-backed; the `sites_yaml` backend was retired in artemis `f115198`). Run `universe whoami` to see which slot resolved; inspect the sites you can deploy to with `universe sites ls --mine`.
+CI runners must export `$GITHUB_TOKEN` explicitly. artemis validates the bearer via GitHub `GET /user`, then authorizes server-side against the Valkey-backed registry. Run `universe whoami` to see which slot resolved; inspect the sites you can deploy to with `universe sites ls --mine`.
 
 ## Configuration (`platform.yaml`)
 
@@ -109,45 +107,7 @@ No credential fields. The proxy holds the R2 admin key; the CLI never reads or w
 
 ## Common flows
 
-Staff onboarding + deploy lifecycle:
-
-```sh
-# 1. Authenticate (laptop, first time)
-universe login
-
-# 2. Identity + how many sites you can deploy to
-universe whoami
-
-# 3. List your authorized sites (intersects registry with your GH teams)
-universe sites ls --mine
-
-# 4. From your site repo: deploy to preview (reads ./platform.yaml)
-universe static deploy
-
-# 5. Inspect recent deploys for the current site
-universe static ls
-
-# 6. Promote preview to production
-universe static promote
-
-# 7. Roll production back to a past deploy
-universe static rollback --to 20260427-141522-abc1234
-```
-
-Registry admin (staff team only — gated server-side by artemis's `REGISTRY_AUTHZ_TEAM`, default `staff`):
-
-```sh
-# Register a new site (defaults --team to staff)
-universe sites register hello-universe --team bots,staff
-
-# Add or replace the teams list on an existing site
-universe sites update hello-universe --team bots,staff,curriculum
-
-# Delete a site from the registry (R2 bytes age out via cleanup cron)
-universe sites rm hello-universe
-```
-
-CI (GitHub Actions) — pass `$GITHUB_TOKEN` explicitly (slot 1). The OIDC slot will return once artemis grows an OIDC verifier. Full operator walkthrough: [`docs/STAFF-GUIDE.md`](docs/STAFF-GUIDE.md).
+Full operator walkthrough (login → deploy → promote → rollback, CI shape, registry admin, troubleshooting) lives in [`docs/STAFF-GUIDE.md`](docs/STAFF-GUIDE.md).
 
 ## Environment overrides
 

@@ -1,8 +1,6 @@
 # Deploying a Static Site
 
-This guide walks a staff user through deploying a static site to `*.freecode.camp` end-to-end. It targets **CLI v0.5.x** (post-pivot: identity-only client; artemis proxy holds the R2 admin credentials).
-
-> Authoritative contract: [Universe ADR-016 — Deploy proxy](https://github.com/freeCodeCamp-Universe/Universe/blob/main/decisions/016-deploy-proxy.md). Schema reference: [`platform-yaml.md`](platform-yaml.md). CLI surface summary: [`../README.md`](../README.md#cli-surface).
+Walkthrough for staff deploying a site to `*.freecode.camp` end-to-end. Schema: [`platform-yaml.md`](platform-yaml.md). Architecture, ADR-016, runbooks, internal conventions: [`README.md`](README.md).
 
 ## Prerequisites
 
@@ -27,7 +25,7 @@ Check it worked:
 universe whoami
 ```
 
-This prints the resolved GitHub identity, which **slot** of the [identity chain](#identity-sources) fired (useful when CI behaves differently from your laptop), and the count of sites the proxy authorizes you for. To see the actual site list:
+This prints the resolved GitHub identity, which **slot** of the identity chain fired (useful when CI behaves differently from your laptop — see [`../README.md#identity-priority-chain`](../README.md#identity-priority-chain)), and the count of sites the proxy authorizes you for. To see the actual site list:
 
 ```sh
 universe sites ls --mine
@@ -138,7 +136,7 @@ Pass `$GITHUB_TOKEN` explicitly — it's slot 1 of the identity chain:
     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-`--promote` finalizes as production directly, which is the usual CI shape when your branch is `main`. An OIDC slot will return once artemis grows an OIDC verifier.
+`--promote` finalizes as production directly — the usual CI shape on `main`.
 
 ### Use a non-prod proxy (staging)
 
@@ -172,18 +170,6 @@ universe sites rm <slug>                                # delete entry (R2 bytes
 
 `--team` accepts a comma-separated list and can be passed multiple times. Teams refer to GitHub team slugs in the freeCodeCamp org.
 
-## Identity sources
-
-The CLI resolves a GitHub identity in this order — first match wins:
-
-1. `$GITHUB_TOKEN` / `$GH_TOKEN`
-1. `gh auth token` (laptop with `gh` installed)
-1. Device-flow stored token at `~/.config/universe-cli/token`
-
-GHA OIDC and Woodpecker OIDC slots were dropped in v0.4 — artemis validates bearers via GitHub `GET /user`, which only accepts user-scoped tokens. The slots will return once artemis grows an OIDC verifier. CI runners must pass `$GITHUB_TOKEN` explicitly.
-
-If `universe whoami` shows a different identity than expected, the most common cause is an env var (slot 1) overriding your laptop login (slot 3). Unset `GITHUB_TOKEN` for that shell or use a fresh terminal.
-
 ## When something breaks
 
 | Symptom                                      | Try                                                                                                                                                                                                                                                                                                                                                                                  |
@@ -193,11 +179,6 @@ If `universe whoami` shows a different identity than expected, the most common c
 | `not a git repository`                       | The CLI stamps deploy ids with a git sha. Initialize git in the project, or run from inside one.                                                                                                                                                                                                                                                                                     |
 | Wrong identity resolved                      | Run `universe whoami` to see which slot fired. Unset `GITHUB_TOKEN` if you didn't intend it.                                                                                                                                                                                                                                                                                         |
 
+If `universe whoami` shows a different identity than expected, the most common cause is an env var (slot 1) overriding your laptop login (slot 3). Unset `GITHUB_TOKEN` for that shell or use a fresh terminal.
+
 For anything else — file an issue with the output of `universe whoami --json` and the failing command's `--json` envelope.
-
-## See also
-
-- [`../README.md`](../README.md) — install + full CLI surface + env vars
-- [`platform-yaml.md`](platform-yaml.md) — `platform.yaml` schema reference
-- [`RELEASING.md`](RELEASING.md) — how the CLI itself ships (maintainers)
-- [ADR-016](https://github.com/freeCodeCamp-Universe/Universe/blob/main/decisions/016-deploy-proxy.md) — full CLI ↔ artemis contract

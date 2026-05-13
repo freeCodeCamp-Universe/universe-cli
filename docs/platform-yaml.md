@@ -1,10 +1,6 @@
 # `platform.yaml` — schema reference
 
-`platform.yaml` lives at the repo root and tells `universe static deploy` what to build and how to deploy. It is the **only** config the CLI reads.
-
-This document covers schema **v2** (CLI v0.4+).
-
-> **Locked by:** [Universe ADR-016 §`platform.yaml` schema](https://github.com/freeCodeCamp-Universe/Universe/blob/main/decisions/016-deploy-proxy.md), Sprint 2026-04-26 DECISIONS Q9–Q15.
+`platform.yaml` lives at the repo root and tells `universe static deploy` what to build and how to deploy. It is the **only** config the CLI reads. Contract owner: ADR-016 (link in [`README.md`](README.md)).
 
 ## Minimal example
 
@@ -38,7 +34,7 @@ deploy:
 
 Becomes the public URL: `<site>.freecode.camp` (production) and `<site>.preview.freecode.camp` (preview).
 
-**Validation rules** (carry-forward from D19 + D37):
+**Validation rules:**
 
 - Lowercase letters, digits, single hyphens.
 - 1–63 characters.
@@ -81,10 +77,9 @@ Omit `deploy:` entirely to take all defaults.
 
 ## Strict validation
 
-The schema is **strict**: unknown keys at any level are rejected. This catches accidental v1 fragments and typos (`bukcet:`, `Site:`) up-front.
+The schema is **strict**: unknown keys at any level are rejected. Catches typos (`bukcet:`, `Site:`) up-front.
 
 ## See also
 
-- [Universe ADR-016 — Deploy proxy](https://github.com/freeCodeCamp-Universe/Universe/blob/main/decisions/016-deploy-proxy.md)
-- [Sprint 2026-04-26 DECISIONS](https://github.com/freeCodeCamp/infra/blob/main/docs/sprints/2026-04-26/DECISIONS.md)
-- [Staff Guide](STAFF-GUIDE.md)
+- [Staff Guide](STAFF-GUIDE.md) — deploy walkthrough that consumes this file.
+- [`README.md`](README.md) — project overview.
