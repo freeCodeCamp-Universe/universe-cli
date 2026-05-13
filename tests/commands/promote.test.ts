@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { promote } from "../../src/commands/promote.js";
-import { ProxyError } from "../../src/lib/proxy-client.js";
+import { AliasDriftError, ProxyError } from "../../src/lib/proxy-client.js";
 
 const VALID_YAML = "site: my-site\n";
 
@@ -52,6 +52,7 @@ interface FakeDeps {
   logSuccess: ReturnType<typeof vi.fn>;
   logError: ReturnType<typeof vi.fn>;
   exit: ReturnType<typeof vi.fn>;
+  promptConfirm: ReturnType<typeof vi.fn>;
 }
 
 function mkDeps(overrides: Partial<FakeDeps> = {}): FakeDeps {
@@ -69,6 +70,7 @@ function mkDeps(overrides: Partial<FakeDeps> = {}): FakeDeps {
     exit: vi.fn().mockImplementation((_code: number) => {
       throw new Error("__exit__");
     }),
+    promptConfirm: vi.fn().mockResolvedValue(false),
     ...overrides,
   };
 }
@@ -218,5 +220,75 @@ describe("promote command", () => {
     expect(deps.logError).toHaveBeenCalledWith(
       expect.stringContaining("no team"),
     );
+  });
+
+  describe("409 alias_drift handling", () => {
+    it("JSON mode emits envelope with top-level current field, no retry", async () => {
+      const proxy = mkProxy();
+      proxy.sitePromote.mockRejectedValueOnce(
+        new AliasDriftError("drift", "actual-prod-id"),
+      );
+      const deps = mkDeps({
+        createProxyClient: vi.fn().mockReturnValue(proxy),
+      });
+      const stdout: string[] = [];
+      const spy = vi
+        .spyOn(process.stdout, "write")
+        .mockImplementation((chunk: unknown) => {
+          stdout.push(String(chunk));
+          return true;
+        });
+      await expect(promote({ json: true }, deps)).rejects.toThrow("__exit__");
+      spy.mockRestore();
+      const env = JSON.parse(stdout.join("").trim());
+      expect(env.success).toBe(false);
+      expect(env.current).toBe("actual-prod-id");
+      expect((env.error as { message: string }).message).toContain(
+        "alias_drift",
+      );
+      expect(deps.exit).toHaveBeenCalledWith(10);
+      expect(deps.promptConfirm).not.toHaveBeenCalled();
+      expect(proxy.sitePromote).toHaveBeenCalledTimes(1);
+    });
+
+    it("non-JSON one-shot retry on confirm=yes re-pins with server current", async () => {
+      const proxy = mkProxy();
+      proxy.sitePromote
+        .mockRejectedValueOnce(new AliasDriftError("drift", "actual-prod-id"))
+        .mockResolvedValueOnce({
+          url: "https://my-site.freecode.camp",
+          deployId: "PREV1",
+        });
+      const deps = mkDeps({
+        createProxyClient: vi.fn().mockReturnValue(proxy),
+        promptConfirm: vi.fn().mockResolvedValue(true),
+      });
+      await promote({ json: false }, deps);
+      expect(deps.exit).not.toHaveBeenCalled();
+      expect(deps.promptConfirm).toHaveBeenCalledTimes(1);
+      expect(proxy.sitePromote).toHaveBeenCalledTimes(2);
+      expect(proxy.sitePromote).toHaveBeenNthCalledWith(2, {
+        site: "my-site",
+        deployId: "PREV1",
+        expectedCurrent: "actual-prod-id",
+      });
+      expect(deps.logError).toHaveBeenCalledWith(
+        expect.stringMatching(/drift.*actual-prod-id/),
+      );
+    });
+
+    it("non-JSON confirm=no exits with EXIT_USAGE, no retry", async () => {
+      const proxy = mkProxy();
+      proxy.sitePromote.mockRejectedValueOnce(
+        new AliasDriftError("drift", "actual-prod-id"),
+      );
+      const deps = mkDeps({
+        createProxyClient: vi.fn().mockReturnValue(proxy),
+        promptConfirm: vi.fn().mockResolvedValue(false),
+      });
+      await expect(promote({ json: false }, deps)).rejects.toThrow("__exit__");
+      expect(deps.exit).toHaveBeenCalledWith(10);
+      expect(proxy.sitePromote).toHaveBeenCalledTimes(1);
+    });
   });
 });

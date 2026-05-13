@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { log } from "@clack/prompts";
+import { confirm, isCancel, log } from "@clack/prompts";
 import { ConfigError, CredentialError } from "../errors.js";
 import { DEFAULT_PROXY_URL } from "../lib/constants.js";
 import { resolveIdentity as defaultResolveIdentity } from "../lib/identity.js";
@@ -9,6 +9,7 @@ import {
   type PlatformYamlV2,
 } from "../lib/platform-yaml.js";
 import {
+  AliasDriftError,
   createProxyClient as defaultCreateProxyClient,
   wrapProxyError,
   type ProxyClient,
@@ -32,7 +33,14 @@ export interface PromoteDeps {
   logSuccess?: (msg: string) => void;
   logError?: (msg: string) => void;
   exit?: (code: number) => never;
+  promptConfirm?: (msg: string) => Promise<boolean>;
 }
+
+const defaultPromptConfirm = async (msg: string): Promise<boolean> => {
+  const r = await confirm({ message: msg, initialValue: false });
+  if (isCancel(r)) return false;
+  return r === true;
+};
 
 const defaultReadPlatformYaml = async (cwd: string): Promise<string> => {
   return readFile(resolve(cwd, "platform.yaml"), "utf-8");
@@ -77,6 +85,7 @@ export async function promote(
   const success = deps.logSuccess ?? ((s: string) => log.success(s));
   const error = deps.logError ?? ((s: string) => log.error(s));
   const exit = deps.exit ?? exitWithCode;
+  const promptConfirm = deps.promptConfirm ?? defaultPromptConfirm;
 
   try {
     const identity = await resolveId({ env });
@@ -127,11 +136,31 @@ export async function promote(
           `Promoting ${preview.deployId} → ${prod?.deployId ?? "<none>"}`,
         );
       }
-      result = await client.sitePromote({
-        site: config.site,
-        deployId: preview.deployId,
-        expectedCurrent: prod?.deployId ?? "",
-      });
+      const initialExpected = prod?.deployId ?? "";
+      try {
+        result = await client.sitePromote({
+          site: config.site,
+          deployId: preview.deployId,
+          expectedCurrent: initialExpected,
+        });
+      } catch (err) {
+        if (!(err instanceof AliasDriftError)) throw err;
+        // V4: single-shot retry on non-JSON only. JSON path falls through
+        // to outer catch which renders the envelope with `current`.
+        if (options.json) throw err;
+        error(
+          `drift: production moved to ${err.current}, expected ${initialExpected}`,
+        );
+        const ok = await promptConfirm(
+          `Retry promote with expectedCurrent='${err.current}'?`,
+        );
+        if (!ok) throw err;
+        result = await client.sitePromote({
+          site: config.site,
+          deployId: preview.deployId,
+          expectedCurrent: err.current,
+        });
+      }
     }
 
     if (options.json) {
@@ -163,7 +192,14 @@ export async function promote(
   } catch (err) {
     const { code, message } = wrapProxyError("promote", err);
     if (options.json) {
-      emitJson(buildErrorEnvelope("promote", code, message));
+      const envelope = buildErrorEnvelope("promote", code, message);
+      if (err instanceof AliasDriftError) {
+        // V3 additive: top-level `current` so scripted callers can
+        // branch + supply a fresh expectedCurrent on next attempt.
+        emitJson({ ...envelope, current: err.current });
+      } else {
+        emitJson(envelope);
+      }
     } else {
       error(message);
     }
