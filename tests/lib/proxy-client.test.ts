@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { createProxyClient, ProxyError } from "../../src/lib/proxy-client.js";
+import {
+  AliasDriftError,
+  createProxyClient,
+  ProxyError,
+} from "../../src/lib/proxy-client.js";
 import {
   EXIT_CREDENTIALS,
   EXIT_STORAGE,
@@ -392,6 +396,77 @@ describe("createProxyClient", () => {
       expect(getInit(fetchMock.mock.calls[0]).method).toBe("POST");
       expect(r.deployId).toBe("y");
     });
+
+    it("passes deployId + expectedCurrent body when provided", async () => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValue(jsonResponse(200, { url: "x", deployId: "new-id" }));
+      const client = createProxyClient({
+        baseUrl,
+        getAuthToken,
+        fetch: fetchMock,
+      });
+      await client.sitePromote({
+        site: "my-site",
+        deployId: "new-id",
+        expectedCurrent: "old-id",
+      });
+      const init = getInit(fetchMock.mock.calls[0]);
+      expect(init.headers["Content-Type"]).toBe("application/json");
+      expect(JSON.parse(init.body as string)).toEqual({
+        deployId: "new-id",
+        expectedCurrent: "old-id",
+      });
+    });
+
+    it("sends empty-string expectedCurrent to assert no-prod-yet", async () => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValue(jsonResponse(200, { url: "x", deployId: "new-id" }));
+      const client = createProxyClient({
+        baseUrl,
+        getAuthToken,
+        fetch: fetchMock,
+      });
+      await client.sitePromote({
+        site: "my-site",
+        deployId: "new-id",
+        expectedCurrent: "",
+      });
+      const init = getInit(fetchMock.mock.calls[0]);
+      expect(JSON.parse(init.body as string)).toEqual({
+        deployId: "new-id",
+        expectedCurrent: "",
+      });
+    });
+
+    it("throws AliasDriftError on 409 alias_drift with current field", async () => {
+      const fetchMock = vi.fn().mockResolvedValue(
+        jsonResponse(409, {
+          error: { code: "alias_drift", message: "drift detected" },
+          site: "my-site",
+          current: "actual-id",
+        }),
+      );
+      const client = createProxyClient({
+        baseUrl,
+        getAuthToken,
+        fetch: fetchMock,
+      });
+      const err = (await client
+        .sitePromote({
+          site: "my-site",
+          deployId: "new-id",
+          expectedCurrent: "stale-id",
+        })
+        .catch((e: unknown) => e)) as AliasDriftError;
+      expect(err).toBeInstanceOf(AliasDriftError);
+      expect(err).toBeInstanceOf(ProxyError);
+      expect(err.status).toBe(409);
+      expect(err.code).toBe("alias_drift");
+      expect(err.current).toBe("actual-id");
+      expect(err.exitCode).toBe(EXIT_USAGE);
+    });
   });
 
   describe("siteRollback", () => {
@@ -412,6 +487,51 @@ describe("createProxyClient", () => {
       expect(init.method).toBe("POST");
       expect(JSON.parse(init.body as string)).toEqual({ to: "old" });
       expect(r.deployId).toBe("old");
+    });
+
+    it("includes expectedCurrent in body when provided", async () => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValue(jsonResponse(200, { url: "x", deployId: "old" }));
+      const client = createProxyClient({
+        baseUrl,
+        getAuthToken,
+        fetch: fetchMock,
+      });
+      await client.siteRollback({
+        site: "my-site",
+        to: "old-id",
+        expectedCurrent: "current-id",
+      });
+      const init = getInit(fetchMock.mock.calls[0]);
+      expect(JSON.parse(init.body as string)).toEqual({
+        to: "old-id",
+        expectedCurrent: "current-id",
+      });
+    });
+
+    it("throws AliasDriftError on 409 with current field", async () => {
+      const fetchMock = vi.fn().mockResolvedValue(
+        jsonResponse(409, {
+          error: { code: "alias_drift", message: "drift" },
+          site: "my-site",
+          current: "newer-id",
+        }),
+      );
+      const client = createProxyClient({
+        baseUrl,
+        getAuthToken,
+        fetch: fetchMock,
+      });
+      const err = (await client
+        .siteRollback({
+          site: "my-site",
+          to: "old-id",
+          expectedCurrent: "stale-id",
+        })
+        .catch((e: unknown) => e)) as AliasDriftError;
+      expect(err).toBeInstanceOf(AliasDriftError);
+      expect(err.current).toBe("newer-id");
     });
   });
 

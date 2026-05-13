@@ -129,8 +129,16 @@ export interface ProxyClient {
     site: string;
     mode: DeployMode;
   }): Promise<AliasResponse | null>;
-  sitePromote(req: { site: string }): Promise<AliasResponse>;
-  siteRollback(req: { site: string; to: string }): Promise<AliasResponse>;
+  sitePromote(req: {
+    site: string;
+    deployId?: string;
+    expectedCurrent?: string;
+  }): Promise<AliasResponse>;
+  siteRollback(req: {
+    site: string;
+    to: string;
+    expectedCurrent?: string;
+  }): Promise<AliasResponse>;
   registerSite(req: RegisterSiteRequest): Promise<SiteRow>;
   listSites(): Promise<SiteRow[]>;
   updateSite(req: UpdateSiteRequest): Promise<SiteRow>;
@@ -153,6 +161,24 @@ export class ProxyError extends CliError {
     this.status = status;
     this.code = code;
     this.exitCode = mapExitCode(status);
+  }
+}
+
+/**
+ * Thrown when artemis returns 409 `alias_drift` — the server's
+ * observed alias state differs from the caller's `expectedCurrent`
+ * CAS guard. Carries the server's authoritative `current` value so
+ * callers can offer a one-shot retry with a fresh expectedCurrent.
+ *
+ * Wire shape: `{error:{code:"alias_drift", message}, site, current}`.
+ * Maps to EXIT_USAGE (operator error: stale state).
+ */
+export class AliasDriftError extends ProxyError {
+  readonly current: string;
+
+  constructor(message: string, current: string) {
+    super(409, "alias_drift", message);
+    this.current = current;
   }
 }
 
@@ -198,6 +224,7 @@ interface ProxyErrorEnvelope {
     code?: string;
     message?: string;
   };
+  current?: unknown;
 }
 
 function isProxyErrorEnvelope(value: unknown): value is ProxyErrorEnvelope {
@@ -209,9 +236,15 @@ function isProxyErrorEnvelope(value: unknown): value is ProxyErrorEnvelope {
   );
 }
 
+interface ErrorEnvelopeFields {
+  code: string;
+  message: string;
+  current?: string;
+}
+
 async function readErrorEnvelope(
   response: Response,
-): Promise<{ code: string; message: string }> {
+): Promise<ErrorEnvelopeFields> {
   const status = response.status;
   let raw: unknown;
   try {
@@ -223,15 +256,24 @@ async function readErrorEnvelope(
     };
   }
   if (isProxyErrorEnvelope(raw) && raw.error) {
+    const current = typeof raw.current === "string" ? raw.current : undefined;
     return {
       code: raw.error.code ?? `http_${status}`,
       message: raw.error.message ?? response.statusText ?? "request failed",
+      ...(current === undefined ? {} : { current }),
     };
   }
   return {
     code: `http_${status}`,
     message: response.statusText || "request failed",
   };
+}
+
+function throwProxyError(status: number, env: ErrorEnvelopeFields): never {
+  if (status === 409 && env.code === "alias_drift") {
+    throw new AliasDriftError(env.message, env.current ?? "");
+  }
+  throw new ProxyError(status, env.code, env.message);
 }
 
 function stripTrailingSlash(url: string): string {
@@ -257,7 +299,7 @@ export function createProxyClient(cfg: ProxyClientConfig): ProxyClient {
     }
     if (!response.ok) {
       const env = await readErrorEnvelope(response);
-      throw new ProxyError(response.status, env.code, env.message);
+      throwProxyError(response.status, env);
     }
     // 204 no-content: cast empty
     if (response.status === 204) {
@@ -352,24 +394,35 @@ export function createProxyClient(cfg: ProxyClientConfig): ProxyClient {
       if (response.status === 404) return null;
       if (!response.ok) {
         const env = await readErrorEnvelope(response);
-        throw new ProxyError(response.status, env.code, env.message);
+        throwProxyError(response.status, env);
       }
       return (await response.json()) as AliasResponse;
     },
 
     async sitePromote(req) {
       const url = `${base}/api/site/${encodeURIComponent(req.site)}/promote`;
+      const headers: Record<string, string> = {
+        Authorization: await userBearer(),
+        Accept: "application/json",
+      };
+      const body: Record<string, string> = {};
+      if (req.deployId !== undefined) body.deployId = req.deployId;
+      if (req.expectedCurrent !== undefined)
+        body.expectedCurrent = req.expectedCurrent;
+      const hasBody = Object.keys(body).length > 0;
+      if (hasBody) headers["Content-Type"] = "application/json";
       return call<AliasResponse>(url, {
         method: "POST",
-        headers: {
-          Authorization: await userBearer(),
-          Accept: "application/json",
-        },
+        headers,
+        ...(hasBody ? { body: JSON.stringify(body) } : {}),
       });
     },
 
     async siteRollback(req) {
       const url = `${base}/api/site/${encodeURIComponent(req.site)}/rollback`;
+      const body: Record<string, string> = { to: req.to };
+      if (req.expectedCurrent !== undefined)
+        body.expectedCurrent = req.expectedCurrent;
       return call<AliasResponse>(url, {
         method: "POST",
         headers: {
@@ -377,7 +430,7 @@ export function createProxyClient(cfg: ProxyClientConfig): ProxyClient {
           Accept: "application/json",
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ to: req.to }),
+        body: JSON.stringify(body),
       });
     },
 
