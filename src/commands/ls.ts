@@ -50,12 +50,18 @@ interface ParsedDeploy {
 }
 
 /**
- * Deploy id format from artemis is `YYYYMMDD-HHMMSS-<sha>` per
- * `internal/r2/r2.go` `NewDeployID`. Pull the timestamp + sha out for
- * presentation; surface a null pair if the id doesn't match (forward-
- * compat with future deploy id schemes).
+ * Deploy id format from artemis is `YYYYMMDD-HHMMSS-<suffix>` per
+ * `internal/r2/r2.go` `NewDeployID`. Pull the timestamp + suffix out
+ * for presentation; surface a null pair if the id doesn't match
+ * (forward-compat with future deploy id schemes).
+ *
+ * Suffix is `\S+` to match server validation in
+ * `internal/handler/site.go` `deployIDPattern` — accepts hex SHAs,
+ * `nogit-N` fallbacks (when the build dir isn't a git checkout), and
+ * any future suffix shape. Narrower client regex (V8) silently drops
+ * valid ids on `static ls`.
  */
-const DEPLOY_ID_RE = /^(\d{8})-(\d{6})-([a-f0-9]+)$/i;
+const DEPLOY_ID_RE = /^(\d{8})-(\d{6})-(\S+)$/;
 
 function parseDeployId(deployId: string): ParsedDeploy {
   const m = DEPLOY_ID_RE.exec(deployId);

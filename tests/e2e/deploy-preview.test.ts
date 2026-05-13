@@ -174,7 +174,7 @@ describe("static deploy preview E2E (real proxy-client + real upload)", () => {
     expect(r.envelope!["fileCount"]).toBe(3);
     expect(r.envelope!["sha"]).toBe("deadbeefcafe1234");
     const deployId = r.envelope!["deployId"] as string;
-    expect(deployId).toMatch(/^\d{8}-\d{6}-[a-f0-9]+$/i);
+    expect(deployId).toMatch(/^\d{8}-\d{6}-\S+$/);
     expect(r.envelope!["url"]).toBe(`https://${site}.preview.freecode.camp`);
 
     const deploy = server.state.deploys.get(deployId);

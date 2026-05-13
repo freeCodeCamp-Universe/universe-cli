@@ -189,7 +189,7 @@ describe("static deploy --promote E2E (alpha trip-wire for B1)", () => {
     expect(r.envelope!["mode"]).toBe("production");
     expect(r.envelope!["site"]).toBe(site);
     const deployId = r.envelope!["deployId"] as string;
-    expect(deployId).toMatch(/^\d{8}-\d{6}-[a-f0-9]+$/i);
+    expect(deployId).toMatch(/^\d{8}-\d{6}-\S+$/);
     expect(r.envelope!["url"]).toBe(`https://${site}.freecode.camp`);
 
     expect(server.state.aliases.production.get(site)).toBe(deployId);

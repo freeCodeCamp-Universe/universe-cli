@@ -199,7 +199,7 @@ describe.skipIf(!REAL_E2E)("real-artemis smoke (opt-in)", () => {
     expect(r.captured.code).toBeUndefined();
     expect(r.envelope!["mode"]).toBe("preview");
     const newDeployId = r.envelope!["deployId"] as string;
-    expect(newDeployId).toMatch(/^\d{8}-\d{6}-[a-f0-9]+$/i);
+    expect(newDeployId).toMatch(/^\d{8}-\d{6}-\S+$/);
 
     const lsResult = await captureJsonRun(() =>
       staticLs(
@@ -254,7 +254,7 @@ describe.skipIf(!REAL_E2E)("real-artemis smoke (opt-in)", () => {
     expect(r.envelope!["mode"]).toBe("production");
     const newDeployId = r.envelope!["deployId"] as string;
     const publicUrl = r.envelope!["url"] as string;
-    expect(newDeployId).toMatch(/^\d{8}-\d{6}-[a-f0-9]+$/i);
+    expect(newDeployId).toMatch(/^\d{8}-\d{6}-\S+$/);
     expect(publicUrl).toMatch(/^https:\/\//);
 
     const lsResult = await captureJsonRun(() =>

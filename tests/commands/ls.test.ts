@@ -201,6 +201,44 @@ describe("ls command", () => {
     ]);
   });
 
+  it("parses nogit-* deploy ids (server-issued when sha unavailable)", async () => {
+    // V8: client DEPLOY_ID_RE must not be narrower than artemis-server's
+    // `^\d{8}-\d{6}-\S+$` (internal/handler/site.go). Hex-only client
+    // regex would reject this valid id and surface it as unparseable.
+    const proxy = mkProxy();
+    proxy.siteDeploys.mockResolvedValue([
+      { deployId: "20260513-120000-nogit-7" },
+      { deployId: "20260512-090000-abc1234" },
+    ]);
+    const deps = mkDeps({
+      createProxyClient: vi.fn().mockReturnValue(proxy),
+    });
+
+    const stdout: string[] = [];
+    const writeSpy = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation((chunk: unknown) => {
+        stdout.push(String(chunk));
+        return true;
+      });
+    await ls({ json: true }, deps);
+    writeSpy.mockRestore();
+
+    const env = JSON.parse(stdout.join("").trim());
+    expect(env.deploys).toEqual([
+      {
+        deployId: "20260513-120000-nogit-7",
+        timestamp: "2026-05-13T12:00:00Z",
+        sha: "nogit-7",
+      },
+      {
+        deployId: "20260512-090000-abc1234",
+        timestamp: "2026-05-12T09:00:00Z",
+        sha: "abc1234",
+      },
+    ]);
+  });
+
   it("falls back to deployId-only row when format unparseable", async () => {
     const proxy = mkProxy();
     proxy.siteDeploys.mockResolvedValue([{ deployId: "weird-id" }]);
