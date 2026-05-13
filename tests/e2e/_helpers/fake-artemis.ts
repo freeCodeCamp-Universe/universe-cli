@@ -453,6 +453,64 @@ async function handle(
     return;
   }
 
+  const aliasMatch = /^\/api\/site\/([^/]+)\/alias\/([^/]+)$/.exec(path);
+  if (method === "GET" && aliasMatch) {
+    const site = decodeURIComponent(aliasMatch[1]!);
+    const modeRaw = decodeURIComponent(aliasMatch[2]!);
+    const token = parseBearer(authorization);
+    const record = token ? state.tokens.get(token) : undefined;
+    if (!record) {
+      logAndSend(callLog, method, path, authorization, body, res, 401, {
+        error: { code: "unauth", message: "bad token" },
+      });
+      return;
+    }
+    if (modeRaw !== "preview" && modeRaw !== "production") {
+      logAndSend(callLog, method, path, authorization, body, res, 400, {
+        error: {
+          code: "bad_request",
+          message: `mode must be 'preview' or 'production', got '${modeRaw}'`,
+        },
+      });
+      return;
+    }
+    if (!state.registry.has(site)) {
+      logAndSend(callLog, method, path, authorization, body, res, 404, {
+        error: {
+          code: "not_found",
+          message: `site '${site}' is not registered`,
+        },
+      });
+      return;
+    }
+    if (!record.authorizedSites.includes(site)) {
+      logAndSend(callLog, method, path, authorization, body, res, 403, {
+        error: {
+          code: "site_unauthorized",
+          message: `not authorized for site '${site}'`,
+        },
+      });
+      return;
+    }
+    const mode = modeRaw as "preview" | "production";
+    const aliasId = state.aliases[mode].get(site);
+    if (!aliasId) {
+      logAndSend(callLog, method, path, authorization, body, res, 404, {
+        error: {
+          code: "not_found",
+          message: `no '${mode}' alias for site '${site}'`,
+        },
+      });
+      return;
+    }
+    const subdomain = mode === "preview" ? `${site}.preview` : site;
+    logAndSend(callLog, method, path, authorization, body, res, 200, {
+      url: `https://${subdomain}.freecode.camp`,
+      deployId: aliasId,
+    });
+    return;
+  }
+
   const promoteMatch = /^\/api\/site\/([^/]+)\/promote$/.exec(path);
   if (method === "POST" && promoteMatch) {
     const site = decodeURIComponent(promoteMatch[1]!);
@@ -473,8 +531,23 @@ async function handle(
       });
       return;
     }
-    const previewId = state.aliases.preview.get(site);
-    if (!previewId) {
+    // G3 body schema: {deployId?, expectedCurrent?}. Empty body = bare.
+    let parsed: { deployId?: string; expectedCurrent?: string } = {};
+    if (body.length > 0) {
+      try {
+        parsed = JSON.parse(body) as typeof parsed;
+      } catch {
+        logAndSend(callLog, method, path, authorization, body, res, 400, {
+          error: { code: "bad_request", message: "invalid JSON body" },
+        });
+        return;
+      }
+    }
+    const targetId =
+      typeof parsed.deployId === "string" && parsed.deployId.length > 0
+        ? parsed.deployId
+        : state.aliases.preview.get(site);
+    if (!targetId) {
       logAndSend(callLog, method, path, authorization, body, res, 404, {
         error: {
           code: "no_preview",
@@ -483,10 +556,25 @@ async function handle(
       });
       return;
     }
-    state.aliases.production.set(site, previewId);
+    // CAS guard: expectedCurrent !== undefined means client opted in.
+    if (parsed.expectedCurrent !== undefined) {
+      const currentProd = state.aliases.production.get(site) ?? "";
+      if (currentProd !== parsed.expectedCurrent) {
+        logAndSend(callLog, method, path, authorization, body, res, 409, {
+          error: {
+            code: "alias_drift",
+            message: `production alias is '${currentProd}', expected '${parsed.expectedCurrent}'`,
+          },
+          site,
+          current: currentProd,
+        });
+        return;
+      }
+    }
+    state.aliases.production.set(site, targetId);
     logAndSend(callLog, method, path, authorization, body, res, 200, {
       url: `https://${site}.freecode.camp`,
-      deployId: previewId,
+      deployId: targetId,
     });
     return;
   }

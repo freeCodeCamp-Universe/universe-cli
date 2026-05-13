@@ -146,9 +146,23 @@ describe("static promote E2E", () => {
 
     expect(server.state.aliases.production.get(site)).toBe(previewId);
 
-    expect(server.callLog).toHaveLength(1);
-    expect(server.callLog[0].method).toBe("POST");
-    expect(server.callLog[0].path).toBe(`/api/site/${site}/promote`);
+    // G3 body-pin: pre-flight GET alias/preview + GET alias/production,
+    // then POST /promote with {deployId, expectedCurrent}.
+    expect(server.callLog).toHaveLength(3);
+    expect(server.callLog[0]).toMatchObject({
+      method: "GET",
+      path: `/api/site/${site}/alias/preview`,
+    });
+    expect(server.callLog[1]).toMatchObject({
+      method: "GET",
+      path: `/api/site/${site}/alias/production`,
+    });
+    expect(server.callLog[2].method).toBe("POST");
+    expect(server.callLog[2].path).toBe(`/api/site/${site}/promote`);
+    expect(JSON.parse(server.callLog[2].body)).toEqual({
+      deployId: previewId,
+      expectedCurrent: "",
+    });
   });
 
   it("promote --from <deployId> calls rollback (alias rewrite to explicit id)", async () => {

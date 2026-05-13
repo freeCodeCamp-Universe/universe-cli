@@ -105,7 +105,33 @@ export async function promote(
         to: options.from,
       });
     } else {
-      result = await client.sitePromote({ site: config.site });
+      // G3 CAS body-pin: read both aliases first, then POST with
+      // {deployId, expectedCurrent}. expectedCurrent === "" is the
+      // documented "assert no prod yet" idiom for first-promote.
+      const preview = await client.getAlias({
+        site: config.site,
+        mode: "preview",
+      });
+      if (preview === null) {
+        throw new ConfigError(
+          "no preview alias to promote — run `universe static deploy` first",
+        );
+      }
+      const prod = await client.getAlias({
+        site: config.site,
+        mode: "production",
+      });
+      if (!options.json) {
+        // Pre-promote echo (RFC §G Phase 1 row 1).
+        success(
+          `Promoting ${preview.deployId} → ${prod?.deployId ?? "<none>"}`,
+        );
+      }
+      result = await client.sitePromote({
+        site: config.site,
+        deployId: preview.deployId,
+        expectedCurrent: prod?.deployId ?? "",
+      });
     }
 
     if (options.json) {

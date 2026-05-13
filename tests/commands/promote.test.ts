@@ -10,6 +10,7 @@ function mkProxy(): {
   deployUpload: ReturnType<typeof vi.fn>;
   deployFinalize: ReturnType<typeof vi.fn>;
   siteDeploys: ReturnType<typeof vi.fn>;
+  getAlias: ReturnType<typeof vi.fn>;
   sitePromote: ReturnType<typeof vi.fn>;
   siteRollback: ReturnType<typeof vi.fn>;
 } {
@@ -19,9 +20,21 @@ function mkProxy(): {
     deployUpload: vi.fn(),
     deployFinalize: vi.fn(),
     siteDeploys: vi.fn(),
+    getAlias: vi
+      .fn()
+      .mockImplementation(
+        async (req: { site: string; mode: "preview" | "production" }) => {
+          if (req.mode === "preview")
+            return {
+              url: "https://x.preview.freecode.camp",
+              deployId: "PREV1",
+            };
+          return { url: "https://x.freecode.camp", deployId: "PROD1" };
+        },
+      ),
     sitePromote: vi.fn().mockResolvedValue({
       url: "https://my-site.freecode.camp",
-      deployId: "20260427-abc",
+      deployId: "PREV1",
     }),
     siteRollback: vi.fn().mockResolvedValue({
       url: "https://my-site.freecode.camp",
@@ -61,14 +74,63 @@ function mkDeps(overrides: Partial<FakeDeps> = {}): FakeDeps {
 }
 
 describe("promote command", () => {
-  it("calls sitePromote with site from platform.yaml", async () => {
+  it("body-pins sitePromote with preview deployId + production expectedCurrent", async () => {
     const deps = mkDeps();
     await promote({ json: false }, deps);
     const proxy = deps.createProxyClient.mock.results[0]?.value as ReturnType<
       typeof mkProxy
     >;
-    expect(proxy.sitePromote).toHaveBeenCalledWith({ site: "my-site" });
+    expect(proxy.getAlias).toHaveBeenCalledWith({
+      site: "my-site",
+      mode: "preview",
+    });
+    expect(proxy.getAlias).toHaveBeenCalledWith({
+      site: "my-site",
+      mode: "production",
+    });
+    expect(proxy.sitePromote).toHaveBeenCalledWith({
+      site: "my-site",
+      deployId: "PREV1",
+      expectedCurrent: "PROD1",
+    });
     expect(proxy.siteRollback).not.toHaveBeenCalled();
+  });
+
+  it("sends empty expectedCurrent when production alias absent (first-promote)", async () => {
+    const proxy = mkProxy();
+    proxy.getAlias.mockImplementation(
+      async (req: { site: string; mode: "preview" | "production" }) => {
+        if (req.mode === "preview") return { url: "x", deployId: "PREV1" };
+        return null;
+      },
+    );
+    const deps = mkDeps({
+      createProxyClient: vi.fn().mockReturnValue(proxy),
+    });
+    await promote({ json: false }, deps);
+    expect(proxy.sitePromote).toHaveBeenCalledWith({
+      site: "my-site",
+      deployId: "PREV1",
+      expectedCurrent: "",
+    });
+  });
+
+  it("fatal when preview alias absent (nothing to promote)", async () => {
+    const proxy = mkProxy();
+    proxy.getAlias.mockImplementation(
+      async (req: { site: string; mode: "preview" | "production" }) => {
+        if (req.mode === "preview") return null;
+        return { url: "x", deployId: "PROD1" };
+      },
+    );
+    const deps = mkDeps({
+      createProxyClient: vi.fn().mockReturnValue(proxy),
+    });
+    await expect(promote({ json: false }, deps)).rejects.toThrow("__exit__");
+    expect(proxy.sitePromote).not.toHaveBeenCalled();
+    expect(deps.logError).toHaveBeenCalledWith(
+      expect.stringMatching(/no preview/i),
+    );
   });
 
   it("emits success envelope in JSON mode", async () => {
@@ -87,7 +149,7 @@ describe("promote command", () => {
     const env = JSON.parse(stdout.join("").trim());
     expect(env.command).toBe("promote");
     expect(env.success).toBe(true);
-    expect(env.deployId).toBe("20260427-abc");
+    expect(env.deployId).toBe("PREV1");
     expect(env.url).toBe("https://my-site.freecode.camp");
   });
 
