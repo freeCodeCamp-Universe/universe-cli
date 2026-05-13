@@ -125,6 +125,10 @@ export interface ProxyClient {
   deployUpload(req: DeployUploadRequest): Promise<DeployUploadResponse>;
   deployFinalize(req: DeployFinalizeRequest): Promise<DeployFinalizeResponse>;
   siteDeploys(req: { site: string }): Promise<DeploySummary[]>;
+  getAlias(req: {
+    site: string;
+    mode: DeployMode;
+  }): Promise<AliasResponse | null>;
   sitePromote(req: { site: string }): Promise<AliasResponse>;
   siteRollback(req: { site: string; to: string }): Promise<AliasResponse>;
   registerSite(req: RegisterSiteRequest): Promise<SiteRow>;
@@ -322,6 +326,35 @@ export function createProxyClient(cfg: ProxyClientConfig): ProxyClient {
           Accept: "application/json",
         },
       });
+    },
+
+    async getAlias(req) {
+      const url = `${base}/api/site/${encodeURIComponent(req.site)}/alias/${encodeURIComponent(req.mode)}`;
+      let response: Response;
+      try {
+        response = await fetchImpl(url, {
+          method: "GET",
+          headers: {
+            Authorization: await userBearer(),
+            Accept: "application/json",
+          },
+        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        throw new ProxyError(
+          0,
+          "network_error",
+          `proxy unreachable: ${message}`,
+        );
+      }
+      // 404 conflates "site-unknown" and "alias-key-absent" — both mean
+      // "no deploy id to read" from caller POV (SPEC §I client surface).
+      if (response.status === 404) return null;
+      if (!response.ok) {
+        const env = await readErrorEnvelope(response);
+        throw new ProxyError(response.status, env.code, env.message);
+      }
+      return (await response.json()) as AliasResponse;
     },
 
     async sitePromote(req) {

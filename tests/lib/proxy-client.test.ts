@@ -296,6 +296,85 @@ describe("createProxyClient", () => {
     });
   });
 
+  describe("getAlias", () => {
+    it("GETs /api/site/{site}/alias/{mode} with bearer and returns AliasResponse", async () => {
+      const fetchMock = vi.fn().mockResolvedValue(
+        jsonResponse(200, {
+          url: "https://my-site.preview.freecode.camp",
+          deployId: "20260513-120000-abc1234",
+        }),
+      );
+      const client = createProxyClient({
+        baseUrl,
+        getAuthToken,
+        fetch: fetchMock,
+      });
+      const r = await client.getAlias({ site: "my-site", mode: "preview" });
+      expect(getUrl(fetchMock.mock.calls[0])).toBe(
+        "https://uploads.freecode.camp/api/site/my-site/alias/preview",
+      );
+      const init = getInit(fetchMock.mock.calls[0]);
+      expect(init.method).toBe("GET");
+      expect(init.headers["Authorization"]).toBe("Bearer ghp_test");
+      expect(r).toEqual({
+        url: "https://my-site.preview.freecode.camp",
+        deployId: "20260513-120000-abc1234",
+      });
+    });
+
+    it("returns null on 404 (alias-key-absent or site-unknown)", async () => {
+      const fetchMock = vi.fn().mockResolvedValue(
+        jsonResponse(404, {
+          error: { code: "not_found", message: "no alias" },
+        }),
+      );
+      const client = createProxyClient({
+        baseUrl,
+        getAuthToken,
+        fetch: fetchMock,
+      });
+      const r = await client.getAlias({
+        site: "my-site",
+        mode: "production",
+      });
+      expect(r).toBeNull();
+    });
+
+    it("throws ProxyError on 400 bad_request", async () => {
+      const fetchMock = vi.fn().mockResolvedValue(
+        jsonResponse(400, {
+          error: { code: "bad_request", message: "bad mode" },
+        }),
+      );
+      const client = createProxyClient({
+        baseUrl,
+        getAuthToken,
+        fetch: fetchMock,
+      });
+      const err = (await client
+        .getAlias({ site: "my-site", mode: "preview" })
+        .catch((e: unknown) => e)) as ProxyError;
+      expect(err).toBeInstanceOf(ProxyError);
+      expect(err.status).toBe(400);
+      expect(err.code).toBe("bad_request");
+    });
+
+    it("URL-encodes site path segment", async () => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValue(jsonResponse(200, { url: "x", deployId: "y" }));
+      const client = createProxyClient({
+        baseUrl,
+        getAuthToken,
+        fetch: fetchMock,
+      });
+      await client.getAlias({ site: "a b", mode: "preview" });
+      expect(getUrl(fetchMock.mock.calls[0])).toBe(
+        "https://uploads.freecode.camp/api/site/a%20b/alias/preview",
+      );
+    });
+  });
+
   describe("sitePromote", () => {
     it("POSTs /api/site/{site}/promote with bearer", async () => {
       const fetchMock = vi
