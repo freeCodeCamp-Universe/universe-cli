@@ -109,10 +109,34 @@ export async function promote(
       // production. To promote a *specific* prior deploy id, the alias
       // must be rewritten directly — the rollback endpoint is the
       // server-side primitive for that. Same atomic single-PUT.
-      result = await client.siteRollback({
+      // V7: CAS body-pin even on --from to keep zero bare callsites.
+      const prod = await client.getAlias({
         site: config.site,
-        to: options.from,
+        mode: "production",
       });
+      const initialExpected = prod?.deployId ?? "";
+      try {
+        result = await client.siteRollback({
+          site: config.site,
+          to: options.from,
+          expectedCurrent: initialExpected,
+        });
+      } catch (err) {
+        if (!(err instanceof AliasDriftError)) throw err;
+        if (options.json) throw err;
+        error(
+          `drift: production moved to ${err.current}, expected ${initialExpected}`,
+        );
+        const ok = await promptConfirm(
+          `Retry promote --from with expectedCurrent='${err.current}'?`,
+        );
+        if (!ok) throw err;
+        result = await client.siteRollback({
+          site: config.site,
+          to: options.from,
+          expectedCurrent: err.current,
+        });
+      }
     } else {
       // G3 CAS body-pin: read both aliases first, then POST with
       // {deployId, expectedCurrent}. expectedCurrent === "" is the

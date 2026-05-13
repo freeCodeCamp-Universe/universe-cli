@@ -182,10 +182,18 @@ describe("static promote E2E", () => {
 
     expect(server.state.aliases.production.get(site)).toBe(targetId);
 
-    expect(server.callLog).toHaveLength(1);
-    expect(server.callLog[0].method).toBe("POST");
-    expect(server.callLog[0].path).toBe(`/api/site/${site}/rollback`);
-    expect(JSON.parse(server.callLog[0].body)).toEqual({ to: targetId });
+    // V7 audit: --from also pre-flights production alias for CAS.
+    expect(server.callLog).toHaveLength(2);
+    expect(server.callLog[0]).toMatchObject({
+      method: "GET",
+      path: `/api/site/${site}/alias/production`,
+    });
+    expect(server.callLog[1].method).toBe("POST");
+    expect(server.callLog[1].path).toBe(`/api/site/${site}/rollback`);
+    expect(JSON.parse(server.callLog[1].body)).toEqual({
+      to: targetId,
+      expectedCurrent: "",
+    });
   });
 
   it("promote --from <id> non-JSON success surfaces 'Preview alias unchanged.' (B7 divergence flag)", async () => {

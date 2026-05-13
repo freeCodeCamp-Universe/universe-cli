@@ -164,6 +164,7 @@ describe("promote command", () => {
     expect(proxy.siteRollback).toHaveBeenCalledWith({
       site: "my-site",
       to: "older-deploy",
+      expectedCurrent: "PROD1",
     });
     expect(proxy.sitePromote).not.toHaveBeenCalled();
   });
