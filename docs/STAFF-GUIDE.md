@@ -65,7 +65,7 @@ deploy:
 
 Full field reference and validation rules: [`platform-yaml.md`](platform-yaml.md).
 
-If your site is brand new and not yet in the registry, a staff member with `sites register` permission needs to register the slug — see [Staff: site registry](#staff-site-registry) below.
+If your site is brand new and not yet in the registry, a staff member with `sites register` permission needs to register the slug — see [Site registry](#site-registry) below.
 
 ## 3. Build & deploy to preview
 
