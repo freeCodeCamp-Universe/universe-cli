@@ -52,6 +52,7 @@ function mkProxy(): {
   siteDeploys: ReturnType<typeof vi.fn>;
   sitePromote: ReturnType<typeof vi.fn>;
   siteRollback: ReturnType<typeof vi.fn>;
+  getAlias: ReturnType<typeof vi.fn>;
 } {
   return {
     whoami: vi.fn().mockResolvedValue({
@@ -72,6 +73,7 @@ function mkProxy(): {
     siteDeploys: vi.fn(),
     sitePromote: vi.fn(),
     siteRollback: vi.fn(),
+    getAlias: vi.fn().mockResolvedValue(null),
   };
 }
 
@@ -648,6 +650,116 @@ describe("deploy command (proxy plane)", () => {
         expect.stringContaining("1"),
       );
       expect(spin.stop).not.toHaveBeenCalled();
+    });
+  });
+
+  // `universe static deploy --promote` writes a new deploy AND repoints
+  // production to it. Preview alias is left pointing at whatever ran
+  // through preview before. Operators who eyeball preview URL after a
+  // promote-deploy can be surprised that it shows an older build. T26
+  // probes preview post-finalize and warns when it diverges.
+  describe("preview-divergence warn on --promote (T26)", () => {
+    it("warns when preview alias points to a prior deploy id", async () => {
+      const proxy = mkProxy();
+      proxy.deployFinalize.mockResolvedValue({
+        url: "https://my-site.freecode.camp",
+        deployId: "20260427-abc1234",
+        mode: "production",
+      });
+      proxy.getAlias.mockResolvedValue({
+        url: "https://my-site.preview.freecode.camp",
+        deployId: "20260425-old00000",
+      });
+      const deps = mkDeps({
+        createProxyClient: vi.fn().mockReturnValue(proxy),
+      });
+      await deploy({ json: false, promote: true }, deps);
+      expect(proxy.getAlias).toHaveBeenCalledWith({
+        site: "my-site",
+        mode: "preview",
+      });
+      expect(deps.logWarn).toHaveBeenCalledTimes(1);
+      expect(deps.logWarn.mock.calls[0]?.[0]).toEqual(
+        expect.stringContaining("20260425-old00000"),
+      );
+    });
+
+    it("does NOT warn when preview alias matches the new deploy id", async () => {
+      const proxy = mkProxy();
+      proxy.deployFinalize.mockResolvedValue({
+        url: "https://my-site.freecode.camp",
+        deployId: "20260427-abc1234",
+        mode: "production",
+      });
+      proxy.getAlias.mockResolvedValue({
+        url: "https://my-site.preview.freecode.camp",
+        deployId: "20260427-abc1234",
+      });
+      const deps = mkDeps({
+        createProxyClient: vi.fn().mockReturnValue(proxy),
+      });
+      await deploy({ json: false, promote: true }, deps);
+      expect(deps.logWarn).not.toHaveBeenCalled();
+    });
+
+    it("does NOT warn when no preview alias exists", async () => {
+      const proxy = mkProxy();
+      proxy.deployFinalize.mockResolvedValue({
+        url: "https://my-site.freecode.camp",
+        deployId: "20260427-abc1234",
+        mode: "production",
+      });
+      proxy.getAlias.mockResolvedValue(null);
+      const deps = mkDeps({
+        createProxyClient: vi.fn().mockReturnValue(proxy),
+      });
+      await deploy({ json: false, promote: true }, deps);
+      expect(deps.logWarn).not.toHaveBeenCalled();
+    });
+
+    it("skips the side-call and warn in --json mode", async () => {
+      const proxy = mkProxy();
+      proxy.deployFinalize.mockResolvedValue({
+        url: "https://my-site.freecode.camp",
+        deployId: "20260427-abc1234",
+        mode: "production",
+      });
+      proxy.getAlias.mockResolvedValue({
+        url: "https://my-site.preview.freecode.camp",
+        deployId: "20260425-old00000",
+      });
+      const deps = mkDeps({
+        createProxyClient: vi.fn().mockReturnValue(proxy),
+      });
+      await deploy({ json: true, promote: true }, deps);
+      expect(proxy.getAlias).not.toHaveBeenCalled();
+      expect(deps.logWarn).not.toHaveBeenCalled();
+    });
+
+    it("skips the side-call on a regular (non-promote) preview deploy", async () => {
+      const proxy = mkProxy();
+      const deps = mkDeps({
+        createProxyClient: vi.fn().mockReturnValue(proxy),
+      });
+      await deploy({ json: false }, deps);
+      expect(proxy.getAlias).not.toHaveBeenCalled();
+      expect(deps.logWarn).not.toHaveBeenCalled();
+    });
+
+    it("does not crash if getAlias itself fails", async () => {
+      const proxy = mkProxy();
+      proxy.deployFinalize.mockResolvedValue({
+        url: "https://my-site.freecode.camp",
+        deployId: "20260427-abc1234",
+        mode: "production",
+      });
+      proxy.getAlias.mockRejectedValue(new Error("network glitch"));
+      const deps = mkDeps({
+        createProxyClient: vi.fn().mockReturnValue(proxy),
+      });
+      await deploy({ json: false, promote: true }, deps);
+      expect(deps.logSuccess).toHaveBeenCalled();
+      expect(deps.exit).not.toHaveBeenCalled();
     });
   });
 });

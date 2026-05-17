@@ -348,7 +348,31 @@ export async function deploy(
       rethrowProxy("deploy finalize failed", err);
     }
 
-    // 10. Output.
+    // 10. Preview-divergence warn.
+    // `--promote` writes a new deploy AND repoints production to it, but
+    // does NOT touch the preview alias — operators eyeballing the
+    // preview URL after a promote-deploy can be surprised to see an
+    // older build. Probe the preview alias and surface the divergence.
+    // JSON mode skips: machine consumers parse `mode` themselves and the
+    // single-envelope contract excludes side-band warns. getAlias
+    // failure is non-fatal — the deploy itself succeeded.
+    if (options.promote && !options.json) {
+      try {
+        const preview = await client.getAlias({
+          site: config.site,
+          mode: "preview",
+        });
+        if (preview && preview.deployId !== finalizeResult.deployId) {
+          warn(
+            `Preview alias still points to ${preview.deployId}; it will not auto-update. Run \`universe static deploy\` (without --promote) to refresh preview.`,
+          );
+        }
+      } catch {
+        // ignore — deploy succeeded, divergence probe is best-effort.
+      }
+    }
+
+    // 11. Output.
     if (options.json) {
       emitJson(
         buildEnvelope("deploy", true, {
