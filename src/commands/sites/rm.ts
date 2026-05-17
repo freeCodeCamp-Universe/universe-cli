@@ -27,7 +27,7 @@ export async function rm(
     if (!options.slug || options.slug.trim().length === 0) {
       throw new UsageError("slug is required (positional argument)");
     }
-    const { client } = await setupClient(deps);
+    const { client, identitySource } = await setupClient(deps);
 
     await client.deleteSite({ slug: options.slug });
 
@@ -36,6 +36,7 @@ export async function rm(
         buildEnvelope(command, true, {
           slug: options.slug,
           deleted: true,
+          identitySource,
         }),
       );
     } else {

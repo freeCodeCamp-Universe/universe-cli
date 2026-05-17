@@ -37,7 +37,7 @@ export async function ls(
   const exit = deps.exit ?? exitWithCode;
 
   try {
-    const { client } = await setupClient(deps);
+    const { client, identitySource } = await setupClient(deps);
     let rows = await client.listSites();
     let scope: "all" | "mine" = "all";
 
@@ -54,6 +54,7 @@ export async function ls(
           count: rows.length,
           scope,
           sites: rows,
+          identitySource,
         }),
       );
     } else {

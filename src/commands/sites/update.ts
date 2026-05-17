@@ -38,7 +38,7 @@ export async function update(
         "--team is required with at least one slug; use `sites rm` to remove a site",
       );
     }
-    const { client } = await setupClient(deps);
+    const { client, identitySource } = await setupClient(deps);
 
     const row = await client.updateSite({
       slug: options.slug,
@@ -51,6 +51,7 @@ export async function update(
           slug: row.slug,
           teams: row.teams,
           updatedAt: row.updatedAt,
+          identitySource,
         }),
       );
     } else {

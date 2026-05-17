@@ -71,6 +71,9 @@ describe("sites rm command", () => {
     expect(env.success).toBe(true);
     expect(env.slug).toBe("blog");
     expect(env.deleted).toBe(true);
+    // identitySource is carried through to JSON envelope for parity
+    // with whoami/deploy/promote/rollback.
+    expect(env.identitySource).toBe("env_GITHUB_TOKEN");
   });
 
   it("maps proxy 404 not_found to surfaced code", async () => {

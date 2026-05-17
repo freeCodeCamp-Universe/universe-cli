@@ -32,7 +32,7 @@ export async function register(
       throw new UsageError("slug is required (positional argument)");
     }
     const teams = parseTeamsFlag(options.team);
-    const { client } = await setupClient(deps);
+    const { client, identitySource } = await setupClient(deps);
 
     const row = await client.registerSite({
       slug: options.slug,
@@ -46,6 +46,7 @@ export async function register(
           teams: row.teams,
           createdAt: row.createdAt,
           createdBy: row.createdBy,
+          identitySource,
         }),
       );
     } else {

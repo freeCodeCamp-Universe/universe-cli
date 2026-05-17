@@ -91,6 +91,9 @@ describe("sites ls command", () => {
     expect(env.success).toBe(true);
     expect(env.count).toBe(2);
     expect(env.sites).toEqual(ROWS);
+    // identitySource is carried through to JSON envelope for parity
+    // with whoami/deploy/promote/rollback.
+    expect(env.identitySource).toBe("env_GITHUB_TOKEN");
   });
 
   it("errors with EXIT_CREDENTIALS when identity chain returns null", async () => {
