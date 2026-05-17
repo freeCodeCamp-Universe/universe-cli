@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { log } from "@clack/prompts";
+import { log, spinner } from "@clack/prompts";
 import {
   CliError,
   ConfigError,
@@ -41,6 +41,18 @@ export interface DeployOptions {
   dir?: string;
 }
 
+/**
+ * Minimal subset of `@clack/prompts` `SpinnerResult` the deploy command
+ * relies on. Kept narrow so unit tests can inject a vi.fn() quad without
+ * stubbing the full clack surface.
+ */
+export interface SpinnerLike {
+  start(msg?: string): void;
+  message(msg?: string): void;
+  stop(msg?: string): void;
+  error(msg?: string): void;
+}
+
 export interface DeployDeps {
   cwd?: string;
   env?: NodeJS.ProcessEnv;
@@ -51,6 +63,7 @@ export interface DeployDeps {
   runBuild?: typeof defaultRunBuild;
   walkFiles?: typeof defaultWalkFiles;
   uploadFiles?: typeof defaultUploadFiles;
+  createSpinner?: () => SpinnerLike;
   logSuccess?: (msg: string) => void;
   logInfo?: (msg: string) => void;
   logWarn?: (msg: string) => void;
@@ -204,6 +217,7 @@ export async function deploy(
   const build = deps.runBuild ?? defaultRunBuild;
   const walk = deps.walkFiles ?? defaultWalkFiles;
   const upload = deps.uploadFiles ?? defaultUploadFiles;
+  const mkSpinner = deps.createSpinner ?? (() => spinner() as SpinnerLike);
   const success = deps.logSuccess ?? ((s: string) => log.success(s));
   const info = deps.logInfo ?? ((s: string) => log.info(s));
   const warn = deps.logWarn ?? ((s: string) => log.warn(s));
@@ -293,18 +307,30 @@ export async function deploy(
       rethrowProxy("deploy init failed", err);
     }
 
-    // 8. Upload.
+    // 8. Upload (with optional TTY progress). Spinner is created only in
+    // non-JSON mode so machine consumers see a single JSON envelope on
+    // stdout. onProgress passes the per-file callback through to
+    // `uploadFiles` — multi-MB / multi-hundred-file sites previously
+    // uploaded silently.
+    const spin = options.json ? null : mkSpinner();
+    spin?.start(`Uploading 0/${filtered.length} files`);
     const uploadResult = await upload({
       client,
       deployId: initResult.deployId,
       jwt: initResult.jwt,
       files: filtered,
+      onProgress: spin
+        ? (p) =>
+            spin.message(`Uploading ${p.uploaded}/${p.total} — ${p.current}`)
+        : undefined,
     });
     if (uploadResult.errors.length > 0) {
+      spin?.error(`Upload failed: ${uploadResult.errors.length} file(s)`);
       const message = `Upload partially failed: ${uploadResult.errors.length} file(s) failed:\n  - ${uploadResult.errors.join("\n  - ")}`;
       // EXIT_PARTIAL is dedicated; throw a CliError that maps to it.
       throw new PartialUploadError(message);
     }
+    spin?.stop(`Uploaded ${uploadResult.fileCount} files`);
 
     // 9. Finalize.
     const mode: "preview" | "production" = options.promote
