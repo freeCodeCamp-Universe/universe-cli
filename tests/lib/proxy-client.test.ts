@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import {
   AliasDriftError,
   createProxyClient,
+  DEFAULT_FETCH_TIMEOUT_MS,
+  parseFetchTimeoutMs,
   ProxyError,
 } from "../../src/lib/proxy-client.js";
 import {
@@ -943,6 +945,96 @@ describe("createProxyClient", () => {
         .deleteSite({ slug: "blog" })
         .catch((e: unknown) => e)) as ProxyError;
       expect(err.exitCode).toBe(EXIT_CREDENTIALS);
+    });
+  });
+
+  describe("fetch timeout", () => {
+    it("DEFAULT_FETCH_TIMEOUT_MS is 30s", () => {
+      expect(DEFAULT_FETCH_TIMEOUT_MS).toBe(30_000);
+    });
+
+    it("attaches an AbortSignal to every fetchImpl call by default", async () => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValue(
+          jsonResponse(200, { login: "alice", authorizedSites: [] }),
+        );
+      const client = createProxyClient({
+        baseUrl,
+        getAuthToken,
+        fetch: fetchMock,
+      });
+      await client.whoami();
+      const init = getInit(fetchMock.mock.calls[0]);
+      expect(init.signal).toBeInstanceOf(AbortSignal);
+    });
+
+    it("passes the same signal contract to getAlias", async () => {
+      const fetchMock = vi.fn().mockResolvedValue(jsonResponse(404, {}));
+      const client = createProxyClient({
+        baseUrl,
+        getAuthToken,
+        fetch: fetchMock,
+      });
+      await client.getAlias({ site: "blog", mode: "production" });
+      const init = getInit(fetchMock.mock.calls[0]);
+      expect(init.signal).toBeInstanceOf(AbortSignal);
+    });
+
+    it("omits signal when timeoutMs <= 0 (disabled)", async () => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValue(
+          jsonResponse(200, { login: "alice", authorizedSites: [] }),
+        );
+      const client = createProxyClient({
+        baseUrl,
+        getAuthToken,
+        fetch: fetchMock,
+        timeoutMs: 0,
+      });
+      await client.whoami();
+      const init = getInit(fetchMock.mock.calls[0]);
+      expect(init.signal).toBeUndefined();
+    });
+
+    it("translates AbortError into a ProxyError with code=timeout", async () => {
+      const fetchMock = vi.fn().mockImplementation(() => {
+        throw new DOMException("aborted", "TimeoutError");
+      });
+      const client = createProxyClient({
+        baseUrl,
+        getAuthToken,
+        fetch: fetchMock,
+        timeoutMs: 10,
+      });
+      const err = (await client
+        .whoami()
+        .catch((e: unknown) => e)) as ProxyError;
+      expect(err).toBeInstanceOf(ProxyError);
+      expect(err.code).toBe("timeout");
+      expect(err.message).toContain("10ms");
+    });
+  });
+
+  describe("parseFetchTimeoutMs", () => {
+    it("returns undefined when env var is unset", () => {
+      expect(parseFetchTimeoutMs({})).toBeUndefined();
+    });
+    it("returns parsed integer for a positive value", () => {
+      expect(parseFetchTimeoutMs({ UNIVERSE_FETCH_TIMEOUT_MS: "5000" })).toBe(
+        5_000,
+      );
+    });
+    it("returns undefined for non-numeric values", () => {
+      expect(
+        parseFetchTimeoutMs({ UNIVERSE_FETCH_TIMEOUT_MS: "fast" }),
+      ).toBeUndefined();
+    });
+    it("returns undefined for negative values", () => {
+      expect(
+        parseFetchTimeoutMs({ UNIVERSE_FETCH_TIMEOUT_MS: "-1" }),
+      ).toBeUndefined();
     });
   });
 });

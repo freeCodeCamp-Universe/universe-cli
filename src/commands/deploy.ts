@@ -25,6 +25,7 @@ import {
 import { suggest } from "../lib/similarity.js";
 import {
   createProxyClient as defaultCreateProxyClient,
+  parseFetchTimeoutMs,
   ProxyError,
   type ProxyClient,
   type ProxyClientConfig,
@@ -226,6 +227,7 @@ export async function deploy(
     const client = mkClient({
       baseUrl,
       getAuthToken: () => identity.token,
+      timeoutMs: parseFetchTimeoutMs(env),
     });
 
     // 4. Preflight authorization. Catches the most common staff-side

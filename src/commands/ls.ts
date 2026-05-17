@@ -10,6 +10,7 @@ import {
 } from "../lib/platform-yaml.js";
 import {
   createProxyClient as defaultCreateProxyClient,
+  parseFetchTimeoutMs,
   wrapProxyError,
   type ProxyClient,
   type ProxyClientConfig,
@@ -142,6 +143,7 @@ export async function ls(options: LsOptions, deps: LsDeps = {}): Promise<void> {
     const client = mkClient({
       baseUrl,
       getAuthToken: () => identity.token,
+      timeoutMs: parseFetchTimeoutMs(env),
     });
 
     const raw = await client.siteDeploys({ site });

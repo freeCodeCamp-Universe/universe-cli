@@ -11,6 +11,7 @@ import {
 import {
   AliasDriftError,
   createProxyClient as defaultCreateProxyClient,
+  parseFetchTimeoutMs,
   wrapProxyError,
   type ProxyClient,
   type ProxyClientConfig,
@@ -106,6 +107,7 @@ export async function rollback(
     const client = mkClient({
       baseUrl,
       getAuthToken: () => identity.token,
+      timeoutMs: parseFetchTimeoutMs(env),
     });
 
     const to = options.to.trim();

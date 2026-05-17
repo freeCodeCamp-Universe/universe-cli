@@ -11,6 +11,7 @@ import {
 import {
   AliasDriftError,
   createProxyClient as defaultCreateProxyClient,
+  parseFetchTimeoutMs,
   wrapProxyError,
   type ProxyClient,
   type ProxyClientConfig,
@@ -101,6 +102,7 @@ export async function promote(
     const client = mkClient({
       baseUrl,
       getAuthToken: () => identity.token,
+      timeoutMs: parseFetchTimeoutMs(env),
     });
 
     let result: { url: string; deployId: string };

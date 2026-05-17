@@ -2,6 +2,7 @@ import { log } from "@clack/prompts";
 import { resolveIdentity as defaultResolveIdentity } from "../lib/identity.js";
 import {
   createProxyClient as defaultCreateProxyClient,
+  parseFetchTimeoutMs,
   ProxyError,
   type ProxyClient,
   type ProxyClientConfig,
@@ -57,6 +58,7 @@ export async function whoami(
   const client = mkClient({
     baseUrl,
     getAuthToken: () => identity.token,
+    timeoutMs: parseFetchTimeoutMs(env),
   });
 
   try {
