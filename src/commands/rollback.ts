@@ -16,8 +16,9 @@ import {
   type ProxyClient,
   type ProxyClientConfig,
 } from "../lib/proxy-client.js";
-import { buildEnvelope, buildErrorEnvelope } from "../output/envelope.js";
+import { buildEnvelope } from "../output/envelope.js";
 import { exitWithCode } from "../output/exit-codes.js";
+import { outputError } from "../output/format.js";
 
 export interface RollbackOptions {
   json: boolean;
@@ -165,18 +166,14 @@ export async function rollback(
     }
   } catch (err) {
     const { code, message } = wrapProxyError("rollback", err);
-    if (options.json) {
-      const envelope = buildErrorEnvelope("rollback", code, message);
-      if (err instanceof AliasDriftError) {
-        // V3 additive: top-level `current` so scripted callers can
-        // branch + supply a fresh expectedCurrent on next attempt.
-        emitJson({ ...envelope, current: err.current });
-      } else {
-        emitJson(envelope);
-      }
-    } else {
-      error(message);
-    }
+    // V3 additive: top-level `current` so scripted callers can branch +
+    // supply a fresh expectedCurrent on next attempt.
+    const extras =
+      err instanceof AliasDriftError ? { current: err.current } : undefined;
+    outputError({ json: options.json, command: "rollback" }, code, message, {
+      logError: error,
+      extras,
+    });
     exit(code);
   }
 }

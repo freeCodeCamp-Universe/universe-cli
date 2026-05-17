@@ -111,4 +111,49 @@ describe("outputError", () => {
     const parsed = JSON.parse(output);
     expect(parsed.error.issues[0]).toContain("****");
   });
+
+  // promote/rollback drift envelopes need to carry a top-level `current`
+  // so scripted callers can re-pin expectedCurrent and retry; envelope
+  // extension via opts.extras keeps the single chokepoint while still
+  // allowing per-command shape additions.
+  it("merges opts.extras into the JSON envelope at the top level", () => {
+    const stdoutSpy = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation(() => true);
+    const ctx: OutputContext = { json: true, command: "promote" };
+    outputError(ctx, 30, "drift detected", {
+      extras: { current: "20260427-abc1234" },
+    });
+
+    const parsed = JSON.parse(stdoutSpy.mock.calls[0][0] as string);
+    expect(parsed.success).toBe(false);
+    expect(parsed.current).toBe("20260427-abc1234");
+  });
+
+  // Commands inject their own logError via deps to keep tests
+  // hermetic — opts.logError lets outputError delegate to that fn
+  // instead of clack's default, while still redacting first.
+  it("uses opts.logError (dep-injected) over clack default in human mode", () => {
+    const logFn = vi.fn();
+    const ctx: OutputContext = { json: false, command: "deploy" };
+    const secret = "abcdef1234567890abcdef1234567890";
+    outputError(ctx, 12, `Bearer ${secret}`, { logError: logFn });
+
+    expect(logFn).toHaveBeenCalledTimes(1);
+    const msg = logFn.mock.calls[0][0] as string;
+    expect(msg).toContain("****");
+    expect(msg).not.toContain(secret);
+  });
+
+  // Back-compat: third positional may still be a bare issues array.
+  it("accepts issues[] as third positional for back-compat", () => {
+    const stdoutSpy = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation(() => true);
+    const ctx: OutputContext = { json: true, command: "deploy" };
+    outputError(ctx, 11, "broken", ["one", "two"]);
+
+    const parsed = JSON.parse(stdoutSpy.mock.calls[0][0] as string);
+    expect(parsed.error.issues).toEqual(["one", "two"]);
+  });
 });

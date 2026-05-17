@@ -15,8 +15,9 @@ import {
   type ProxyClient,
   type ProxyClientConfig,
 } from "../lib/proxy-client.js";
-import { buildEnvelope, buildErrorEnvelope } from "../output/envelope.js";
+import { buildEnvelope } from "../output/envelope.js";
 import { exitWithCode } from "../output/exit-codes.js";
+import { outputError } from "../output/format.js";
 
 export interface LsOptions {
   json: boolean;
@@ -174,11 +175,9 @@ export async function ls(options: LsOptions, deps: LsDeps = {}): Promise<void> {
     success(formatTable(deploys));
   } catch (err) {
     const { code, message } = wrapProxyError("ls", err);
-    if (options.json) {
-      emitJson(buildErrorEnvelope("ls", code, message));
-    } else {
-      error(message);
-    }
+    outputError({ json: options.json, command: "ls" }, code, message, {
+      logError: error,
+    });
     exit(code);
   }
 }

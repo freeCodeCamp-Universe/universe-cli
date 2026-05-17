@@ -1,7 +1,8 @@
 import { log } from "@clack/prompts";
 import { wrapProxyError } from "../../lib/proxy-client.js";
-import { buildEnvelope, buildErrorEnvelope } from "../../output/envelope.js";
+import { buildEnvelope } from "../../output/envelope.js";
 import { exitWithCode } from "../../output/exit-codes.js";
+import { outputError } from "../../output/format.js";
 import {
   emitJson,
   setupClient,
@@ -51,11 +52,9 @@ export async function rm(
     }
   } catch (err) {
     const { code, message } = wrapProxyError(command, err);
-    if (options.json) {
-      emitJson(buildErrorEnvelope(command, code, message));
-    } else {
-      error(message);
-    }
+    outputError({ json: options.json, command }, code, message, {
+      logError: error,
+    });
     exit(code);
   }
 }

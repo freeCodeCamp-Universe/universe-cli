@@ -7,7 +7,8 @@ import {
   type ProxyClient,
   type ProxyClientConfig,
 } from "../lib/proxy-client.js";
-import { buildEnvelope, buildErrorEnvelope } from "../output/envelope.js";
+import { buildEnvelope } from "../output/envelope.js";
+import { outputError } from "../output/format.js";
 import { EXIT_CREDENTIALS, exitWithCode } from "../output/exit-codes.js";
 import { CliError } from "../errors.js";
 
@@ -45,11 +46,12 @@ export async function whoami(
   if (!identity) {
     const msg =
       "No GitHub identity available. Run `universe login`, set $GITHUB_TOKEN, or install the gh CLI.";
-    if (options.json) {
-      emitJson(buildErrorEnvelope("whoami", EXIT_CREDENTIALS, msg));
-    } else {
-      error(msg);
-    }
+    outputError(
+      { json: options.json, command: "whoami" },
+      EXIT_CREDENTIALS,
+      msg,
+      { logError: error },
+    );
     exit(EXIT_CREDENTIALS);
     return;
   }
@@ -93,11 +95,9 @@ export async function whoami(
         : err instanceof Error
           ? err.message
           : String(err);
-    if (options.json) {
-      emitJson(buildErrorEnvelope("whoami", exitCode, message));
-    } else {
-      error(message);
-    }
+    outputError({ json: options.json, command: "whoami" }, exitCode, message, {
+      logError: error,
+    });
     exit(exitCode);
   }
 }

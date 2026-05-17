@@ -31,8 +31,9 @@ import {
   type ProxyClientConfig,
 } from "../lib/proxy-client.js";
 import { uploadFiles as defaultUploadFiles } from "../lib/upload.js";
-import { buildEnvelope, buildErrorEnvelope } from "../output/envelope.js";
+import { buildEnvelope } from "../output/envelope.js";
 import { EXIT_USAGE, exitWithCode } from "../output/exit-codes.js";
+import { outputError } from "../output/format.js";
 
 export interface DeployOptions {
   json: boolean;
@@ -422,11 +423,9 @@ export async function deploy(
       code = EXIT_USAGE;
       message = String(err);
     }
-    if (options.json) {
-      emitJson(buildErrorEnvelope("deploy", code, message));
-    } else {
-      error(message);
-    }
+    outputError({ json: options.json, command: "deploy" }, code, message, {
+      logError: error,
+    });
     exit(code);
   }
 }

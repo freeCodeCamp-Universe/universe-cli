@@ -11,6 +11,7 @@ import {
   EXIT_CREDENTIALS,
   exitWithCode,
 } from "../output/exit-codes.js";
+import { outputError } from "../output/format.js";
 
 export interface LoginOptions {
   json: boolean;
@@ -102,17 +103,12 @@ export async function login(
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    if (options.json) {
-      emitJson({
-        schemaVersion: "1",
-        command: "login",
-        success: false,
-        timestamp: new Date().toISOString(),
-        error: { code: EXIT_CREDENTIALS, message },
-      });
-    } else {
-      error(message);
-    }
+    outputError(
+      { json: options.json, command: "login" },
+      EXIT_CREDENTIALS,
+      message,
+      { logError: error },
+    );
     exit(EXIT_CREDENTIALS);
     return;
   }
