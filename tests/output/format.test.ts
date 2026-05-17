@@ -130,6 +130,29 @@ describe("outputError", () => {
     expect(parsed.current).toBe("20260427-abc1234");
   });
 
+  // Future-proofing: opts.extras must pass through redactObject so a
+  // caller who stuffs a credential into extras can't leak it. Today's
+  // only callers pass deploy ids (redact-clean), but the API surface
+  // must not be a footgun.
+  it("redacts credentials inside opts.extras", () => {
+    const stdoutSpy = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation(() => true);
+    const ctx: OutputContext = { json: true, command: "promote" };
+    const secret = "abcdef1234567890abcdef1234567890";
+    outputError(ctx, 30, "drift detected", {
+      extras: {
+        current: "20260427-abc1234",
+        token: `Bearer ${secret}`,
+      },
+    });
+
+    const parsed = JSON.parse(stdoutSpy.mock.calls[0][0] as string);
+    expect(parsed.current).toBe("20260427-abc1234");
+    expect(parsed.token).not.toContain(secret);
+    expect(parsed.token).toContain("****");
+  });
+
   // Commands inject their own logError via deps to keep tests
   // hermetic — opts.logError lets outputError delegate to that fn
   // instead of clack's default, while still redacting first.

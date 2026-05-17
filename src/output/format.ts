@@ -1,6 +1,6 @@
 import { log } from "@clack/prompts";
 import { buildEnvelope, buildErrorEnvelope } from "./envelope.js";
-import { redact } from "./redact.js";
+import { redact, redactObject } from "./redact.js";
 
 export type OutputContext = {
   json: boolean;
@@ -61,7 +61,14 @@ export function outputError(
       redactedMessage,
       redactedIssues,
     );
-    const payload = opts.extras ? { ...envelope, ...opts.extras } : envelope;
+    // opts.extras passes through redactObject so a future caller who
+    // stuffs a token / credential into the extras map doesn't leak it.
+    // Today's only callers (promote / rollback drift) pass `{ current:
+    // <deployId> }`; redact() is a no-op on a deploy id, so the
+    // observable behaviour is unchanged.
+    const payload = opts.extras
+      ? { ...envelope, ...redactObject(opts.extras) }
+      : envelope;
     process.stdout.write(JSON.stringify(payload) + "\n");
   } else {
     (opts.logError ?? ((m: string) => log.error(m)))(redactedMessage);
