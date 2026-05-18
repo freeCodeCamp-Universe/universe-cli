@@ -368,8 +368,20 @@ export async function deploy(
             `Preview alias still points to ${preview.deployId}; it will not auto-update. Run \`universe static deploy\` (without --promote) to refresh preview.`,
           );
         }
-      } catch {
-        // ignore — deploy succeeded, divergence probe is best-effort.
+      } catch (err) {
+        // Surface credential-rotation errors loudly even though the
+        // probe itself is best-effort; deploy already succeeded, so
+        // the next `universe` call may fail with no obvious context
+        // unless the operator sees this now. Transient network errors
+        // (timeouts, DNS hiccups) stay swallowed.
+        if (
+          err instanceof ProxyError &&
+          (err.status === 401 || err.status === 403)
+        ) {
+          warn(
+            `Preview alias probe got ${err.status} (${err.code}) — token may need rotation: ${err.message}`,
+          );
+        }
       }
     }
 
