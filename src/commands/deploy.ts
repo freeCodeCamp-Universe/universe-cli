@@ -226,7 +226,6 @@ export async function deploy(
   const exit = deps.exit ?? exitWithCode;
 
   try {
-    // 1. Identity.
     const identity = await resolveId({ env });
     if (!identity) {
       throw new CredentialError(
@@ -234,10 +233,9 @@ export async function deploy(
       );
     }
 
-    // 2. Config.
     const config = await readAndParseConfig(cwd, readYaml);
 
-    // 3. Proxy client (early so preflight can run before the slow build).
+    // Proxy client built early so preflight can run before the slow build.
     const baseUrl = env["UNIVERSE_PROXY_URL"] ?? DEFAULT_PROXY_URL;
     const client = mkClient({
       baseUrl,
@@ -245,7 +243,7 @@ export async function deploy(
       timeoutMs: parseFetchTimeoutMs(env),
     });
 
-    // 4. Preflight authorization. Catches the most common staff-side
+    // Preflight authorization. Catches the most common staff-side
     // failure (`site_unauthorized`) BEFORE running the build, and
     // surfaces the registry-CLI remediation inline (typo hint +
     // authorized list + `universe sites register/update` commands).
@@ -266,7 +264,6 @@ export async function deploy(
       );
     }
 
-    // 5. Git state (informational).
     const git = gitState();
     if (git.dirty && !options.json) {
       warn(
@@ -275,7 +272,6 @@ export async function deploy(
     }
     const sha = git.hash ?? syntheticSha();
 
-    // 6. Build.
     const outputDir = options.dir ?? config.build.output;
     const buildResult = await build({
       command: config.build.command,
@@ -287,7 +283,6 @@ export async function deploy(
     }
     const resolvedOutputDir = buildResult.outputDir;
 
-    // 7. Walk + ignore.
     const walked = walk(resolvedOutputDir);
     const ignore = createIgnoreFilter(config.deploy.ignore);
     const filtered = walked.filter((f) => !ignore(f.relPath));
@@ -296,7 +291,6 @@ export async function deploy(
     }
     const fileList = filtered.map((f) => f.relPath);
 
-    // 8. Init.
     let initResult;
     try {
       initResult = await client.deployInit({
@@ -308,11 +302,10 @@ export async function deploy(
       rethrowProxy("deploy init failed", err);
     }
 
-    // 8. Upload (with optional TTY progress). Spinner is created only in
-    // non-JSON mode so machine consumers see a single JSON envelope on
-    // stdout. onProgress passes the per-file callback through to
-    // `uploadFiles` — multi-MB / multi-hundred-file sites previously
-    // uploaded silently.
+    // Spinner is created only in non-JSON mode so machine consumers
+    // see a single JSON envelope on stdout. onProgress passes the
+    // per-file callback through to `uploadFiles` — multi-MB /
+    // multi-hundred-file sites previously uploaded silently.
     const spin = options.json ? null : mkSpinner();
     spin?.start(`Uploading 0/${filtered.length} files`);
     const uploadResult = await upload({
@@ -333,7 +326,6 @@ export async function deploy(
     }
     spin?.stop(`Uploaded ${uploadResult.fileCount} files`);
 
-    // 9. Finalize.
     const mode: "preview" | "production" = options.promote
       ? "production"
       : "preview";
@@ -349,7 +341,6 @@ export async function deploy(
       rethrowProxy("deploy finalize failed", err);
     }
 
-    // 10. Preview-divergence warn.
     // `--promote` writes a new deploy AND repoints production to it, but
     // does NOT touch the preview alias — operators eyeballing the
     // preview URL after a promote-deploy can be surprised to see an
@@ -385,7 +376,6 @@ export async function deploy(
       }
     }
 
-    // 11. Output.
     if (options.json) {
       emitJson(
         buildEnvelope("deploy", true, {
