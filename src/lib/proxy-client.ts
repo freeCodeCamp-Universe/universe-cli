@@ -327,6 +327,10 @@ export function createProxyClient(cfg: ProxyClientConfig): ProxyClient {
   function withTimeoutSignal(init: RequestInit): RequestInit {
     if (timeoutMs <= 0) return init;
     const timeoutSignal = AbortSignal.timeout(timeoutMs);
+    // AbortSignal.any: Node ≥20.3 / bun ≥1.0. Pinned by `engines.node`
+    // in package.json (>=24); dropping that floor would silently break
+    // this merge path — caller signal would no longer compose with the
+    // timeout signal and one of the two cancellations would be lost.
     const merged = init.signal
       ? AbortSignal.any([init.signal, timeoutSignal])
       : timeoutSignal;
