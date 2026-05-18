@@ -651,6 +651,58 @@ describe("deploy command (proxy plane)", () => {
       );
       expect(spin.stop).not.toHaveBeenCalled();
     });
+
+    it("handles single-file deploy spinner transitions 0/1 -> 1/1", async () => {
+      const spin = mkSpinner();
+      const createSpinner = vi.fn().mockReturnValue(spin);
+      const fakeUpload = vi
+        .fn()
+        .mockImplementation(
+          async (opts: {
+            onProgress?: (p: {
+              uploaded: number;
+              total: number;
+              current: string;
+            }) => void;
+          }) => {
+            opts.onProgress?.({
+              uploaded: 1,
+              total: 1,
+              current: "index.html",
+            });
+            return {
+              fileCount: 1,
+              totalSize: 512,
+              uploaded: ["index.html"],
+              errors: [],
+            };
+          },
+        );
+      const walkFiles = vi
+        .fn()
+        .mockReturnValue([
+          { relPath: "index.html", absPath: "/proj/dist/index.html" },
+        ]);
+      const deps = mkDeps({
+        createSpinner,
+        uploadFiles: fakeUpload,
+        walkFiles,
+      });
+
+      await deploy({ json: false }, deps);
+
+      expect(createSpinner).toHaveBeenCalledTimes(1);
+      expect(spin.start).toHaveBeenCalledTimes(1);
+      expect(spin.start.mock.calls[0]?.[0]).toEqual(
+        expect.stringContaining("0/1"),
+      );
+      expect(spin.message).toHaveBeenCalledTimes(1);
+      expect(spin.message.mock.calls[0]?.[0]).toEqual(
+        expect.stringContaining("1/1"),
+      );
+      expect(spin.stop).toHaveBeenCalledTimes(1);
+      expect(spin.error).not.toHaveBeenCalled();
+    });
   });
 
   // `universe static deploy --promote` writes a new deploy AND repoints
