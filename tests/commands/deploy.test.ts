@@ -12,11 +12,26 @@ interface FakeDeps {
   runBuild: ReturnType<typeof vi.fn>;
   walkFiles: ReturnType<typeof vi.fn>;
   uploadFiles: ReturnType<typeof vi.fn>;
+  createSpinner: ReturnType<typeof vi.fn>;
   logSuccess: ReturnType<typeof vi.fn>;
   logInfo: ReturnType<typeof vi.fn>;
   logWarn: ReturnType<typeof vi.fn>;
   logError: ReturnType<typeof vi.fn>;
   exit: ReturnType<typeof vi.fn>;
+}
+
+function mkSpinner(): {
+  start: ReturnType<typeof vi.fn>;
+  message: ReturnType<typeof vi.fn>;
+  stop: ReturnType<typeof vi.fn>;
+  error: ReturnType<typeof vi.fn>;
+} {
+  return {
+    start: vi.fn(),
+    message: vi.fn(),
+    stop: vi.fn(),
+    error: vi.fn(),
+  };
 }
 
 const VALID_YAML = `site: my-site
@@ -37,6 +52,7 @@ function mkProxy(): {
   siteDeploys: ReturnType<typeof vi.fn>;
   sitePromote: ReturnType<typeof vi.fn>;
   siteRollback: ReturnType<typeof vi.fn>;
+  getAlias: ReturnType<typeof vi.fn>;
 } {
   return {
     whoami: vi.fn().mockResolvedValue({
@@ -57,6 +73,7 @@ function mkProxy(): {
     siteDeploys: vi.fn(),
     sitePromote: vi.fn(),
     siteRollback: vi.fn(),
+    getAlias: vi.fn().mockResolvedValue(null),
   };
 }
 
@@ -89,6 +106,7 @@ function mkDeps(overrides: Partial<FakeDeps> = {}): FakeDeps {
       uploaded: ["index.html", "main.js"],
       errors: [],
     }),
+    createSpinner: vi.fn().mockImplementation(() => mkSpinner()),
     logSuccess: vi.fn(),
     logInfo: vi.fn(),
     logWarn: vi.fn(),
@@ -539,6 +557,261 @@ describe("deploy command (proxy plane)", () => {
       });
       await deploy({ json: false }, deps);
       expect(deps.logWarn).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // Multi-MB / multi-hundred-file sites upload silently — operator-visible
+  // only when finalize succeeds/fails. uploadFiles already exposes
+  // `onProgress`, but deploy.ts did not wire it. T25 plumbs it through a
+  // clack `spinner()` gated on `!options.json` so machine consumers stay
+  // clean.
+  describe("upload progress (T25)", () => {
+    it("invokes createSpinner in non-JSON mode and wires onProgress", async () => {
+      const spin = mkSpinner();
+      const createSpinner = vi.fn().mockReturnValue(spin);
+      const fakeUpload = vi
+        .fn()
+        .mockImplementation(
+          async (opts: {
+            onProgress?: (p: {
+              uploaded: number;
+              total: number;
+              current: string;
+            }) => void;
+          }) => {
+            opts.onProgress?.({
+              uploaded: 1,
+              total: 2,
+              current: "index.html",
+            });
+            opts.onProgress?.({
+              uploaded: 2,
+              total: 2,
+              current: "main.js",
+            });
+            return {
+              fileCount: 2,
+              totalSize: 2048,
+              uploaded: ["index.html", "main.js"],
+              errors: [],
+            };
+          },
+        );
+      const deps = mkDeps({ createSpinner, uploadFiles: fakeUpload });
+
+      await deploy({ json: false }, deps);
+
+      expect(createSpinner).toHaveBeenCalledTimes(1);
+      expect(spin.start).toHaveBeenCalledTimes(1);
+      expect(spin.start.mock.calls[0]?.[0]).toEqual(
+        expect.stringContaining("0/2"),
+      );
+      expect(spin.message).toHaveBeenCalledTimes(2);
+      expect(spin.message.mock.calls[0]?.[0]).toEqual(
+        expect.stringContaining("1/2"),
+      );
+      expect(spin.message.mock.calls[1]?.[0]).toEqual(
+        expect.stringContaining("2/2"),
+      );
+      expect(spin.stop).toHaveBeenCalledTimes(1);
+      expect(spin.error).not.toHaveBeenCalled();
+    });
+
+    it("does NOT create a spinner in --json mode", async () => {
+      const createSpinner = vi.fn();
+      const deps = mkDeps({ createSpinner });
+      await deploy({ json: true }, deps);
+      expect(createSpinner).not.toHaveBeenCalled();
+      const uploadCall = deps.uploadFiles.mock.calls[0]?.[0] as {
+        onProgress?: unknown;
+      };
+      expect(uploadCall?.onProgress).toBeUndefined();
+    });
+
+    it("calls spinner.error when uploadFiles reports per-file errors", async () => {
+      const spin = mkSpinner();
+      const createSpinner = vi.fn().mockReturnValue(spin);
+      const deps = mkDeps({
+        createSpinner,
+        uploadFiles: vi.fn().mockResolvedValue({
+          fileCount: 1,
+          totalSize: 1024,
+          uploaded: ["index.html"],
+          errors: ["main.js: 500"],
+        }),
+      });
+      try {
+        await deploy({ json: false }, deps);
+      } catch {
+        // exit() throws __exit__ in fixture.
+      }
+      expect(spin.error).toHaveBeenCalledTimes(1);
+      expect(spin.error.mock.calls[0]?.[0]).toEqual(
+        expect.stringContaining("1"),
+      );
+      expect(spin.stop).not.toHaveBeenCalled();
+    });
+
+    it("handles single-file deploy spinner transitions 0/1 -> 1/1", async () => {
+      const spin = mkSpinner();
+      const createSpinner = vi.fn().mockReturnValue(spin);
+      const fakeUpload = vi
+        .fn()
+        .mockImplementation(
+          async (opts: {
+            onProgress?: (p: {
+              uploaded: number;
+              total: number;
+              current: string;
+            }) => void;
+          }) => {
+            opts.onProgress?.({
+              uploaded: 1,
+              total: 1,
+              current: "index.html",
+            });
+            return {
+              fileCount: 1,
+              totalSize: 512,
+              uploaded: ["index.html"],
+              errors: [],
+            };
+          },
+        );
+      const walkFiles = vi
+        .fn()
+        .mockReturnValue([
+          { relPath: "index.html", absPath: "/proj/dist/index.html" },
+        ]);
+      const deps = mkDeps({
+        createSpinner,
+        uploadFiles: fakeUpload,
+        walkFiles,
+      });
+
+      await deploy({ json: false }, deps);
+
+      expect(createSpinner).toHaveBeenCalledTimes(1);
+      expect(spin.start).toHaveBeenCalledTimes(1);
+      expect(spin.start.mock.calls[0]?.[0]).toEqual(
+        expect.stringContaining("0/1"),
+      );
+      expect(spin.message).toHaveBeenCalledTimes(1);
+      expect(spin.message.mock.calls[0]?.[0]).toEqual(
+        expect.stringContaining("1/1"),
+      );
+      expect(spin.stop).toHaveBeenCalledTimes(1);
+      expect(spin.error).not.toHaveBeenCalled();
+    });
+  });
+
+  // `universe static deploy --promote` writes a new deploy AND repoints
+  // production to it. Preview alias is left pointing at whatever ran
+  // through preview before. Operators who eyeball preview URL after a
+  // promote-deploy can be surprised that it shows an older build. T26
+  // probes preview post-finalize and warns when it diverges.
+  describe("preview-divergence warn on --promote (T26)", () => {
+    it("warns when preview alias points to a prior deploy id", async () => {
+      const proxy = mkProxy();
+      proxy.deployFinalize.mockResolvedValue({
+        url: "https://my-site.freecode.camp",
+        deployId: "20260427-abc1234",
+        mode: "production",
+      });
+      proxy.getAlias.mockResolvedValue({
+        url: "https://my-site.preview.freecode.camp",
+        deployId: "20260425-old00000",
+      });
+      const deps = mkDeps({
+        createProxyClient: vi.fn().mockReturnValue(proxy),
+      });
+      await deploy({ json: false, promote: true }, deps);
+      expect(proxy.getAlias).toHaveBeenCalledWith({
+        site: "my-site",
+        mode: "preview",
+      });
+      expect(deps.logWarn).toHaveBeenCalledTimes(1);
+      expect(deps.logWarn.mock.calls[0]?.[0]).toEqual(
+        expect.stringContaining("20260425-old00000"),
+      );
+    });
+
+    it("does NOT warn when preview alias matches the new deploy id", async () => {
+      const proxy = mkProxy();
+      proxy.deployFinalize.mockResolvedValue({
+        url: "https://my-site.freecode.camp",
+        deployId: "20260427-abc1234",
+        mode: "production",
+      });
+      proxy.getAlias.mockResolvedValue({
+        url: "https://my-site.preview.freecode.camp",
+        deployId: "20260427-abc1234",
+      });
+      const deps = mkDeps({
+        createProxyClient: vi.fn().mockReturnValue(proxy),
+      });
+      await deploy({ json: false, promote: true }, deps);
+      expect(deps.logWarn).not.toHaveBeenCalled();
+    });
+
+    it("does NOT warn when no preview alias exists", async () => {
+      const proxy = mkProxy();
+      proxy.deployFinalize.mockResolvedValue({
+        url: "https://my-site.freecode.camp",
+        deployId: "20260427-abc1234",
+        mode: "production",
+      });
+      proxy.getAlias.mockResolvedValue(null);
+      const deps = mkDeps({
+        createProxyClient: vi.fn().mockReturnValue(proxy),
+      });
+      await deploy({ json: false, promote: true }, deps);
+      expect(deps.logWarn).not.toHaveBeenCalled();
+    });
+
+    it("skips the side-call and warn in --json mode", async () => {
+      const proxy = mkProxy();
+      proxy.deployFinalize.mockResolvedValue({
+        url: "https://my-site.freecode.camp",
+        deployId: "20260427-abc1234",
+        mode: "production",
+      });
+      proxy.getAlias.mockResolvedValue({
+        url: "https://my-site.preview.freecode.camp",
+        deployId: "20260425-old00000",
+      });
+      const deps = mkDeps({
+        createProxyClient: vi.fn().mockReturnValue(proxy),
+      });
+      await deploy({ json: true, promote: true }, deps);
+      expect(proxy.getAlias).not.toHaveBeenCalled();
+      expect(deps.logWarn).not.toHaveBeenCalled();
+    });
+
+    it("skips the side-call on a regular (non-promote) preview deploy", async () => {
+      const proxy = mkProxy();
+      const deps = mkDeps({
+        createProxyClient: vi.fn().mockReturnValue(proxy),
+      });
+      await deploy({ json: false }, deps);
+      expect(proxy.getAlias).not.toHaveBeenCalled();
+      expect(deps.logWarn).not.toHaveBeenCalled();
+    });
+
+    it("does not crash if getAlias itself fails", async () => {
+      const proxy = mkProxy();
+      proxy.deployFinalize.mockResolvedValue({
+        url: "https://my-site.freecode.camp",
+        deployId: "20260427-abc1234",
+        mode: "production",
+      });
+      proxy.getAlias.mockRejectedValue(new Error("network glitch"));
+      const deps = mkDeps({
+        createProxyClient: vi.fn().mockReturnValue(proxy),
+      });
+      await deploy({ json: false, promote: true }, deps);
+      expect(deps.logSuccess).toHaveBeenCalled();
+      expect(deps.exit).not.toHaveBeenCalled();
     });
   });
 });

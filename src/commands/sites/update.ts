@@ -1,7 +1,8 @@
 import { log } from "@clack/prompts";
 import { wrapProxyError } from "../../lib/proxy-client.js";
-import { buildEnvelope, buildErrorEnvelope } from "../../output/envelope.js";
+import { buildEnvelope } from "../../output/envelope.js";
 import { exitWithCode } from "../../output/exit-codes.js";
+import { outputError } from "../../output/format.js";
 import {
   emitJson,
   parseTeamsFlag,
@@ -38,7 +39,7 @@ export async function update(
         "--team is required with at least one slug; use `sites rm` to remove a site",
       );
     }
-    const { client } = await setupClient(deps);
+    const { client, identitySource } = await setupClient(deps);
 
     const row = await client.updateSite({
       slug: options.slug,
@@ -51,6 +52,7 @@ export async function update(
           slug: row.slug,
           teams: row.teams,
           updatedAt: row.updatedAt,
+          identitySource,
         }),
       );
     } else {
@@ -66,11 +68,9 @@ export async function update(
     }
   } catch (err) {
     const { code, message } = wrapProxyError(command, err);
-    if (options.json) {
-      emitJson(buildErrorEnvelope(command, code, message));
-    } else {
-      error(message);
-    }
+    outputError({ json: options.json, command }, code, message, {
+      logError: error,
+    });
     exit(code);
   }
 }

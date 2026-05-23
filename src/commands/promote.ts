@@ -11,12 +11,14 @@ import {
 import {
   AliasDriftError,
   createProxyClient as defaultCreateProxyClient,
+  parseFetchTimeoutMs,
   wrapProxyError,
   type ProxyClient,
   type ProxyClientConfig,
 } from "../lib/proxy-client.js";
-import { buildEnvelope, buildErrorEnvelope } from "../output/envelope.js";
+import { buildEnvelope } from "../output/envelope.js";
 import { exitWithCode } from "../output/exit-codes.js";
+import { outputError } from "../output/format.js";
 
 export interface PromoteOptions {
   json: boolean;
@@ -101,6 +103,7 @@ export async function promote(
     const client = mkClient({
       baseUrl,
       getAuthToken: () => identity.token,
+      timeoutMs: parseFetchTimeoutMs(env),
     });
 
     let result: { url: string; deployId: string };
@@ -215,18 +218,14 @@ export async function promote(
     }
   } catch (err) {
     const { code, message } = wrapProxyError("promote", err);
-    if (options.json) {
-      const envelope = buildErrorEnvelope("promote", code, message);
-      if (err instanceof AliasDriftError) {
-        // V3 additive: top-level `current` so scripted callers can
-        // branch + supply a fresh expectedCurrent on next attempt.
-        emitJson({ ...envelope, current: err.current });
-      } else {
-        emitJson(envelope);
-      }
-    } else {
-      error(message);
-    }
+    // V3 additive: top-level `current` so scripted callers can branch +
+    // supply a fresh expectedCurrent on next attempt.
+    const extras =
+      err instanceof AliasDriftError ? { current: err.current } : undefined;
+    outputError({ json: options.json, command: "promote" }, code, message, {
+      logError: error,
+      extras,
+    });
     exit(code);
   }
 }

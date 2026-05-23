@@ -3,6 +3,7 @@ import { DEFAULT_PROXY_URL } from "../../lib/constants.js";
 import { resolveIdentity as defaultResolveIdentity } from "../../lib/identity.js";
 import {
   createProxyClient as defaultCreateProxyClient,
+  parseFetchTimeoutMs,
   type ProxyClient,
   type ProxyClientConfig,
 } from "../../lib/proxy-client.js";
@@ -58,6 +59,7 @@ export async function setupClient(deps: SitesCommandDeps): Promise<{
   const client = mkClient({
     baseUrl,
     getAuthToken: () => identity.token,
+    timeoutMs: parseFetchTimeoutMs(env),
   });
   return { client, identitySource: identity.source };
 }

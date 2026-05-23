@@ -1,7 +1,8 @@
 import { log } from "@clack/prompts";
 import { wrapProxyError } from "../../lib/proxy-client.js";
-import { buildEnvelope, buildErrorEnvelope } from "../../output/envelope.js";
+import { buildEnvelope } from "../../output/envelope.js";
 import { exitWithCode } from "../../output/exit-codes.js";
+import { outputError } from "../../output/format.js";
 import {
   emitJson,
   parseTeamsFlag,
@@ -32,7 +33,7 @@ export async function register(
       throw new UsageError("slug is required (positional argument)");
     }
     const teams = parseTeamsFlag(options.team);
-    const { client } = await setupClient(deps);
+    const { client, identitySource } = await setupClient(deps);
 
     const row = await client.registerSite({
       slug: options.slug,
@@ -46,6 +47,7 @@ export async function register(
           teams: row.teams,
           createdAt: row.createdAt,
           createdBy: row.createdBy,
+          identitySource,
         }),
       );
     } else {
@@ -62,11 +64,9 @@ export async function register(
     }
   } catch (err) {
     const { code, message } = wrapProxyError(command, err);
-    if (options.json) {
-      emitJson(buildErrorEnvelope(command, code, message));
-    } else {
-      error(message);
-    }
+    outputError({ json: options.json, command }, code, message, {
+      logError: error,
+    });
     exit(code);
   }
 }

@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { log } from "@clack/prompts";
+import { log, spinner } from "@clack/prompts";
 import {
   CliError,
   ConfigError,
@@ -25,19 +25,33 @@ import {
 import { suggest } from "../lib/similarity.js";
 import {
   createProxyClient as defaultCreateProxyClient,
+  parseFetchTimeoutMs,
   ProxyError,
   type ProxyClient,
   type ProxyClientConfig,
 } from "../lib/proxy-client.js";
 import { uploadFiles as defaultUploadFiles } from "../lib/upload.js";
-import { buildEnvelope, buildErrorEnvelope } from "../output/envelope.js";
+import { buildEnvelope } from "../output/envelope.js";
 import { EXIT_USAGE, exitWithCode } from "../output/exit-codes.js";
+import { outputError } from "../output/format.js";
 
 export interface DeployOptions {
   json: boolean;
   promote?: boolean;
   /** Override `build.output` from platform.yaml (matches `--dir` flag). */
   dir?: string;
+}
+
+/**
+ * Minimal subset of `@clack/prompts` `SpinnerResult` the deploy command
+ * relies on. Kept narrow so unit tests can inject a vi.fn() quad without
+ * stubbing the full clack surface.
+ */
+export interface SpinnerLike {
+  start(msg?: string): void;
+  message(msg?: string): void;
+  stop(msg?: string): void;
+  error(msg?: string): void;
 }
 
 export interface DeployDeps {
@@ -50,6 +64,7 @@ export interface DeployDeps {
   runBuild?: typeof defaultRunBuild;
   walkFiles?: typeof defaultWalkFiles;
   uploadFiles?: typeof defaultUploadFiles;
+  createSpinner?: () => SpinnerLike;
   logSuccess?: (msg: string) => void;
   logInfo?: (msg: string) => void;
   logWarn?: (msg: string) => void;
@@ -203,6 +218,7 @@ export async function deploy(
   const build = deps.runBuild ?? defaultRunBuild;
   const walk = deps.walkFiles ?? defaultWalkFiles;
   const upload = deps.uploadFiles ?? defaultUploadFiles;
+  const mkSpinner = deps.createSpinner ?? (() => spinner() as SpinnerLike);
   const success = deps.logSuccess ?? ((s: string) => log.success(s));
   const info = deps.logInfo ?? ((s: string) => log.info(s));
   const warn = deps.logWarn ?? ((s: string) => log.warn(s));
@@ -210,7 +226,6 @@ export async function deploy(
   const exit = deps.exit ?? exitWithCode;
 
   try {
-    // 1. Identity.
     const identity = await resolveId({ env });
     if (!identity) {
       throw new CredentialError(
@@ -218,17 +233,17 @@ export async function deploy(
       );
     }
 
-    // 2. Config.
     const config = await readAndParseConfig(cwd, readYaml);
 
-    // 3. Proxy client (early so preflight can run before the slow build).
+    // Proxy client built early so preflight can run before the slow build.
     const baseUrl = env["UNIVERSE_PROXY_URL"] ?? DEFAULT_PROXY_URL;
     const client = mkClient({
       baseUrl,
       getAuthToken: () => identity.token,
+      timeoutMs: parseFetchTimeoutMs(env),
     });
 
-    // 4. Preflight authorization. Catches the most common staff-side
+    // Preflight authorization. Catches the most common staff-side
     // failure (`site_unauthorized`) BEFORE running the build, and
     // surfaces the registry-CLI remediation inline (typo hint +
     // authorized list + `universe sites register/update` commands).
@@ -249,7 +264,6 @@ export async function deploy(
       );
     }
 
-    // 5. Git state (informational).
     const git = gitState();
     if (git.dirty && !options.json) {
       warn(
@@ -258,7 +272,6 @@ export async function deploy(
     }
     const sha = git.hash ?? syntheticSha();
 
-    // 6. Build.
     const outputDir = options.dir ?? config.build.output;
     const buildResult = await build({
       command: config.build.command,
@@ -270,7 +283,6 @@ export async function deploy(
     }
     const resolvedOutputDir = buildResult.outputDir;
 
-    // 7. Walk + ignore.
     const walked = walk(resolvedOutputDir);
     const ignore = createIgnoreFilter(config.deploy.ignore);
     const filtered = walked.filter((f) => !ignore(f.relPath));
@@ -279,7 +291,6 @@ export async function deploy(
     }
     const fileList = filtered.map((f) => f.relPath);
 
-    // 8. Init.
     let initResult;
     try {
       initResult = await client.deployInit({
@@ -291,20 +302,30 @@ export async function deploy(
       rethrowProxy("deploy init failed", err);
     }
 
-    // 8. Upload.
+    // Spinner is created only in non-JSON mode so machine consumers
+    // see a single JSON envelope on stdout. onProgress passes the
+    // per-file callback through to `uploadFiles` — multi-MB /
+    // multi-hundred-file sites previously uploaded silently.
+    const spin = options.json ? null : mkSpinner();
+    spin?.start(`Uploading 0/${filtered.length} files`);
     const uploadResult = await upload({
       client,
       deployId: initResult.deployId,
       jwt: initResult.jwt,
       files: filtered,
+      onProgress: spin
+        ? (p) =>
+            spin.message(`Uploading ${p.uploaded}/${p.total} — ${p.current}`)
+        : undefined,
     });
     if (uploadResult.errors.length > 0) {
+      spin?.error(`Upload failed: ${uploadResult.errors.length} file(s)`);
       const message = `Upload partially failed: ${uploadResult.errors.length} file(s) failed:\n  - ${uploadResult.errors.join("\n  - ")}`;
       // EXIT_PARTIAL is dedicated; throw a CliError that maps to it.
       throw new PartialUploadError(message);
     }
+    spin?.stop(`Uploaded ${uploadResult.fileCount} files`);
 
-    // 9. Finalize.
     const mode: "preview" | "production" = options.promote
       ? "production"
       : "preview";
@@ -320,7 +341,41 @@ export async function deploy(
       rethrowProxy("deploy finalize failed", err);
     }
 
-    // 10. Output.
+    // `--promote` writes a new deploy AND repoints production to it, but
+    // does NOT touch the preview alias — operators eyeballing the
+    // preview URL after a promote-deploy can be surprised to see an
+    // older build. Probe the preview alias and surface the divergence.
+    // JSON mode skips: machine consumers parse `mode` themselves and the
+    // single-envelope contract excludes side-band warns. getAlias
+    // failure is non-fatal — the deploy itself succeeded.
+    if (options.promote && !options.json) {
+      try {
+        const preview = await client.getAlias({
+          site: config.site,
+          mode: "preview",
+        });
+        if (preview && preview.deployId !== finalizeResult.deployId) {
+          warn(
+            `Preview alias still points to ${preview.deployId}; it will not auto-update. Run \`universe static deploy\` (without --promote) to refresh preview.`,
+          );
+        }
+      } catch (err) {
+        // Surface credential-rotation errors loudly even though the
+        // probe itself is best-effort; deploy already succeeded, so
+        // the next `universe` call may fail with no obvious context
+        // unless the operator sees this now. Transient network errors
+        // (timeouts, DNS hiccups) stay swallowed.
+        if (
+          err instanceof ProxyError &&
+          (err.status === 401 || err.status === 403)
+        ) {
+          warn(
+            `Preview alias probe got ${err.status} (${err.code}) — token may need rotation: ${err.message}`,
+          );
+        }
+      }
+    }
+
     if (options.json) {
       emitJson(
         buildEnvelope("deploy", true, {
@@ -370,11 +425,9 @@ export async function deploy(
       code = EXIT_USAGE;
       message = String(err);
     }
-    if (options.json) {
-      emitJson(buildErrorEnvelope("deploy", code, message));
-    } else {
-      error(message);
-    }
+    outputError({ json: options.json, command: "deploy" }, code, message, {
+      logError: error,
+    });
     exit(code);
   }
 }

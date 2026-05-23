@@ -1,7 +1,8 @@
 import { log } from "@clack/prompts";
 import { wrapProxyError, type SiteRow } from "../../lib/proxy-client.js";
-import { buildEnvelope, buildErrorEnvelope } from "../../output/envelope.js";
+import { buildEnvelope } from "../../output/envelope.js";
 import { exitWithCode } from "../../output/exit-codes.js";
+import { outputError } from "../../output/format.js";
 import { emitJson, setupClient, type SitesCommandDeps } from "./_shared.js";
 
 export interface SitesLsOptions {
@@ -37,7 +38,7 @@ export async function ls(
   const exit = deps.exit ?? exitWithCode;
 
   try {
-    const { client } = await setupClient(deps);
+    const { client, identitySource } = await setupClient(deps);
     let rows = await client.listSites();
     let scope: "all" | "mine" = "all";
 
@@ -54,6 +55,7 @@ export async function ls(
           count: rows.length,
           scope,
           sites: rows,
+          identitySource,
         }),
       );
     } else {
@@ -61,11 +63,9 @@ export async function ls(
     }
   } catch (err) {
     const { code, message } = wrapProxyError(command, err);
-    if (options.json) {
-      emitJson(buildErrorEnvelope(command, code, message));
-    } else {
-      error(message);
-    }
+    outputError({ json: options.json, command }, code, message, {
+      logError: error,
+    });
     exit(code);
   }
 }

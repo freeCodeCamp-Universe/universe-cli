@@ -36,6 +36,39 @@ export interface ProxyClientConfig {
   baseUrl: string;
   getAuthToken: () => Promise<string> | string;
   fetch?: typeof globalThis.fetch;
+  /**
+   * Per-request fetch timeout in milliseconds. Defaults to 30000.
+   * Pass 0 to disable (uploads with their own caller-supplied
+   * AbortSignal are unaffected — signals are merged via
+   * AbortSignal.any when both are present).
+   */
+  timeoutMs?: number;
+}
+
+/**
+ * DEFAULT_FETCH_TIMEOUT_MS is the budget for a single fetch
+ * round-trip. Picked to accommodate a slow R2 round-trip during
+ * deploy finalize without leaving an operator staring at a CLI
+ * that will never return; `parseFetchTimeoutMs` reads the env
+ * override.
+ */
+export const DEFAULT_FETCH_TIMEOUT_MS = 30_000;
+
+/**
+ * parseFetchTimeoutMs reads `UNIVERSE_FETCH_TIMEOUT_MS` from the
+ * supplied environment, returning a positive integer or undefined
+ * (which leaves `createProxyClient` on its default). Designed for
+ * setupClient/whoami wiring; surfaces in the public API so command
+ * teardown can share the parse contract.
+ */
+export function parseFetchTimeoutMs(
+  env: NodeJS.ProcessEnv | Record<string, string | undefined>,
+): number | undefined {
+  const raw = env["UNIVERSE_FETCH_TIMEOUT_MS"];
+  if (raw === undefined || raw === "") return undefined;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 0) return undefined;
+  return Math.floor(n);
 }
 
 export type DeployMode = "preview" | "production";
@@ -283,6 +316,41 @@ function stripTrailingSlash(url: string): string {
 export function createProxyClient(cfg: ProxyClientConfig): ProxyClient {
   const base = stripTrailingSlash(cfg.baseUrl);
   const fetchImpl = cfg.fetch ?? globalThis.fetch.bind(globalThis);
+  const timeoutMs = cfg.timeoutMs ?? DEFAULT_FETCH_TIMEOUT_MS;
+
+  /**
+   * withTimeoutSignal returns a new RequestInit whose signal aborts
+   * after `timeoutMs`. If the caller supplied their own signal, the
+   * two are merged via `AbortSignal.any` so explicit cancellation
+   * still works. `timeoutMs <= 0` disables the timeout.
+   */
+  function withTimeoutSignal(init: RequestInit): RequestInit {
+    if (timeoutMs <= 0) return init;
+    const timeoutSignal = AbortSignal.timeout(timeoutMs);
+    // AbortSignal.any: Node ≥20.3 / bun ≥1.0. Pinned by `engines.node`
+    // in package.json (>=24); dropping that floor would silently break
+    // this merge path — caller signal would no longer compose with the
+    // timeout signal and one of the two cancellations would be lost.
+    const merged = init.signal
+      ? AbortSignal.any([init.signal, timeoutSignal])
+      : timeoutSignal;
+    return { ...init, signal: merged };
+  }
+
+  function translateFetchError(err: unknown): never {
+    if (
+      err instanceof DOMException &&
+      (err.name === "TimeoutError" || err.name === "AbortError")
+    ) {
+      throw new ProxyError(
+        0,
+        "timeout",
+        `proxy timed out after ${timeoutMs}ms`,
+      );
+    }
+    const message = err instanceof Error ? err.message : String(err);
+    throw new ProxyError(0, "network_error", `proxy unreachable: ${message}`);
+  }
 
   async function userBearer(): Promise<string> {
     const tok = await cfg.getAuthToken();
@@ -292,10 +360,9 @@ export function createProxyClient(cfg: ProxyClientConfig): ProxyClient {
   async function call<T>(url: string, init: RequestInit): Promise<T> {
     let response: Response;
     try {
-      response = await fetchImpl(url, init);
+      response = await fetchImpl(url, withTimeoutSignal(init));
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      throw new ProxyError(0, "network_error", `proxy unreachable: ${message}`);
+      translateFetchError(err);
     }
     if (!response.ok) {
       const env = await readErrorEnvelope(response);
@@ -374,20 +441,18 @@ export function createProxyClient(cfg: ProxyClientConfig): ProxyClient {
       const url = `${base}/api/site/${encodeURIComponent(req.site)}/alias/${encodeURIComponent(req.mode)}`;
       let response: Response;
       try {
-        response = await fetchImpl(url, {
-          method: "GET",
-          headers: {
-            Authorization: await userBearer(),
-            Accept: "application/json",
-          },
-        });
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        throw new ProxyError(
-          0,
-          "network_error",
-          `proxy unreachable: ${message}`,
+        response = await fetchImpl(
+          url,
+          withTimeoutSignal({
+            method: "GET",
+            headers: {
+              Authorization: await userBearer(),
+              Accept: "application/json",
+            },
+          }),
         );
+      } catch (err) {
+        translateFetchError(err);
       }
       // 404 conflates "site-unknown" and "alias-key-absent" — both mean
       // "no deploy id to read" from caller POV (SPEC §I client surface).
