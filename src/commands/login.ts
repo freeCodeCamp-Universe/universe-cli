@@ -2,6 +2,12 @@ import { log } from "@clack/prompts";
 import { DEFAULT_GH_CLIENT_ID } from "../lib/constants.js";
 import { runDeviceFlow as defaultRunDeviceFlow } from "../lib/device-flow.js";
 import {
+  createProxyClient as defaultCreateProxyClient,
+  parseFetchTimeoutMs,
+  type ProxyClient,
+  type ProxyClientConfig,
+} from "../lib/proxy-client.js";
+import {
   loadToken as defaultLoadToken,
   saveToken as defaultSaveToken,
 } from "../lib/token-store.js";
@@ -22,14 +28,29 @@ export interface LoginDeps {
   runDeviceFlow?: typeof defaultRunDeviceFlow;
   saveToken?: typeof defaultSaveToken;
   loadToken?: typeof defaultLoadToken;
+  createProxyClient?: (cfg: ProxyClientConfig) => ProxyClient;
   env?: NodeJS.ProcessEnv;
   logSuccess?: (msg: string) => void;
   logInfo?: (msg: string) => void;
+  logWarn?: (msg: string) => void;
   logError?: (msg: string) => void;
   exit?: (code: number) => never;
 }
 
 const DEFAULT_SCOPE = "read:org user:email";
+const DEFAULT_PROXY_URL = "https://uploads.freecode.camp";
+const NO_SITES_WARNING = [
+  "Logged in, but the proxy reports 0 authorized sites for your account.",
+  "This usually means the Universe CLI GitHub App is not installed on the org",
+  "that owns the registry-authz team (production: `freeCodeCamp-Universe`), or",
+  "your account is not on a team granted access to any site.",
+  "",
+  "Next steps:",
+  "  1. Run `universe whoami` to confirm the identity that resolved.",
+  "  2. Ask an org owner to install the Universe CLI GitHub App on the org.",
+  "  3. Confirm your team membership at",
+  "     https://github.com/orgs/freeCodeCamp-Universe/teams.",
+].join("\n");
 
 function emitJson(envelope: Record<string, unknown>): void {
   process.stdout.write(JSON.stringify(envelope) + "\n");
@@ -115,9 +136,67 @@ export async function login(
 
   await save(token);
 
+  const selfCheck = await postLoginSelfCheck(token, env, deps);
+
   if (options.json) {
-    emitJson(buildEnvelope("login", true, { stored: true }));
+    emitJson(
+      buildEnvelope("login", true, {
+        stored: true,
+        ...(selfCheck.checked
+          ? {
+              authorizedSitesCount: selfCheck.authorizedSitesCount,
+              ...(selfCheck.warning ? { warning: selfCheck.warning } : {}),
+            }
+          : {}),
+      }),
+    );
   } else {
     success("Logged in. Token stored at ~/.config/universe-cli/token.");
+    if (selfCheck.checked && selfCheck.warning) {
+      const warn = deps.logWarn ?? ((s: string) => log.warn(s));
+      warn(selfCheck.warning);
+    }
+  }
+}
+
+interface SelfCheckResult {
+  /** False if the proxy probe failed (network etc.) — login still succeeds. */
+  checked: boolean;
+  authorizedSitesCount: number;
+  /** Set only when count is 0. Carries the human-readable hint. */
+  warning?: string;
+}
+
+/**
+ * Best-effort post-login probe. Never throws — login itself must
+ * succeed regardless of proxy reachability. If the bearer can't see
+ * any authorized sites, surface the hint so users don't discover the
+ * App-installation gap at `sites register` time.
+ */
+async function postLoginSelfCheck(
+  token: string,
+  env: NodeJS.ProcessEnv,
+  deps: LoginDeps,
+): Promise<SelfCheckResult> {
+  const mkClient = deps.createProxyClient ?? defaultCreateProxyClient;
+  try {
+    const baseUrl = env["UNIVERSE_PROXY_URL"] ?? DEFAULT_PROXY_URL;
+    const client = mkClient({
+      baseUrl,
+      getAuthToken: () => token,
+      timeoutMs: parseFetchTimeoutMs(env),
+    });
+    const result = await client.whoami();
+    const count = result.authorizedSites.length;
+    if (count === 0) {
+      return {
+        checked: true,
+        authorizedSitesCount: 0,
+        warning: NO_SITES_WARNING,
+      };
+    }
+    return { checked: true, authorizedSitesCount: count };
+  } catch {
+    return { checked: false, authorizedSitesCount: 0 };
   }
 }

@@ -6,11 +6,35 @@ interface FakeDeps {
   runDeviceFlow: ReturnType<typeof vi.fn>;
   saveToken: ReturnType<typeof vi.fn>;
   loadToken: ReturnType<typeof vi.fn>;
+  createProxyClient: ReturnType<typeof vi.fn>;
   env: NodeJS.ProcessEnv;
   logSuccess: ReturnType<typeof vi.fn>;
   logInfo: ReturnType<typeof vi.fn>;
+  logWarn: ReturnType<typeof vi.fn>;
   logError: ReturnType<typeof vi.fn>;
   exit: ReturnType<typeof vi.fn>;
+}
+
+/**
+ * Default fake proxy client — whoami returns one authorized site so
+ * the self-check stays quiet for tests that don't care about it.
+ * Override via `createProxyClient` to test the 0-sites warning path
+ * or self-check failures.
+ */
+function mkFakeProxyClient(
+  whoamiImpl?: () => Promise<{
+    login: string;
+    authorizedSites: Array<{ slug: string; teams: string[] }>;
+  }>,
+) {
+  return vi.fn().mockReturnValue({
+    whoami:
+      whoamiImpl ??
+      (async () => ({
+        login: "test-user",
+        authorizedSites: [{ slug: "test-site", teams: ["staff"] }],
+      })),
+  });
 }
 
 function mkDeps(overrides: Partial<FakeDeps> = {}): FakeDeps {
@@ -18,9 +42,11 @@ function mkDeps(overrides: Partial<FakeDeps> = {}): FakeDeps {
     runDeviceFlow: vi.fn().mockResolvedValue("ghu_secret"),
     saveToken: vi.fn().mockResolvedValue(undefined),
     loadToken: vi.fn().mockResolvedValue(null),
+    createProxyClient: mkFakeProxyClient(),
     env: { UNIVERSE_GH_CLIENT_ID: "Iv1.test" },
     logSuccess: vi.fn(),
     logInfo: vi.fn(),
+    logWarn: vi.fn(),
     logError: vi.fn(),
     exit: vi.fn().mockImplementation((_code: number) => {
       throw new Error("__exit__");
@@ -175,5 +201,88 @@ describe("login command", () => {
     expect(deps.logError).toHaveBeenCalledWith(
       expect.stringContaining("denied"),
     );
+  });
+
+  describe("post-login self-check", () => {
+    it("stays quiet when whoami reports authorized sites", async () => {
+      const deps = mkDeps();
+      await login({ json: false }, deps);
+      expect(deps.logWarn).not.toHaveBeenCalled();
+      expect(deps.logSuccess).toHaveBeenCalled();
+    });
+
+    it("warns in text mode when whoami reports 0 authorized sites", async () => {
+      const deps = mkDeps({
+        createProxyClient: mkFakeProxyClient(async () => ({
+          login: "newbie",
+          authorizedSites: [],
+        })),
+      });
+      await login({ json: false }, deps);
+      expect(deps.logWarn).toHaveBeenCalledTimes(1);
+      const warning = deps.logWarn.mock.calls[0]![0] as string;
+      expect(warning).toContain("0 authorized sites");
+      expect(warning).toContain("GitHub App");
+      expect(warning).toContain("freeCodeCamp-Universe");
+    });
+
+    it("includes authorizedSitesCount + warning in JSON success envelope", async () => {
+      const stdout: string[] = [];
+      const writeSpy = vi
+        .spyOn(process.stdout, "write")
+        .mockImplementation((chunk: unknown) => {
+          stdout.push(String(chunk));
+          return true;
+        });
+
+      const deps = mkDeps({
+        createProxyClient: mkFakeProxyClient(async () => ({
+          login: "newbie",
+          authorizedSites: [],
+        })),
+      });
+      await login({ json: true }, deps);
+      writeSpy.mockRestore();
+
+      const lines = stdout.join("").trim().split("\n");
+      const successLine = JSON.parse(lines[0]!);
+      expect(successLine.stored).toBe(true);
+      expect(successLine.authorizedSitesCount).toBe(0);
+      expect(successLine.warning).toContain("0 authorized sites");
+    });
+
+    it("omits warning from JSON envelope when sites count > 0", async () => {
+      const stdout: string[] = [];
+      const writeSpy = vi
+        .spyOn(process.stdout, "write")
+        .mockImplementation((chunk: unknown) => {
+          stdout.push(String(chunk));
+          return true;
+        });
+
+      const deps = mkDeps();
+      await login({ json: true }, deps);
+      writeSpy.mockRestore();
+
+      const lines = stdout.join("").trim().split("\n");
+      const successLine = JSON.parse(lines[0]!);
+      expect(successLine.stored).toBe(true);
+      expect(successLine.authorizedSitesCount).toBe(1);
+      expect(successLine.warning).toBeUndefined();
+    });
+
+    it("login still succeeds when whoami throws (no warning, no error)", async () => {
+      const deps = mkDeps({
+        createProxyClient: mkFakeProxyClient(async () => {
+          throw new Error("network down");
+        }),
+      });
+      await login({ json: false }, deps);
+      expect(deps.saveToken).toHaveBeenCalledWith("ghu_secret");
+      expect(deps.logSuccess).toHaveBeenCalled();
+      expect(deps.logWarn).not.toHaveBeenCalled();
+      expect(deps.logError).not.toHaveBeenCalled();
+      expect(deps.exit).not.toHaveBeenCalled();
+    });
   });
 });
