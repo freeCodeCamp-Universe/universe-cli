@@ -5,17 +5,29 @@ import { loadToken as defaultLoadToken } from "./token-store.js";
 const execFileP = promisify(execFile);
 
 /**
- * Identity priority chain — ADR-016 Q10 (post-F7).
+ * Identity priority chain — ADR-016 Q10 (post-authz-followups).
  *
- *   1. $GITHUB_TOKEN / $GH_TOKEN env (CI explicit)
- *   2. `gh auth token` shell-out (laptop with gh installed)
- *   3. Device-flow stored token (~/.config/universe-cli/token)
+ *   1. $GITHUB_TOKEN env (CI explicit)
+ *   2. $GH_TOKEN env (CI explicit, legacy alias)
+ *   3. Device-flow stored token (~/.config/universe-cli/token) — `universe login`
+ *   4. `gh auth token` shell-out (laptop fallback if no `universe login`)
+ *
+ * Slots 3 and 4 were swapped (was: gh CLI > device-flow) to:
+ *   - Prefer least-privilege: device-flow token is a GitHub App `ghu_`
+ *     user-to-server token scoped to the App's installation; `gh` CLI
+ *     token is a broader `gho_` OAuth user token.
+ *   - Surface App-installation gaps at user time. Previously a working
+ *     `gh` token masked App-install misconfig (see B1).
+ *   - Align runtime identity with the documented onboarding command.
+ *
+ * `gh` CLI remains a working fallback — first-time staff who installed
+ * `gh` but never ran `universe login` still get an identity.
  *
  * GHA OIDC and Woodpecker OIDC slots were dropped: artemis validates
  * bearers via GitHub `GET /user`, which only accepts user-scoped PATs /
- * OAuth tokens — OIDC ID tokens cannot satisfy that probe. CI users
- * must explicitly export `$GITHUB_TOKEN`. Re-add these slots only when
- * artemis grows an OIDC verifier.
+ * OAuth / App user-to-server tokens — OIDC ID tokens cannot satisfy
+ * that probe. CI users must explicitly export `$GITHUB_TOKEN`. Re-add
+ * these slots only when artemis grows an OIDC verifier.
  *
  * Source labels are stable strings used by `whoami` output and tests.
  */
@@ -69,16 +81,19 @@ export async function resolveIdentity(
     return { token: ghTokenEnv.trim(), source: "env_GH_TOKEN" };
   }
 
-  // Slot 2 — gh auth token shell-out.
-  const ghCli = await execGh();
-  if (isNonEmpty(ghCli)) {
-    return { token: ghCli.trim(), source: "gh_cli" };
-  }
-
-  // Slot 3 — device-flow stored token.
+  // Slot 3 — device-flow stored token (`universe login`). Preferred
+  // over `gh` CLI: tighter scope (App installation) and surfaces
+  // App-install gaps immediately for staff users.
   const stored = await loadStored();
   if (isNonEmpty(stored)) {
     return { token: stored.trim(), source: "device_flow" };
+  }
+
+  // Slot 4 — gh auth token shell-out (fallback for users without
+  // `universe login`).
+  const ghCli = await execGh();
+  if (isNonEmpty(ghCli)) {
+    return { token: ghCli.trim(), source: "gh_cli" };
   }
 
   return null;
