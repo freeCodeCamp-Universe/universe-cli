@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-05-23
+
 ### Added
 
 - End-to-end test suite covering all 11 CLI verbs against a local fake-artemis fixture. Two layers under `tests/e2e/`: in-process command-handler tests with the real `proxy-client` (sequence + behavior coverage) and a spawned-binary smoke matrix (cac dispatch + tsup-output regression guard). See `docs/README.md` §Internal conventions for extension notes.
@@ -16,10 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `static deploy --json` no longer prints the build-skipped notice or the git-dirty warning to stdout. Both `info()` and `warn()` are now gated behind `!options.json`, so machine consumers can parse stdout as a single JSON document.
 - `static ls` now returns deploys newest-first. Previously artemis returned the list lexicographically ascending and the CLI did not re-sort, so the top of the list was always the OLDEST deploy. Operators reading `ls` after a successful deploy saw a stale top entry and reasonably concluded that the deploy had not landed — the most likely root cause of the "sites are not updating" reports. The CLI now sorts descending by deployId regardless of server order.
 
-
-
 ## [0.6.0] - 2026-05-13
-
 
 ### Added
 
@@ -29,15 +28,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - extend promote/rollback schema + AliasDriftError (client)
 - add getAlias() to proxy-client (client)
 
-
 ### Fixed
 
 - widen DEPLOY_ID_RE to server parity (client)
 
-
-
 ## [0.5.1] - 2026-05-13
-
 
 ### Fixed
 
@@ -45,8 +40,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - pin --from <id> in preview next-hint (deploy)
 - sort deploys newest-first (ls)
 - silence info+warn under --json (B2) (deploy)
-
-
 
 ## [0.5.0] - 2026-05-11
 
