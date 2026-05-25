@@ -78,7 +78,7 @@ pnpm test:smoke      # opt-in: real-artemis smoke against uploads.freecode.camp
 - **Site-name validation:** lowercase letters, digits, single hyphens; 1–63 chars; no leading/trailing/consecutive hyphens. Source: `SITE_NAME_PATTERN` in `src/lib/platform-yaml.schema.ts`.
 - **`platform.yaml` schema** lives in `src/lib/platform-yaml.schema.ts` (`{site, build?, deploy}`). Strict — unknown keys reject.
 - **Config precedence:** CLI flags > env > `platform.yaml` defaults. Recognized env: `UNIVERSE_PROXY_URL`, `UNIVERSE_GH_CLIENT_ID`.
-- **Identity is a 3-slot priority chain** in `src/lib/identity.ts`: `$GITHUB_TOKEN` / `$GH_TOKEN` → `gh auth token` → device-flow token at `~/.config/universe-cli/token` (mode 0600). artemis validates bearers via GitHub `GET /user`.
+- **Identity is a 3-slot priority chain** in `src/lib/identity.ts`: `$GITHUB_TOKEN` / `$GH_TOKEN` → device-flow token at `~/.config/universe-cli/token` (mode 0600; `universe login`) → `gh auth token` shell-out (laptop fallback). artemis validates bearers via GitHub `GET /user`.
 - **No secrets, no `.env` reads.** Credentials come from the identity chain or `UNIVERSE_PROXY_URL`, never disk.
 - **npm tarball ships `dist/` + `README.md` + `LICENSE`** (see `package.json` `files`). SEA artifacts (`sea-config.json` + `entitlements.plist` + ad-hoc `codesign` on macOS) build the four-platform signed binaries attached to GitHub Releases.
 - **Release is OIDC-only.** `Actions → Release` publishes to npm via Trusted Publisher. No `NPM_TOKEN`. Prereleases (`*-alpha.*`, `*-beta.*`, `*-rc.*`) publish under a non-`latest` dist-tag.

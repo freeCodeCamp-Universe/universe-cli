@@ -5,7 +5,7 @@ Walkthrough for staff deploying a site to `*.freecode.camp` end-to-end. Schema: 
 ## Prerequisites
 
 - `universe` CLI installed ([Install](../README.md#install)).
-- A freeCodeCamp GitHub account that belongs to a team granted access to the target site (the proxy enforces team membership server-side — there is no per-site config in your repo).
+- A GitHub account that is a member of the `freeCodeCamp-Universe` org and belongs to a team granted access to the target site (the proxy enforces team membership server-side — there is no per-site config in your repo).
 
 That's it. No R2 token, no `.env` file, no `S3_*` variables.
 
@@ -168,7 +168,7 @@ universe sites update <slug> --team=staff,news-editors  # replace the teams list
 universe sites rm <slug>                                # delete entry (R2 bytes age out via cron)
 ```
 
-`--team` accepts a comma-separated list and can be passed multiple times. Teams refer to GitHub team slugs in the freeCodeCamp org.
+`--team` accepts a comma-separated list and can be passed multiple times. Teams refer to GitHub team slugs in the `freeCodeCamp-Universe` org.
 
 ## When something breaks
 
@@ -179,6 +179,6 @@ universe sites rm <slug>                                # delete entry (R2 bytes
 | `not a git repository`                       | The CLI stamps deploy ids with a git sha. Initialize git in the project, or run from inside one.                                                                                                                                                                                                                                                                                     |
 | Wrong identity resolved                      | Run `universe whoami` to see which slot fired. Unset `GITHUB_TOKEN` if you didn't intend it.                                                                                                                                                                                                                                                                                         |
 
-If `universe whoami` shows a different identity than expected, the most common cause is an env var (slot 1) overriding your laptop login (slot 3). Unset `GITHUB_TOKEN` for that shell or use a fresh terminal.
+If `universe whoami` shows a different identity than expected, the most common cause is an env var (slot 1) overriding your `universe login` (slot 2). Unset `GITHUB_TOKEN` for that shell or use a fresh terminal.
 
 For anything else — file an issue with the output of `universe whoami --json` and the failing command's `--json` envelope.

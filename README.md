@@ -88,8 +88,8 @@ All commands support `--json` for CI integration.
 The CLI resolves a GitHub identity in this order — first match wins:
 
 1. `$GITHUB_TOKEN` / `$GH_TOKEN` env (CI explicit)
-1. `gh auth token` shell-out (laptop with `gh` installed)
-1. Device-flow stored token at `~/.config/universe-cli/token`
+1. Device-flow stored token at `~/.config/universe-cli/token` (`universe login`)
+1. `gh auth token` shell-out (laptop fallback when no `universe login` token)
 
 CI runners must export `$GITHUB_TOKEN` explicitly. artemis validates the bearer via GitHub `GET /user`, then authorizes server-side against the Valkey-backed registry. Run `universe whoami` to see which slot resolved; inspect the sites you can deploy to with `universe sites ls --mine`.
 
@@ -111,10 +111,10 @@ Full operator walkthrough (login → deploy → promote → rollback, CI shape, 
 
 ## Environment overrides
 
-| Env                         | Default                          | Purpose                                                   |
-| --------------------------- | -------------------------------- | --------------------------------------------------------- |
-| `UNIVERSE_PROXY_URL`        | `https://uploads.freecode.camp`  | Override proxy host (staging etc.)                        |
-| `UNIVERSE_GH_CLIENT_ID`     | _baked-in freeCodeCamp OAuth id_ | Override GitHub OAuth App id (fork tenants, `login` only) |
-| `GITHUB_TOKEN` / `GH_TOKEN` | —                                | Slot 1 of identity chain                                  |
+| Env                         | Default                                        | Purpose                                                    |
+| --------------------------- | ---------------------------------------------- | ---------------------------------------------------------- |
+| `UNIVERSE_PROXY_URL`        | `https://uploads.freecode.camp`                | Override proxy host (staging etc.)                         |
+| `UNIVERSE_GH_CLIENT_ID`     | _baked-in freeCodeCamp-Universe GitHub App id_ | Override GitHub App client id (fork tenants, `login` only) |
+| `GITHUB_TOKEN` / `GH_TOKEN` | —                                              | Slot 1 of identity chain                                   |
 
-The shipped binary embeds the `freeCodeCamp` GitHub OAuth App client id (public; device flow uses no `client_secret`), so `universe login` works out of the box for staff. Fork operators and self-hosted mirror tenants set `UNIVERSE_GH_CLIENT_ID` to their own OAuth App's id — env value wins when set.
+The shipped binary embeds the `freeCodeCamp-Universe` GitHub App client id (public; device flow uses no `client_secret`), so `universe login` works out of the box for staff once the App is installed on their org. Fork operators and self-hosted mirror tenants set `UNIVERSE_GH_CLIENT_ID` to their own GitHub App's id — env value wins when set.
