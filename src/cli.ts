@@ -13,6 +13,7 @@ import { update as sitesUpdate } from "./commands/sites/update.js";
 import { type OutputContext, outputError } from "./output/format.js";
 import { EXIT_USAGE, exitWithCode } from "./output/exit-codes.js";
 import { CliError } from "./errors.js";
+import { installExitNotice, refreshIfStale } from "./lib/update-notifier.js";
 
 declare const __VERSION__: string;
 const version = typeof __VERSION__ !== "undefined" ? __VERSION__ : "0.0.0";
@@ -41,6 +42,9 @@ function findFirstPositional(args: readonly string[]): number {
 }
 
 export function run(argv = process.argv) {
+  installExitNotice(version);
+  void refreshIfStale();
+
   const args = argv.slice(2);
   const firstPosIdx = findFirstPositional(args);
   const namespace = firstPosIdx >= 0 ? args[firstPosIdx] : undefined;
