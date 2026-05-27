@@ -1,7 +1,7 @@
 {
   "name": "@freecodecamp/universe-cli",
   "version": "0.8.0",
-  "main": "dist/index.js",
+  "main": "dist/index.cjs",
   "scripts": {
     "test": "vitest run",
     "test:smoke": "UNIVERSE_E2E_REAL=1 vitest run tests/e2e/smoke-real-artemis.test.ts",
@@ -26,7 +26,7 @@
   ],
   "type": "module",
   "bin": {
-    "universe": "dist/index.js"
+    "universe": "dist/index.cjs"
   },
   "dependencies": {
     "@clack/prompts": "^1.2.0",

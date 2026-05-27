@@ -171,7 +171,7 @@ describe("whoami E2E (real proxy-client + real identity chain)", () => {
   });
 });
 
-describe("whoami binary smoke (spawned dist/index.js)", () => {
+describe("whoami binary smoke (spawned dist/index.cjs)", () => {
   let server: FakeArtemis;
   let env: CliEnv;
 

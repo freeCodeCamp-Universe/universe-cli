@@ -10,14 +10,14 @@ const BIN_PATH = resolve(REPO_ROOT, "dist", "index.cjs");
 const SRC_DIR = resolve(REPO_ROOT, "src");
 
 /**
- * Build dist/index.js exactly once per worker process. Cached promise
+ * Build dist/index.cjs exactly once per worker process. Cached promise
  * dedups concurrent callers within the same vitest worker. Across
  * workers the dist may be rebuilt redundantly — acceptable cost; tsdown
  * writes atomically per-file so concurrent rebuilds don't corrupt
  * output.
  *
- * Staleness rule: rebuild when dist/index.js is missing OR any file
- * under src/ is newer than dist/index.js. Without this, edits to a
+ * Staleness rule: rebuild when dist/index.cjs is missing OR any file
+ * under src/ is newer than dist/index.cjs. Without this, edits to a
  * command handler land in src/ but the binary smoke continues running
  * the prior build — silent false negatives.
  */
