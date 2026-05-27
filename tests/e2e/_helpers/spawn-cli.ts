@@ -6,13 +6,13 @@ import { promisify } from "node:util";
 const execFileP = promisify(execFile);
 
 const REPO_ROOT = resolve(process.cwd());
-const BIN_PATH = resolve(REPO_ROOT, "dist", "index.js");
+const BIN_PATH = resolve(REPO_ROOT, "dist", "index.cjs");
 const SRC_DIR = resolve(REPO_ROOT, "src");
 
 /**
  * Build dist/index.js exactly once per worker process. Cached promise
  * dedups concurrent callers within the same vitest worker. Across
- * workers the dist may be rebuilt redundantly — acceptable cost; tsup
+ * workers the dist may be rebuilt redundantly — acceptable cost; tsdown
  * writes atomically per-file so concurrent rebuilds don't corrupt
  * output.
  *

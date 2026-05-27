@@ -5,7 +5,7 @@
   "scripts": {
     "test": "vitest run",
     "test:smoke": "UNIVERSE_E2E_REAL=1 vitest run tests/e2e/smoke-real-artemis.test.ts",
-    "build": "tsup",
+    "build": "tsdown",
     "lint": "oxlint src tests",
     "typecheck": "tsc --noEmit",
     "prepare": "husky"
@@ -39,7 +39,7 @@
     "husky": "^9.1.7",
     "oxlint": "^1.60.0",
     "postject": "1.0.0-alpha.6",
-    "tsup": "^8.5.1",
+    "tsdown": "0.22.0",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4"
   },

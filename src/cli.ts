@@ -19,9 +19,9 @@ import { type OutputContext, outputError } from "./output/format.js";
 import { EXIT_USAGE, exitWithCode } from "./output/exit-codes.js";
 import { CliError } from "./errors.js";
 import { installExitNotice, refreshIfStale } from "./lib/update-notifier.js";
+import pkg from "../package.json" with { type: "json" };
 
-declare const __VERSION__: string;
-const version = typeof __VERSION__ !== "undefined" ? __VERSION__ : "0.0.0";
+const { version } = pkg;
 
 function handleActionError(command: string, json: boolean, err: unknown): void {
   const ctx: OutputContext = { json, command };

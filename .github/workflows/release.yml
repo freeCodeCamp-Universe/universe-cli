@@ -75,7 +75,7 @@ jobs:
           node-version: "24"
           cache: "pnpm"
       - run: pnpm install --frozen-lockfile
-      - run: pnpm tsup
+      - run: pnpm tsdown
       - name: Generate SEA blob
         run: node --experimental-sea-config sea-config.json
       - name: Create executable
@@ -123,10 +123,21 @@ jobs:
           registry-url: "https://registry.npmjs.org"
       - run: pnpm install --frozen-lockfile
       - run: pnpm tsup
-      # package.json is already at the release version (release-please bumped it
-      # on the tagged commit). Stable-only: dist-tag is always `latest`.
-      # --provenance is implicit under Trusted Publishing; kept explicit.
-      - run: npm publish --provenance --access public --tag latest
+      - run: npm version "$VERSION" --no-git-tag-version --allow-same-version
+      # G1 — derive npm dist-tag from the version. Stable releases land
+      # on `latest`; prereleases on `alpha` / `beta` / `next` so that
+      # `npm i -g @freecodecamp/universe-cli` keeps resolving to the
+      # last stable for unflagged consumers.
+      - name: Resolve npm dist-tag
+        id: npmtag
+        run: |
+          case "$VERSION" in
+            *-alpha*) echo "tag=alpha" >> "$GITHUB_OUTPUT" ;;
+            *-beta*)  echo "tag=beta"  >> "$GITHUB_OUTPUT" ;;
+            *-rc*)    echo "tag=next"  >> "$GITHUB_OUTPUT" ;;
+            *)        echo "tag=latest" >> "$GITHUB_OUTPUT" ;;
+          esac
+      - run: npm publish --provenance --access public --tag ${{ steps.npmtag.outputs.tag }}
 
   upload:
     needs: [release-please, build, publish]

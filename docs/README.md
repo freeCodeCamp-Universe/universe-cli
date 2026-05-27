@@ -62,7 +62,7 @@ src/
 tests/
   e2e/                # in-process fake-artemis + spawned-binary smoke
   commands/ deploy/ lib/ output/   # unit, mirrors src/
-dist/                 # tsup output (ESM index.js + CJS index.cjs for SEA)
+dist/                 # tsdown output (CJS index.cjs for SEA)
 ```
 
 ## Build & test
@@ -72,7 +72,7 @@ pnpm install
 pnpm lint            # oxlint
 pnpm test            # vitest run
 pnpm typecheck       # tsc --noEmit
-pnpm build           # tsup → dist/
+pnpm build           # tsdown → dist/
 pnpm test:smoke      # opt-in: real-artemis smoke against uploads.freecode.camp
 ```
 
