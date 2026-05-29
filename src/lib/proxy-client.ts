@@ -152,6 +152,63 @@ export interface DeleteSiteRequest {
   slug: string;
 }
 
+export type RepoVisibility = "public" | "private";
+export type RepoRequestStatus =
+  | "pending"
+  | "approved"
+  | "active"
+  | "rejected"
+  | "failed";
+
+/**
+ * Canonical repo-request row returned by every `/api/repo*` endpoint.
+ * camelCase mirrors the artemis Go struct tags (dossier §I/§V6). Optional
+ * fields are absent until the lifecycle reaches the relevant state
+ * (`url` on active, `error` on failed, `approver`/`rejectReason` on
+ * resolution).
+ */
+export interface RepoRow {
+  id: string;
+  name: string;
+  owner: string;
+  visibility: RepoVisibility;
+  description?: string;
+  template?: string;
+  status: RepoRequestStatus;
+  url?: string;
+  error?: string;
+  requestedBy: string;
+  approver?: string;
+  rejectReason?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateRepoRequestBody {
+  name: string;
+  visibility?: RepoVisibility;
+  description?: string;
+  template?: string;
+}
+
+export interface ListRepoRequestsQuery {
+  status?: string;
+  mine?: boolean;
+}
+
+export type RepoApproveOutcome = "ok" | "approved_failed";
+
+/**
+ * 200 body of POST /api/repo/{id}/approve. `ok` → repo created (status
+ * active); `approved_failed` → approval recorded but GitHub creation
+ * failed (status failed, error populated). A 409 already_resolved (lost
+ * the approval race) surfaces as a ProxyError, not this shape.
+ */
+export interface RepoApproveResult {
+  outcome: RepoApproveOutcome;
+  request: RepoRow;
+}
+
 export interface ProxyClient {
   whoami(): Promise<WhoAmIResponse>;
   deployInit(req: DeployInitRequest): Promise<DeployInitResponse>;
@@ -176,6 +233,12 @@ export interface ProxyClient {
   listSites(): Promise<SiteRow[]>;
   updateSite(req: UpdateSiteRequest): Promise<SiteRow>;
   deleteSite(req: DeleteSiteRequest): Promise<void>;
+  createRepoRequest(req: CreateRepoRequestBody): Promise<RepoRow>;
+  listRepoRequests(req?: ListRepoRequestsQuery): Promise<RepoRow[]>;
+  getRepoRequest(id: string): Promise<RepoRow>;
+  approveRepoRequest(req: { id: string }): Promise<RepoApproveResult>;
+  rejectRepoRequest(req: { id: string; reason?: string }): Promise<RepoRow>;
+  listRepoTemplates(): Promise<string[]>;
 }
 
 /**
@@ -547,6 +610,91 @@ export function createProxyClient(cfg: ProxyClientConfig): ProxyClient {
           Accept: "application/json",
         },
       });
+    },
+
+    async createRepoRequest(req) {
+      const body: Record<string, unknown> = { name: req.name };
+      if (req.visibility !== undefined) body.visibility = req.visibility;
+      if (req.description !== undefined) body.description = req.description;
+      // template omitted (never empty string) when blank — V7.
+      if (req.template !== undefined && req.template !== "") {
+        body.template = req.template;
+      }
+      return call<RepoRow>(`${base}/api/repo`, {
+        method: "POST",
+        headers: {
+          Authorization: await userBearer(),
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+    },
+
+    async listRepoRequests(req) {
+      const params = new URLSearchParams();
+      if (req?.status) params.set("status", req.status);
+      if (req?.mine) params.set("mine", "1");
+      const qs = params.toString();
+      const url = `${base}/api/repos${qs ? `?${qs}` : ""}`;
+      return call<RepoRow[]>(url, {
+        method: "GET",
+        headers: {
+          Authorization: await userBearer(),
+          Accept: "application/json",
+        },
+      });
+    },
+
+    async getRepoRequest(id) {
+      const url = `${base}/api/repo/${encodeURIComponent(id)}`;
+      return call<RepoRow>(url, {
+        method: "GET",
+        headers: {
+          Authorization: await userBearer(),
+          Accept: "application/json",
+        },
+      });
+    },
+
+    async approveRepoRequest(req) {
+      const url = `${base}/api/repo/${encodeURIComponent(req.id)}/approve`;
+      return call<RepoApproveResult>(url, {
+        method: "POST",
+        headers: {
+          Authorization: await userBearer(),
+          Accept: "application/json",
+        },
+      });
+    },
+
+    async rejectRepoRequest(req) {
+      const url = `${base}/api/repo/${encodeURIComponent(req.id)}/reject`;
+      const body: Record<string, unknown> = {};
+      if (req.reason !== undefined) body.reason = req.reason;
+      return call<RepoRow>(url, {
+        method: "POST",
+        headers: {
+          Authorization: await userBearer(),
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+    },
+
+    async listRepoTemplates() {
+      const res = await call<{ templates: string[] }>(
+        `${base}/api/repo/templates`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: await userBearer(),
+            Accept: "application/json",
+          },
+        },
+      );
+      return res.templates ?? [];
     },
   };
 }

@@ -1038,3 +1038,176 @@ describe("createProxyClient", () => {
     });
   });
 });
+
+const sampleRepoRow = {
+  id: "req_001",
+  name: "learn-python-rpg",
+  owner: "freeCodeCamp-Universe",
+  visibility: "private",
+  status: "pending",
+  requestedBy: "alice",
+  createdAt: "2026-05-29T12:00:00Z",
+  updatedAt: "2026-05-29T12:00:00Z",
+};
+
+describe("createProxyClient — repo requests", () => {
+  it("createRepoRequest POSTs /api/repo and omits empty template", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(jsonResponse(201, sampleRepoRow));
+    const client = createProxyClient({
+      baseUrl,
+      getAuthToken,
+      fetch: fetchMock,
+    });
+
+    const row = await client.createRepoRequest({
+      name: "learn-python-rpg",
+      visibility: "private",
+      template: "",
+    });
+
+    expect(getUrl(fetchMock.mock.calls[0])).toBe(`${baseUrl}/api/repo`);
+    const init = getInit(fetchMock.mock.calls[0]);
+    expect(init.method).toBe("POST");
+    expect(init.headers.Authorization).toBe("Bearer ghp_test");
+    const body = JSON.parse(init.body as string) as Record<string, unknown>;
+    expect(body).toEqual({ name: "learn-python-rpg", visibility: "private" });
+    expect(body.template).toBeUndefined();
+    expect(row.id).toBe("req_001");
+  });
+
+  it("listRepoRequests builds status + mine query", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(jsonResponse(200, [sampleRepoRow]));
+    const client = createProxyClient({
+      baseUrl,
+      getAuthToken,
+      fetch: fetchMock,
+    });
+
+    const rows = await client.listRepoRequests({ status: "all", mine: true });
+    expect(getUrl(fetchMock.mock.calls[0])).toBe(
+      `${baseUrl}/api/repos?status=all&mine=1`,
+    );
+    expect(rows).toHaveLength(1);
+  });
+
+  it("listRepoRequests with no args hits bare /api/repos", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, []));
+    const client = createProxyClient({
+      baseUrl,
+      getAuthToken,
+      fetch: fetchMock,
+    });
+    await client.listRepoRequests();
+    expect(getUrl(fetchMock.mock.calls[0])).toBe(`${baseUrl}/api/repos`);
+  });
+
+  it("getRepoRequest GETs the id-scoped path", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(jsonResponse(200, sampleRepoRow));
+    const client = createProxyClient({
+      baseUrl,
+      getAuthToken,
+      fetch: fetchMock,
+    });
+    await client.getRepoRequest("req_001");
+    expect(getUrl(fetchMock.mock.calls[0])).toBe(`${baseUrl}/api/repo/req_001`);
+  });
+
+  it("approveRepoRequest returns the outcome envelope", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse(200, {
+        outcome: "ok",
+        request: { ...sampleRepoRow, status: "active", url: "https://x" },
+      }),
+    );
+    const client = createProxyClient({
+      baseUrl,
+      getAuthToken,
+      fetch: fetchMock,
+    });
+    const res = await client.approveRepoRequest({ id: "req_001" });
+    expect(getUrl(fetchMock.mock.calls[0])).toBe(
+      `${baseUrl}/api/repo/req_001/approve`,
+    );
+    expect(getInit(fetchMock.mock.calls[0]).method).toBe("POST");
+    expect(res.outcome).toBe("ok");
+    expect(res.request.status).toBe("active");
+  });
+
+  it("approveRepoRequest maps 409 already_resolved to EXIT_USAGE ProxyError", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse(409, {
+        error: {
+          code: "already_resolved",
+          message: "resolved by another admin",
+        },
+      }),
+    );
+    const client = createProxyClient({
+      baseUrl,
+      getAuthToken,
+      fetch: fetchMock,
+    });
+    await expect(
+      client.approveRepoRequest({ id: "req_001" }),
+    ).rejects.toMatchObject({ code: "already_resolved", exitCode: EXIT_USAGE });
+  });
+
+  it("rejectRepoRequest sends the reason", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        jsonResponse(200, { ...sampleRepoRow, status: "rejected" }),
+      );
+    const client = createProxyClient({
+      baseUrl,
+      getAuthToken,
+      fetch: fetchMock,
+    });
+    await client.rejectRepoRequest({ id: "req_001", reason: "out of scope" });
+    const init = getInit(fetchMock.mock.calls[0]);
+    expect(getUrl(fetchMock.mock.calls[0])).toBe(
+      `${baseUrl}/api/repo/req_001/reject`,
+    );
+    expect(JSON.parse(init.body as string)).toEqual({ reason: "out of scope" });
+  });
+
+  it("listRepoTemplates unwraps the templates array", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        jsonResponse(200, { templates: ["hello-universe", "starter"] }),
+      );
+    const client = createProxyClient({
+      baseUrl,
+      getAuthToken,
+      fetch: fetchMock,
+    });
+    const t = await client.listRepoTemplates();
+    expect(getUrl(fetchMock.mock.calls[0])).toBe(
+      `${baseUrl}/api/repo/templates`,
+    );
+    expect(t).toEqual(["hello-universe", "starter"]);
+  });
+
+  it("createRepoRequest maps 403 to EXIT_CREDENTIALS", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse(403, {
+        error: { code: "user_unauthorized", message: "not on staff" },
+      }),
+    );
+    const client = createProxyClient({
+      baseUrl,
+      getAuthToken,
+      fetch: fetchMock,
+    });
+    await expect(client.createRepoRequest({ name: "x" })).rejects.toMatchObject(
+      { exitCode: EXIT_CREDENTIALS },
+    );
+  });
+});
