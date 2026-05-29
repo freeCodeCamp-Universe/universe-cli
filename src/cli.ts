@@ -10,6 +10,11 @@ import { ls as sitesLs } from "./commands/sites/ls.js";
 import { register as sitesRegister } from "./commands/sites/register.js";
 import { rm as sitesRm } from "./commands/sites/rm.js";
 import { update as sitesUpdate } from "./commands/sites/update.js";
+import { approve as repoApprove } from "./commands/repo/approve.js";
+import { create as repoCreate } from "./commands/repo/create.js";
+import { ls as repoLs } from "./commands/repo/ls.js";
+import { reject as repoReject } from "./commands/repo/reject.js";
+import { status as repoStatus } from "./commands/repo/status.js";
 import { type OutputContext, outputError } from "./output/format.js";
 import { EXIT_USAGE, exitWithCode } from "./output/exit-codes.js";
 import { CliError } from "./errors.js";
@@ -50,6 +55,7 @@ export function run(argv = process.argv) {
   const namespace = firstPosIdx >= 0 ? args[firstPosIdx] : undefined;
   const isStatic = namespace === "static";
   const isSites = namespace === "sites";
+  const isRepo = namespace === "repo";
 
   if (isSites) {
     const sitesArgs = [
@@ -141,6 +147,130 @@ export function run(argv = process.argv) {
     sitesCli.help();
     sitesCli.version(version);
     sitesCli.parse(["node", "universe-sites", ...sitesArgs]);
+    return;
+  }
+
+  if (isRepo) {
+    const repoArgs = [
+      ...args.slice(0, firstPosIdx),
+      ...args.slice(firstPosIdx + 1),
+    ];
+    const repoCli = cac("universe repo");
+
+    repoCli
+      .command("create [name]", "Request a new repository (staff only)")
+      .option("--json", "Output as JSON")
+      .option("--visibility <vis>", "public or private (default: private)")
+      .option("--description <text>", "Repository description")
+      .option(
+        "--template <name>",
+        "Org template repo to generate from; omit for a blank repo",
+      )
+      .option("--yes", "Skip prompts + confirmation (required for non-TTY)")
+      .action(
+        async (
+          name: string | undefined,
+          flags: {
+            json?: boolean;
+            visibility?: string;
+            description?: string;
+            template?: string;
+            yes?: boolean;
+          },
+        ) => {
+          try {
+            await repoCreate({
+              json: flags.json ?? false,
+              name,
+              visibility: flags.visibility,
+              description: flags.description,
+              template: flags.template,
+              yes: flags.yes ?? false,
+            });
+          } catch (err: unknown) {
+            handleActionError("repo create", flags.json ?? false, err);
+          }
+        },
+      );
+
+    repoCli
+      .command("ls", "List repo requests (default: pending)")
+      .option("--json", "Output as JSON")
+      .option(
+        "--status <status>",
+        "pending | approved | active | rejected | failed | all",
+      )
+      .option("--mine", "Only requests you submitted")
+      .action(
+        async (flags: { json?: boolean; status?: string; mine?: boolean }) => {
+          try {
+            await repoLs({
+              json: flags.json ?? false,
+              status: flags.status,
+              mine: flags.mine ?? false,
+            });
+          } catch (err: unknown) {
+            handleActionError("repo ls", flags.json ?? false, err);
+          }
+        },
+      );
+
+    repoCli
+      .command(
+        "approve <id>",
+        "Approve a pending request — creates the repo (admin only)",
+      )
+      .option("--json", "Output as JSON")
+      .option("--yes", "Skip the confirmation prompt")
+      .action(async (id: string, flags: { json?: boolean; yes?: boolean }) => {
+        try {
+          await repoApprove({
+            json: flags.json ?? false,
+            id,
+            yes: flags.yes ?? false,
+          });
+        } catch (err: unknown) {
+          handleActionError("repo approve", flags.json ?? false, err);
+        }
+      });
+
+    repoCli
+      .command("reject <id>", "Reject a pending request (admin only)")
+      .option("--json", "Output as JSON")
+      .option("--reason <text>", "Reason shown to the requester")
+      .option("--yes", "Skip the confirmation prompt")
+      .action(
+        async (
+          id: string,
+          flags: { json?: boolean; reason?: string; yes?: boolean },
+        ) => {
+          try {
+            await repoReject({
+              json: flags.json ?? false,
+              id,
+              reason: flags.reason,
+              yes: flags.yes ?? false,
+            });
+          } catch (err: unknown) {
+            handleActionError("repo reject", flags.json ?? false, err);
+          }
+        },
+      );
+
+    repoCli
+      .command("status <id>", "Show a request's current state")
+      .option("--json", "Output as JSON")
+      .action(async (id: string, flags: { json?: boolean }) => {
+        try {
+          await repoStatus({ json: flags.json ?? false, id });
+        } catch (err: unknown) {
+          handleActionError("repo status", flags.json ?? false, err);
+        }
+      });
+
+    repoCli.help();
+    repoCli.version(version);
+    repoCli.parse(["node", "universe-repo", ...repoArgs]);
     return;
   }
 
@@ -267,6 +397,10 @@ export function run(argv = process.argv) {
     // above intercepts before cac runs, so these actions are unreachable.
     cli.command("static <subcommand>", "Static site deployment commands");
     cli.command("sites <subcommand>", "Static site registry commands");
+    cli.command(
+      "repo <subcommand>",
+      "Repository creation + approval queue commands",
+    );
 
     cli.help();
     cli.version(version);

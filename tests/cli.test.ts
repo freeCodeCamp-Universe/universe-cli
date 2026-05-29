@@ -130,15 +130,26 @@ vi.mock("../src/commands/logout.js", () => ({
 vi.mock("../src/commands/whoami.js", () => ({
   whoami: vi.fn(),
 }));
+vi.mock("../src/commands/repo/create.js", () => ({ create: vi.fn() }));
+vi.mock("../src/commands/repo/ls.js", () => ({ ls: vi.fn() }));
+vi.mock("../src/commands/repo/approve.js", () => ({ approve: vi.fn() }));
+vi.mock("../src/commands/repo/reject.js", () => ({ reject: vi.fn() }));
+vi.mock("../src/commands/repo/status.js", () => ({ status: vi.fn() }));
 
 import { deploy } from "../src/commands/deploy.js";
 import { login } from "../src/commands/login.js";
 import { logout } from "../src/commands/logout.js";
 import { whoami } from "../src/commands/whoami.js";
+import { create as repoCreate } from "../src/commands/repo/create.js";
+import { ls as repoLs } from "../src/commands/repo/ls.js";
+import { approve as repoApprove } from "../src/commands/repo/approve.js";
 const mockDeploy = vi.mocked(deploy);
 const mockLogin = vi.mocked(login);
 const mockLogout = vi.mocked(logout);
 const mockWhoami = vi.mocked(whoami);
+const mockRepoCreate = vi.mocked(repoCreate);
+const mockRepoLs = vi.mocked(repoLs);
+const mockRepoApprove = vi.mocked(repoApprove);
 
 describe("top-level error handling", () => {
   beforeEach(() => {
@@ -304,6 +315,85 @@ describe("universe static namespace", () => {
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(mockDeploy).toHaveBeenCalledWith(
       expect.objectContaining({ json: true, promote: true }),
+    );
+  });
+});
+
+describe("universe repo namespace", () => {
+  let output: string;
+
+  beforeEach(() => {
+    output = "";
+    vi.spyOn(process.stdout, "write").mockImplementation(((chunk: unknown) => {
+      output += String(chunk);
+      return true;
+    }) as never);
+    vi.spyOn(console, "log").mockImplementation(((...args: unknown[]) => {
+      output += args.map(String).join(" ") + "\n";
+    }) as never);
+    vi.spyOn(console, "info").mockImplementation(((...args: unknown[]) => {
+      output += args.map(String).join(" ") + "\n";
+    }) as never);
+    vi.spyOn(process, "exit").mockImplementation((() => {}) as never);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("repo --help lists subcommands (create, ls, approve, reject, status)", () => {
+    run(["node", "universe", "repo", "--help"]);
+    expect(output).toContain("create");
+    expect(output).toContain("ls");
+    expect(output).toContain("approve");
+    expect(output).toContain("reject");
+    expect(output).toContain("status");
+  });
+
+  it("repo create --help shows create-specific options", () => {
+    run(["node", "universe", "repo", "create", "--help"]);
+    expect(output).toContain("--visibility");
+    expect(output).toContain("--template");
+    expect(output).toContain("--yes");
+  });
+
+  it("global --json BEFORE 'repo' still routes to repoCli", async () => {
+    mockRepoLs.mockResolvedValue(undefined);
+    run(["node", "universe", "--json", "repo", "ls"]);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(mockRepoLs).toHaveBeenCalledWith(
+      expect.objectContaining({ json: true }),
+    );
+  });
+
+  it("repo create passes the positional name + flags", async () => {
+    mockRepoCreate.mockResolvedValue(undefined);
+    run([
+      "node",
+      "universe",
+      "repo",
+      "create",
+      "learn-python-rpg",
+      "--visibility",
+      "public",
+      "--yes",
+    ]);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(mockRepoCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "learn-python-rpg",
+        visibility: "public",
+        yes: true,
+      }),
+    );
+  });
+
+  it("repo approve passes the id positional", async () => {
+    mockRepoApprove.mockResolvedValue(undefined);
+    run(["node", "universe", "repo", "approve", "req_001", "--yes"]);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(mockRepoApprove).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "req_001", yes: true }),
     );
   });
 });
