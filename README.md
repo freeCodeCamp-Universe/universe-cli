@@ -81,6 +81,19 @@ universe sites update <slug> --team=<name>...       # replace teams list (staff)
 universe sites rm <slug>                            # delete entry (staff; R2 deploy bytes untouched)
 ```
 
+Repository creation + approval queue (namespaced under `repo`):
+
+```sh
+universe repo create [name] [--visibility public|private] [--template <repo>] [--description <text>] [--yes]
+                                                    # request a repo in freeCodeCamp-Universe (staff; prompts when run bare)
+universe repo ls [--status <state>] [--mine]        # list requests (default: pending; state ∈ pending|approved|active|rejected|failed|all)
+universe repo status <id>                           # show one request's lifecycle state
+universe repo approve <id> [--yes]                  # approve → creates the repo via the Apollo-11 App (admin)
+universe repo reject <id> [--reason <text>] [--yes] # reject a pending request (admin)
+```
+
+Repo requests enter an artemis-owned approval queue (independent of the legacy Windmill flow). The Apollo-11 GitHub App key lives in the cluster, never the CLI — the CLI only carries your GitHub bearer.
+
 All commands support `--json` for CI integration.
 
 ## Identity (priority chain)

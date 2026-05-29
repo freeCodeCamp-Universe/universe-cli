@@ -170,6 +170,48 @@ universe sites rm <slug>                                # delete entry (R2 bytes
 
 `--team` accepts a comma-separated list and can be passed multiple times. Teams refer to GitHub team slugs in the `freeCodeCamp-Universe` org.
 
+## Creating a repository
+
+Staff can request a new repository in the `freeCodeCamp-Universe` org. The request enters an approval queue; an admin approves it, and the proxy creates the repo via the Apollo-11 GitHub App. (This replaces the old Google Chat / Windmill flow — same outcome, run from your terminal.)
+
+### Request a repo (staff)
+
+Run it interactively — the CLI prompts for name, visibility, description, and an optional template:
+
+```sh
+universe repo create
+```
+
+Or pass everything as flags (also the CI / non-interactive form — `--yes` skips the confirmation):
+
+```sh
+universe repo create learn-python-rpg --visibility private --template hello-universe --yes
+```
+
+- **Name** — starts with a letter or digit, then letters, digits, `.`, `_`, `-` (≤100 chars).
+- **Visibility** — `private` (default) or `public`.
+- **Template** — an org template repo to generate from; omit for a blank repo. The interactive picker lists the templates the App can actually clone; if that list can't be fetched it falls back to free-text.
+
+The request is queued as `pending`. Track it:
+
+```sh
+universe repo ls                 # your view of the pending queue
+universe repo ls --mine          # only the requests you submitted
+universe repo status <id>        # one request's full lifecycle state
+```
+
+### Approve or reject (admin)
+
+Admins (a dedicated GitHub team in the org) resolve pending requests. Approval creates the repo synchronously, so you see the outcome inline:
+
+```sh
+universe repo ls --status pending
+universe repo approve <id>                 # confirms, then creates the repo via the Apollo-11 App
+universe repo reject <id> --reason "out of scope"
+```
+
+If GitHub creation fails after approval (e.g. the App lacks `Contents:read` on a template), the command reports `approved, but repository creation failed` with the error and exits non-zero — the request shows `failed` and its name is freed for a retry. A request another admin already resolved returns *already resolved* (no double-creation).
+
 ## When something breaks
 
 | Symptom                                      | Try                                                                                                                                                                                                                                                                                                                                                                                  |
