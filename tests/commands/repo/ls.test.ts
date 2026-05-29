@@ -99,4 +99,23 @@ describe("repo ls command", () => {
       expect.stringContaining("alpha"),
     );
   });
+
+  it("rejects an unknown --status with a usage error before any call", async () => {
+    const deps = mkDeps();
+    await expect(ls({ json: false, status: "actve" }, deps)).rejects.toThrow(
+      "__exit__",
+    );
+    expect(deps.exit).toHaveBeenCalledWith(10);
+    expect(deps.createProxyClient).not.toHaveBeenCalled();
+  });
+
+  it("accepts the 'all' pseudo-status", async () => {
+    const deps = mkDeps();
+    await ls({ json: false, status: "all" }, deps);
+    const proxy = deps.createProxyClient.mock.results[0]?.value;
+    expect(proxy.listRepoRequests).toHaveBeenCalledWith({
+      status: "all",
+      mine: false,
+    });
+  });
 });

@@ -1,4 +1,5 @@
 import { log } from "@clack/prompts";
+import { UsageError } from "../../errors.js";
 import { wrapProxyError } from "../../lib/proxy-client.js";
 import { buildEnvelope } from "../../output/envelope.js";
 import { exitWithCode } from "../../output/exit-codes.js";
@@ -9,6 +10,10 @@ import {
   type RepoCommandDeps,
   setupClient,
 } from "./_shared.js";
+import { repoStatusSchema } from "./schema.js";
+
+/** Closed set accepted by `--status`: the row statuses plus `all`. */
+const LS_STATUSES = [...repoStatusSchema.options, "all"] as const;
 
 export interface RepoLsOptions {
   json: boolean;
@@ -28,6 +33,14 @@ export async function ls(
   const exit = deps.exit ?? exitWithCode;
 
   try {
+    if (
+      options.status !== undefined &&
+      !(LS_STATUSES as readonly string[]).includes(options.status)
+    ) {
+      throw new UsageError(
+        `invalid --status "${options.status}": must be one of ${LS_STATUSES.join(", ")}`,
+      );
+    }
     const { client, identitySource } = await setupClient(deps);
     const rows = await client.listRepoRequests({
       status: options.status,
