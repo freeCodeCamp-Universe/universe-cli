@@ -29,10 +29,7 @@ export async function reject(
   const error = deps.logError ?? ((s: string) => log.error(s));
   const exit = deps.exit ?? exitWithCode;
   const prompts = deps.prompts ?? defaultRepoPrompts;
-  const interactive =
-    !options.json &&
-    !options.yes &&
-    (deps.isTTY ?? Boolean(process.stdout.isTTY));
+  const isTTY = deps.isTTY ?? Boolean(process.stdout.isTTY);
 
   try {
     if (!options.id || options.id.trim().length === 0) {
@@ -40,7 +37,14 @@ export async function reject(
     }
     const { client, identitySource } = await setupClient(deps);
 
-    if (interactive) {
+    // Confirmation required unless --yes / --json; a non-TTY human
+    // session must pass --yes rather than silently rejecting.
+    if (!options.json && !options.yes) {
+      if (!isTTY) {
+        throw new UsageError(
+          "non-interactive session: pass --yes to reject without confirmation",
+        );
+      }
       const cur = await client.getRepoRequest(options.id);
       const ok = await prompts.confirm({
         message: `Reject the request for "${cur.name}" by ${cur.requestedBy}?`,

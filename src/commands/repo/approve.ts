@@ -1,8 +1,8 @@
 import { log } from "@clack/prompts";
-import { ConfirmError } from "../../errors.js";
+import { ConfirmError, StorageError } from "../../errors.js";
 import { wrapProxyError } from "../../lib/proxy-client.js";
 import { buildEnvelope } from "../../output/envelope.js";
-import { EXIT_STORAGE, exitWithCode } from "../../output/exit-codes.js";
+import { exitWithCode } from "../../output/exit-codes.js";
 import { outputError } from "../../output/format.js";
 import {
   defaultRepoPrompts,
@@ -28,10 +28,7 @@ export async function approve(
   const error = deps.logError ?? ((s: string) => log.error(s));
   const exit = deps.exit ?? exitWithCode;
   const prompts = deps.prompts ?? defaultRepoPrompts;
-  const interactive =
-    !options.json &&
-    !options.yes &&
-    (deps.isTTY ?? Boolean(process.stdout.isTTY));
+  const isTTY = deps.isTTY ?? Boolean(process.stdout.isTTY);
 
   try {
     if (!options.id || options.id.trim().length === 0) {
@@ -39,7 +36,15 @@ export async function approve(
     }
     const { client, identitySource } = await setupClient(deps);
 
-    if (interactive) {
+    // Confirmation is required unless --yes (explicit opt-out) or --json
+    // (automation path). A non-TTY human session cannot prompt, so it
+    // must pass --yes rather than silently approving.
+    if (!options.json && !options.yes) {
+      if (!isTTY) {
+        throw new UsageError(
+          "non-interactive session: pass --yes to approve without confirmation",
+        );
+      }
       const cur = await client.getRepoRequest(options.id);
       const ok = await prompts.confirm({
         message: `Approve ${cur.visibility} repo "${cur.name}" requested by ${cur.requestedBy}? This creates the repository.`,
@@ -53,29 +58,14 @@ export async function approve(
     const row = res.request;
 
     if (res.outcome === "approved_failed") {
-      if (options.json) {
-        emitJson(
-          buildEnvelope(command, false, {
-            id: row.id,
-            outcome: res.outcome,
-            repo: `${row.owner}/${row.name}`,
-            error: row.error,
-            identitySource,
-          }),
-        );
-      } else {
-        error(
-          [
-            `Approved, but repository creation failed`,
-            ``,
-            `  Repository:   ${row.owner}/${row.name}`,
-            `  Requested by: ${row.requestedBy}`,
-            `  Error:        ${row.error ?? "unknown"}`,
-          ].join("\n"),
-        );
-      }
-      exit(EXIT_STORAGE);
-      return;
+      // Approval recorded, but GitHub creation failed. Throw so the
+      // single catch path renders the standard error envelope (JSON) or
+      // message (human) and exits EXIT_STORAGE — consistent with every
+      // other failure, and free of the double-output that an inline
+      // exit() incurs when exit is a throwing stub.
+      throw new StorageError(
+        `approved, but repository creation failed: ${row.error ?? "unknown"} (${row.owner}/${row.name}, requested by ${row.requestedBy})`,
+      );
     }
 
     if (options.json) {

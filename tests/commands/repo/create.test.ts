@@ -215,12 +215,22 @@ describe("repo create command", () => {
         new ProxyError(409, "already_exists", "already pending"),
       );
     const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
-    await expect(create({ json: false, name: "dup" }, deps)).rejects.toThrow(
-      "__exit__",
-    );
+    await expect(
+      create({ json: false, name: "dup", yes: true }, deps),
+    ).rejects.toThrow("__exit__");
     expect(deps.exit).toHaveBeenCalledWith(10);
     expect(deps.logError).toHaveBeenCalledWith(
       expect.stringContaining("already_exists"),
     );
+  });
+
+  it("requires --yes in a non-interactive (non-TTY) session", async () => {
+    const deps = mkDeps();
+    await expect(
+      create({ json: false, name: "my-repo" }, deps),
+    ).rejects.toThrow("__exit__");
+    const proxy = deps.createProxyClient.mock.results[0]?.value;
+    expect(proxy.createRepoRequest).not.toHaveBeenCalled();
+    expect(deps.exit).toHaveBeenCalledWith(10); // EXIT_USAGE
   });
 });

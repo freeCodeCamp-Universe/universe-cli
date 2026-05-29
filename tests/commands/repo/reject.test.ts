@@ -94,4 +94,14 @@ describe("repo reject command", () => {
     expect(proxy.rejectRepoRequest).not.toHaveBeenCalled();
     expect(deps.exit).toHaveBeenCalledWith(18);
   });
+
+  it("requires --yes in a non-interactive (non-TTY) session", async () => {
+    const proxy = mkProxy();
+    const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
+    await expect(reject({ json: false, id: "req_001" }, deps)).rejects.toThrow(
+      "__exit__",
+    );
+    expect(proxy.rejectRepoRequest).not.toHaveBeenCalled();
+    expect(deps.exit).toHaveBeenCalledWith(10); // EXIT_USAGE
+  });
 });

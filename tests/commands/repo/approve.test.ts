@@ -86,9 +86,9 @@ describe("repo approve command", () => {
       request: repoRow({ status: "failed", error: "missing Contents:read" }),
     });
     const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
-    await expect(approve({ json: false, id: "req_001" }, deps)).rejects.toThrow(
-      "__exit__",
-    );
+    await expect(
+      approve({ json: false, id: "req_001", yes: true }, deps),
+    ).rejects.toThrow("__exit__");
     expect(deps.exit).toHaveBeenCalledWith(13); // EXIT_STORAGE
     expect(deps.logError).toHaveBeenCalledWith(
       expect.stringContaining("creation failed"),
@@ -125,12 +125,47 @@ describe("repo approve command", () => {
         new ProxyError(409, "already_resolved", "resolved by another admin"),
       );
     const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
-    await expect(approve({ json: false, id: "req_001" }, deps)).rejects.toThrow(
-      "__exit__",
-    );
+    await expect(
+      approve({ json: false, id: "req_001", yes: true }, deps),
+    ).rejects.toThrow("__exit__");
     expect(deps.exit).toHaveBeenCalledWith(10);
     expect(deps.logError).toHaveBeenCalledWith(
       expect.stringContaining("already_resolved"),
     );
+  });
+
+  it("emits a standard error envelope for approved_failed in JSON mode", async () => {
+    const stdout: string[] = [];
+    const writeSpy = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation((c: unknown) => {
+        stdout.push(String(c));
+        return true;
+      });
+    const proxy = mkProxy();
+    proxy.approveRepoRequest = vi.fn().mockResolvedValue({
+      outcome: "approved_failed",
+      request: repoRow({ status: "failed", error: "missing Contents:read" }),
+    });
+    const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
+    await expect(approve({ json: true, id: "req_001" }, deps)).rejects.toThrow(
+      "__exit__",
+    );
+    writeSpy.mockRestore();
+    expect(deps.exit).toHaveBeenCalledWith(13);
+    const env = JSON.parse(stdout.join("").trim());
+    expect(env.success).toBe(false);
+    expect(env.error.code).toBe(13);
+    expect(env.error.message).toContain("creation failed");
+  });
+
+  it("requires --yes in a non-interactive (non-TTY) session", async () => {
+    const proxy = mkProxy();
+    const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
+    await expect(approve({ json: false, id: "req_001" }, deps)).rejects.toThrow(
+      "__exit__",
+    );
+    expect(proxy.approveRepoRequest).not.toHaveBeenCalled();
+    expect(deps.exit).toHaveBeenCalledWith(10); // EXIT_USAGE
   });
 });

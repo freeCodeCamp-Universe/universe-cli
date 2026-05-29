@@ -77,10 +77,10 @@ export async function create(
   const error = deps.logError ?? ((s: string) => log.error(s));
   const exit = deps.exit ?? exitWithCode;
   const prompts = deps.prompts ?? defaultRepoPrompts;
-  const interactive =
-    !options.json &&
-    !options.yes &&
-    (deps.isTTY ?? Boolean(process.stdout.isTTY));
+  const isTTY = deps.isTTY ?? Boolean(process.stdout.isTTY);
+  // canPrompt: a TTY human session that hasn't opted out (--yes) or into
+  // automation (--json) — the only mode where we gather + confirm.
+  const canPrompt = !options.json && !options.yes && isTTY;
 
   try {
     const { client, identitySource } = await setupClient(deps);
@@ -90,7 +90,7 @@ export async function create(
     let description = options.description;
     let template = options.template;
 
-    if (interactive) {
+    if (canPrompt) {
       if (!name) {
         const v = await prompts.text({
           message: "Repository name",
@@ -149,7 +149,14 @@ export async function create(
     }
     const body = parsed.data;
 
-    if (interactive) {
+    // Confirm required unless --yes / --json. A non-TTY human session
+    // cannot prompt, so it must pass --yes rather than silently submitting.
+    if (!options.json && !options.yes) {
+      if (!isTTY) {
+        throw new UsageError(
+          "non-interactive session: pass --yes to submit without confirmation (or --json)",
+        );
+      }
       const ok = await prompts.confirm({
         message: `Submit request to create ${body.visibility} repo "${body.name}"${
           body.template ? ` from template ${body.template}` : ""
