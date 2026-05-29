@@ -393,8 +393,8 @@ export function run(argv = process.argv) {
         }
       });
 
-    // Register `static` and `sites` only for help text — the dispatch
-    // above intercepts before cac runs, so these actions are unreachable.
+    // Register `static`, `sites`, and `repo` only for help text — the
+    // dispatch above intercepts before cac runs, so these are unreachable.
     cli.command("static <subcommand>", "Static site deployment commands");
     cli.command("sites <subcommand>", "Static site registry commands");
     cli.command(
