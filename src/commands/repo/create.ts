@@ -83,7 +83,21 @@ export async function create(
   const canPrompt = !options.json && !options.yes && isTTY;
 
   try {
-    const { client, identitySource } = await setupClient(deps);
+    // Identity/client setup is deferred until after local validation and
+    // the non-TTY `--yes` gate, so a missing name / bad option / missing
+    // `--yes` reports a usage error rather than a credential error. The
+    // interactive template prompt still needs a client, so prompting paths
+    // set it up just before that prompt.
+    let client: ProxyClient | undefined;
+    let identitySource = "";
+    const ensureClient = async (): Promise<ProxyClient> => {
+      if (!client) {
+        const setup = await setupClient(deps);
+        client = setup.client;
+        identitySource = setup.identitySource;
+      }
+      return client;
+    };
 
     let name = blankToUndefined(options.name) ?? "";
     let visibility = options.visibility;
@@ -123,7 +137,7 @@ export async function create(
         description = String(v);
       }
       if (template === undefined) {
-        template = await promptTemplate(client, prompts);
+        template = await promptTemplate(await ensureClient(), prompts);
       }
     }
 
@@ -167,7 +181,8 @@ export async function create(
       }
     }
 
-    const row = await client.createRepoRequest({
+    const activeClient = await ensureClient();
+    const row = await activeClient.createRepoRequest({
       name: body.name,
       visibility: body.visibility,
       description: body.description,

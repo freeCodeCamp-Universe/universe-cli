@@ -229,8 +229,22 @@ describe("repo create command", () => {
     await expect(
       create({ json: false, name: "my-repo" }, deps),
     ).rejects.toThrow("__exit__");
-    const proxy = deps.createProxyClient.mock.results[0]?.value;
-    expect(proxy.createRepoRequest).not.toHaveBeenCalled();
+    // The --yes gate must fire before any client setup.
+    expect(deps.createProxyClient).not.toHaveBeenCalled();
     expect(deps.exit).toHaveBeenCalledWith(10); // EXIT_USAGE
+  });
+
+  it("reports the usage error before the credential lookup", async () => {
+    const deps = mkDeps({
+      resolveIdentity: vi.fn().mockResolvedValue(null), // no identity
+    });
+    // Non-interactive, missing name, no identity: the missing-name usage
+    // error must win over the credential lookup.
+    await expect(create({ json: false }, deps)).rejects.toThrow("__exit__");
+    expect(deps.exit).toHaveBeenCalledWith(10); // EXIT_USAGE, not EXIT_CREDENTIALS
+    expect(deps.logError).toHaveBeenCalledWith(
+      expect.stringMatching(/name is required/i),
+    );
+    expect(deps.resolveIdentity).not.toHaveBeenCalled();
   });
 });
