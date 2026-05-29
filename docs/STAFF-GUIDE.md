@@ -1,6 +1,6 @@
-# Deploying a Static Site
+# Universe CLI — Staff Guide
 
-Walkthrough for staff deploying a site to `*.freecode.camp` end-to-end. Schema: [`platform-yaml.md`](platform-yaml.md). Architecture, ADR-016, runbooks, internal conventions: [`README.md`](README.md).
+Staff walkthrough for the freeCodeCamp Universe platform. The numbered steps below deploy a static site to `*.freecode.camp` end-to-end; later sections cover the [site registry](#site-registry) and [repository creation](#creating-a-repository). Schema: [`platform-yaml.md`](platform-yaml.md). Architecture, ADR-016, runbooks, internal conventions: [`README.md`](README.md).
 
 ## Prerequisites
 

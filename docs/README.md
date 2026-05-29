@@ -3,7 +3,7 @@
 Read this when you change CLI code. Other entry points:
 
 - Root [`README.md`](../README.md) — install + CLI surface + env overrides.
-- [`STAFF-GUIDE.md`](STAFF-GUIDE.md) — staff deploy / promote / rollback walkthrough.
+- [`STAFF-GUIDE.md`](STAFF-GUIDE.md) — staff guide: deploy / promote / rollback, site registry, repo creation.
 - [`platform-yaml.md`](platform-yaml.md) — `platform.yaml` schema reference.
 - [`RELEASING.md`](RELEASING.md) — cutting a release.
 
