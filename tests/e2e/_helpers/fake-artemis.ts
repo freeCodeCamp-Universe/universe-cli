@@ -71,6 +71,23 @@ export interface FailureInjection {
   message: string;
 }
 
+export interface RepoRow {
+  id: string;
+  name: string;
+  owner: string;
+  visibility: "public" | "private";
+  description?: string;
+  template?: string;
+  status: "pending" | "approved" | "active" | "rejected" | "failed";
+  url?: string;
+  error?: string;
+  requestedBy: string;
+  approver?: string;
+  rejectReason?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface FakeArtemisState {
   tokens: Map<string, TokenRecord>;
   failures: Map<string, FailureInjection>;
@@ -86,6 +103,10 @@ export interface FakeArtemisState {
   uploadFailPaths: Map<string, FailureInjection>;
   /** Next /finalize call returns this envelope (and clears the field). */
   finalizeFailure: FailureInjection | null;
+  /** repo-request approval queue, keyed by request id. */
+  repoRequests: Map<string, RepoRow>;
+  /** templates returned by GET /api/repo/templates. */
+  repoTemplates: string[];
 }
 
 export interface CallLogEntry {
@@ -115,6 +136,8 @@ export async function startFakeArtemis(): Promise<FakeArtemis> {
     aliases: { preview: new Map(), production: new Map() },
     uploadFailPaths: new Map(),
     finalizeFailure: null,
+    repoRequests: new Map(),
+    repoTemplates: [],
   };
   const callLog: CallLogEntry[] = [];
 
@@ -704,6 +727,212 @@ async function handle(
     res.statusCode = 204;
     res.end();
     callLog.push({ method, path, authorization, status: 204, body });
+    return;
+  }
+
+  // --- repo-request feature (/api/repo*) ---
+  const repoPath = path.split("?")[0] ?? path;
+  const repoToken = parseBearer(authorization);
+  const repoRecord = repoToken ? state.tokens.get(repoToken) : undefined;
+
+  if (method === "POST" && repoPath === "/api/repo") {
+    if (!repoRecord) {
+      logAndSend(callLog, method, path, authorization, body, res, 401, {
+        error: { code: "unauth", message: "bad token" },
+      });
+      return;
+    }
+    let parsed: {
+      name?: string;
+      visibility?: string;
+      description?: string;
+      template?: string;
+    };
+    try {
+      parsed = JSON.parse(body) as typeof parsed;
+    } catch {
+      logAndSend(callLog, method, path, authorization, body, res, 400, {
+        error: { code: "bad_request", message: "invalid JSON body" },
+      });
+      return;
+    }
+    const name = typeof parsed.name === "string" ? parsed.name.trim() : "";
+    if (name.length === 0) {
+      logAndSend(callLog, method, path, authorization, body, res, 400, {
+        error: { code: "invalid_name", message: "name is required" },
+      });
+      return;
+    }
+    // case-insensitive dedupe against non-terminal/active requests.
+    for (const r of state.repoRequests.values()) {
+      if (
+        r.name.toLowerCase() === name.toLowerCase() &&
+        r.status !== "rejected" &&
+        r.status !== "failed"
+      ) {
+        logAndSend(callLog, method, path, authorization, body, res, 409, {
+          error: {
+            code: "already_exists",
+            message: `a request for '${name}' is already pending or active`,
+          },
+        });
+        return;
+      }
+    }
+    const id = `req_${state.repoRequests.size + 1}`;
+    const now = "2026-05-29T12:00:00Z";
+    const row: RepoRow = {
+      id,
+      name,
+      owner: "freeCodeCamp-Universe",
+      visibility: parsed.visibility === "public" ? "public" : "private",
+      ...(parsed.description ? { description: parsed.description } : {}),
+      ...(parsed.template ? { template: parsed.template } : {}),
+      status: "pending",
+      requestedBy: repoRecord.login,
+      createdAt: now,
+      updatedAt: now,
+    };
+    state.repoRequests.set(id, row);
+    logAndSend(callLog, method, path, authorization, body, res, 201, row);
+    return;
+  }
+
+  if (method === "GET" && repoPath === "/api/repos") {
+    if (!repoRecord) {
+      logAndSend(callLog, method, path, authorization, body, res, 401, {
+        error: { code: "unauth", message: "bad token" },
+      });
+      return;
+    }
+    const q = new URLSearchParams(path.split("?")[1] ?? "");
+    const status = q.get("status") ?? "pending";
+    const mine = q.get("mine") === "1" || q.get("mine") === "true";
+    let rows = [...state.repoRequests.values()];
+    if (status !== "all") rows = rows.filter((r) => r.status === status);
+    if (mine) rows = rows.filter((r) => r.requestedBy === repoRecord.login);
+    logAndSend(callLog, method, path, authorization, body, res, 200, rows);
+    return;
+  }
+
+  if (method === "GET" && repoPath === "/api/repo/templates") {
+    if (!repoRecord) {
+      logAndSend(callLog, method, path, authorization, body, res, 401, {
+        error: { code: "unauth", message: "bad token" },
+      });
+      return;
+    }
+    logAndSend(callLog, method, path, authorization, body, res, 200, {
+      templates: state.repoTemplates,
+    });
+    return;
+  }
+
+  if (method === "GET" && repoPath.startsWith("/api/repo/")) {
+    if (!repoRecord) {
+      logAndSend(callLog, method, path, authorization, body, res, 401, {
+        error: { code: "unauth", message: "bad token" },
+      });
+      return;
+    }
+    const id = repoPath.slice("/api/repo/".length);
+    const row = state.repoRequests.get(id);
+    if (!row) {
+      logAndSend(callLog, method, path, authorization, body, res, 404, {
+        error: { code: "not_found", message: "repo request not found" },
+      });
+      return;
+    }
+    logAndSend(callLog, method, path, authorization, body, res, 200, row);
+    return;
+  }
+
+  if (
+    method === "POST" &&
+    repoPath.startsWith("/api/repo/") &&
+    repoPath.endsWith("/approve")
+  ) {
+    if (!repoRecord) {
+      logAndSend(callLog, method, path, authorization, body, res, 401, {
+        error: { code: "unauth", message: "bad token" },
+      });
+      return;
+    }
+    const id = repoPath.slice("/api/repo/".length, -"/approve".length);
+    const row = state.repoRequests.get(id);
+    if (!row) {
+      logAndSend(callLog, method, path, authorization, body, res, 404, {
+        error: { code: "not_found", message: "repo request not found" },
+      });
+      return;
+    }
+    if (row.status !== "pending") {
+      logAndSend(callLog, method, path, authorization, body, res, 409, {
+        error: {
+          code: "already_resolved",
+          message: "request was already resolved by another admin",
+        },
+      });
+      return;
+    }
+    const updated: RepoRow = {
+      ...row,
+      status: "active",
+      url: `https://github.com/${row.owner}/${row.name}`,
+      approver: repoRecord.login,
+      updatedAt: "2026-05-29T12:05:00Z",
+    };
+    state.repoRequests.set(id, updated);
+    logAndSend(callLog, method, path, authorization, body, res, 200, {
+      outcome: "ok",
+      request: updated,
+    });
+    return;
+  }
+
+  if (
+    method === "POST" &&
+    repoPath.startsWith("/api/repo/") &&
+    repoPath.endsWith("/reject")
+  ) {
+    if (!repoRecord) {
+      logAndSend(callLog, method, path, authorization, body, res, 401, {
+        error: { code: "unauth", message: "bad token" },
+      });
+      return;
+    }
+    const id = repoPath.slice("/api/repo/".length, -"/reject".length);
+    const row = state.repoRequests.get(id);
+    if (!row) {
+      logAndSend(callLog, method, path, authorization, body, res, 404, {
+        error: { code: "not_found", message: "repo request not found" },
+      });
+      return;
+    }
+    if (row.status !== "pending") {
+      logAndSend(callLog, method, path, authorization, body, res, 409, {
+        error: {
+          code: "already_resolved",
+          message: "request was already resolved by another admin",
+        },
+      });
+      return;
+    }
+    let reason = "";
+    try {
+      reason = (JSON.parse(body || "{}") as { reason?: string }).reason ?? "";
+    } catch {
+      reason = "";
+    }
+    const updated: RepoRow = {
+      ...row,
+      status: "rejected",
+      rejectReason: reason,
+      approver: repoRecord.login,
+      updatedAt: "2026-05-29T12:05:00Z",
+    };
+    state.repoRequests.set(id, updated);
+    logAndSend(callLog, method, path, authorization, body, res, 200, updated);
     return;
   }
 
