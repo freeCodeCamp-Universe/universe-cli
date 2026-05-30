@@ -2,7 +2,7 @@ import { log } from "@clack/prompts";
 import { ConfirmError, StorageError } from "../../errors.js";
 import { wrapProxyError } from "../../lib/proxy-client.js";
 import { buildEnvelope } from "../../output/envelope.js";
-import { exitWithCode } from "../../output/exit-codes.js";
+import { EXIT_STORAGE, exitWithCode } from "../../output/exit-codes.js";
 import { outputError } from "../../output/format.js";
 import {
   defaultRepoPrompts,
@@ -30,6 +30,7 @@ export async function approve(
   const prompts = deps.prompts ?? defaultRepoPrompts;
   const isTTY = deps.isTTY ?? Boolean(process.stdout.isTTY);
 
+  let jsonFailureEnvelope: Record<string, unknown> | undefined;
   try {
     if (!options.id || options.id.trim().length === 0) {
       throw new UsageError("request id is required (positional argument)");
@@ -58,17 +59,21 @@ export async function approve(
     const row = res.request;
 
     if (res.outcome === "approved_failed") {
-      // Approval recorded, but GitHub creation failed. Throw so the
-      // single catch path renders the standard error envelope (JSON) or
-      // message (human) and exits EXIT_STORAGE — consistent with every
-      // other failure, and free of the double-output that an inline
-      // exit() incurs when exit is a throwing stub.
-      throw new StorageError(
-        `approved, but repository creation failed: ${row.error ?? "unknown"} (${row.owner}/${row.name}, requested by ${row.requestedBy})`,
-      );
-    }
-
-    if (options.json) {
+      if (!options.json) {
+        throw new StorageError(
+          `approved, but repository creation failed: ${row.error ?? "unknown"} (${row.owner}/${row.name}, requested by ${row.requestedBy})`,
+        );
+      }
+      jsonFailureEnvelope = {
+        outcome: res.outcome,
+        id: row.id,
+        repo: `${row.owner}/${row.name}`,
+        status: row.status,
+        error: row.error ?? "unknown",
+        requestedBy: row.requestedBy,
+        identitySource,
+      };
+    } else if (options.json) {
       emitJson(
         buildEnvelope(command, true, {
           id: row.id,
@@ -97,5 +102,11 @@ export async function approve(
       logError: error,
     });
     exit(code);
+    return;
+  }
+
+  if (jsonFailureEnvelope) {
+    emitJson(buildEnvelope(command, false, jsonFailureEnvelope));
+    exit(EXIT_STORAGE);
   }
 }

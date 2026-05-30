@@ -134,7 +134,7 @@ describe("repo approve command", () => {
     );
   });
 
-  it("emits a standard error envelope for approved_failed in JSON mode", async () => {
+  it("emits a structured failure envelope for approved_failed in JSON mode", async () => {
     const stdout: string[] = [];
     const writeSpy = vi
       .spyOn(process.stdout, "write")
@@ -155,8 +155,11 @@ describe("repo approve command", () => {
     expect(deps.exit).toHaveBeenCalledWith(13);
     const env = JSON.parse(stdout.join("").trim());
     expect(env.success).toBe(false);
-    expect(env.error.code).toBe(13);
-    expect(env.error.message).toContain("creation failed");
+    expect(env.outcome).toBe("approved_failed");
+    expect(env.id).toBe("req_001");
+    expect(env.repo).toBe("freeCodeCamp-Universe/alpha");
+    expect(env.status).toBe("failed");
+    expect(env.error).toContain("missing Contents:read");
   });
 
   it("requires --yes in a non-interactive (non-TTY) session", async () => {
