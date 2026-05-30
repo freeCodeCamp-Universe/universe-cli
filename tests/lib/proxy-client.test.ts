@@ -5,6 +5,7 @@ import {
   DEFAULT_FETCH_TIMEOUT_MS,
   parseFetchTimeoutMs,
   ProxyError,
+  wrapProxyError,
 } from "../../src/lib/proxy-client.js";
 import {
   EXIT_CREDENTIALS,
@@ -1209,5 +1210,31 @@ describe("createProxyClient — repo requests", () => {
     await expect(client.createRepoRequest({ name: "x" })).rejects.toMatchObject(
       { exitCode: EXIT_CREDENTIALS },
     );
+  });
+});
+
+describe("wrapProxyError authz hint", () => {
+  it("appends a read:org / SSO hint on user_unauthorized", () => {
+    const { code, message } = wrapProxyError(
+      "repo approve",
+      new ProxyError(
+        403,
+        "user_unauthorized",
+        "caller is not on the required team",
+      ),
+    );
+    expect(code).toBe(EXIT_CREDENTIALS);
+    expect(message).toContain("user_unauthorized");
+    expect(message).toMatch(/read:org/);
+    expect(message).toMatch(/whoami/);
+    expect(message).toMatch(/GITHUB_TOKEN/);
+  });
+
+  it("does not add the hint for unrelated proxy errors", () => {
+    const { message } = wrapProxyError(
+      "repo create",
+      new ProxyError(409, "already_exists", "a request already exists"),
+    );
+    expect(message).not.toMatch(/read:org/);
   });
 });

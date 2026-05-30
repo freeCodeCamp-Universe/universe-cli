@@ -301,10 +301,20 @@ export function wrapProxyError(
   err: unknown,
 ): { code: number; message: string } {
   if (err instanceof ProxyError) {
-    return {
-      code: err.exitCode,
-      message: `${command} failed (${err.code}): ${err.message}`,
-    };
+    let message = `${command} failed (${err.code}): ${err.message}`;
+    if (err.code === "user_unauthorized") {
+      // A team-membership probe denied the caller. The usual real cause
+      // is the active token, not actual non-membership: a token can read
+      // /user yet 404 on org membership when it lacks the read:org scope
+      // or SAML-SSO authorization. $GITHUB_TOKEN / $GH_TOKEN also shadow
+      // `gh auth token` in the identity chain, so a low-scope env token
+      // silently wins. Surface that so the failure is actionable.
+      message +=
+        "\n  hint: the active GitHub token may lack the read:org scope or SSO authorization for the org. " +
+        "$GITHUB_TOKEN / $GH_TOKEN override `gh auth token` — run `universe whoami` to check the active identity source, " +
+        "then unset them or re-authorize the token (Configure SSO).";
+    }
+    return { code: err.exitCode, message };
   }
   if (err instanceof CliError) {
     return { code: err.exitCode, message: err.message };
