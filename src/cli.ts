@@ -32,7 +32,7 @@ function handleActionError(command: string, json: boolean, err: unknown): void {
 }
 
 /**
- * cac (v6.7.x) does not support nested subcommands — it matches against
+ * cac (v7.x) does not support nested subcommands — it matches against
  * a single argv segment only. We keep three cac instances and dispatch
  * by detecting `static` or `sites` as the first **non-flag** positional.
  * Preserves global flags placed before the namespace token (e.g.
@@ -270,6 +270,32 @@ export function run(argv = process.argv) {
 
     repoCli.help();
     repoCli.version(version);
+
+    const repoSub = repoArgs.find((a) => !a.startsWith("-"));
+    const knownRepoSubs = new Set([
+      "create",
+      "ls",
+      "approve",
+      "reject",
+      "status",
+    ]);
+    const repoWantsHelp =
+      repoArgs.includes("--help") ||
+      repoArgs.includes("-h") ||
+      repoArgs.includes("--version");
+    if (repoSub === undefined ? !repoWantsHelp : !knownRepoSubs.has(repoSub)) {
+      if (repoSub === undefined) {
+        repoCli.outputHelp();
+      } else {
+        outputError(
+          { json: repoArgs.includes("--json"), command: "repo" },
+          EXIT_USAGE,
+          `unknown repo subcommand "${repoSub}" — run \`universe repo --help\``,
+        );
+      }
+      exitWithCode(EXIT_USAGE);
+      return;
+    }
     repoCli.parse(["node", "universe-repo", ...repoArgs]);
     return;
   }
