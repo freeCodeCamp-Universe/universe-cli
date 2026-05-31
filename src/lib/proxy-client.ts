@@ -424,11 +424,15 @@ export function createProxyClient(cfg: ProxyClientConfig): ProxyClient {
       throw new ProxyError(
         0,
         "timeout",
-        `proxy timed out after ${timeoutMs}ms`,
+        `proxy timed out after ${timeoutMs}ms (${base})`,
       );
     }
     const message = err instanceof Error ? err.message : String(err);
-    throw new ProxyError(0, "network_error", `proxy unreachable: ${message}`);
+    throw new ProxyError(
+      0,
+      "network_error",
+      `proxy unreachable at ${base}: ${message}`,
+    );
   }
 
   async function userBearer(): Promise<string> {

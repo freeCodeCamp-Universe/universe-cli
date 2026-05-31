@@ -646,6 +646,7 @@ describe("createProxyClient", () => {
       expect(err.status).toBe(0);
       expect(err.code).toBe("network_error");
       expect(err.exitCode).toBe(EXIT_STORAGE);
+      expect(err.message).toContain("uploads.freecode.camp");
     });
   });
 
