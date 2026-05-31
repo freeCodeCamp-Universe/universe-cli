@@ -396,4 +396,39 @@ describe("universe repo namespace", () => {
       expect.objectContaining({ id: "req_001", yes: true }),
     );
   });
+
+  it("repo approve missing <id> routes through outputError, no uncaught throw", async () => {
+    const { EXIT_USAGE } = await import("../src/output/exit-codes.js");
+    expect(() => run(["node", "universe", "repo", "approve"])).not.toThrow();
+    expect(mockExitWithCode).toHaveBeenCalledWith(EXIT_USAGE);
+    expect(mockOutputError).toHaveBeenCalledWith(
+      expect.objectContaining({ command: "repo" }),
+      EXIT_USAGE,
+      expect.any(String),
+    );
+  });
+
+  it("repo create unknown option routes through outputError, no throw", async () => {
+    const { EXIT_USAGE } = await import("../src/output/exit-codes.js");
+    expect(() =>
+      run(["node", "universe", "repo", "create", "x", "--bogus", "--yes"]),
+    ).not.toThrow();
+    expect(mockExitWithCode).toHaveBeenCalledWith(EXIT_USAGE);
+    expect(mockOutputError).toHaveBeenCalledWith(
+      expect.objectContaining({ command: "repo", json: false }),
+      EXIT_USAGE,
+      expect.any(String),
+    );
+  });
+
+  it("bare repo --json emits a JSON error envelope, not human help", async () => {
+    const { EXIT_USAGE } = await import("../src/output/exit-codes.js");
+    run(["node", "universe", "repo", "--json"]);
+    expect(mockOutputError).toHaveBeenCalledWith(
+      expect.objectContaining({ command: "repo", json: true }),
+      EXIT_USAGE,
+      expect.any(String),
+    );
+    expect(mockExitWithCode).toHaveBeenCalledWith(EXIT_USAGE);
+  });
 });

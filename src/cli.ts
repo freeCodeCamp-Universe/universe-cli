@@ -271,7 +271,6 @@ export function run(argv = process.argv) {
     repoCli.help();
     repoCli.version(version);
 
-    const repoSub = repoArgs.find((a) => !a.startsWith("-"));
     const knownRepoSubs = new Set([
       "create",
       "ls",
@@ -279,24 +278,51 @@ export function run(argv = process.argv) {
       "reject",
       "status",
     ]);
+    const repoValueFlags = new Set([
+      "--visibility",
+      "--description",
+      "--template",
+      "--status",
+      "--reason",
+    ]);
+    let repoSub: string | undefined;
+    for (let i = 0; i < repoArgs.length; i += 1) {
+      const a = repoArgs[i];
+      if (a === undefined) continue;
+      if (repoValueFlags.has(a)) {
+        i += 1;
+        continue;
+      }
+      if (!a.startsWith("-")) {
+        repoSub = a;
+        break;
+      }
+    }
+    const repoJson = repoArgs.includes("--json");
     const repoWantsHelp =
       repoArgs.includes("--help") ||
       repoArgs.includes("-h") ||
       repoArgs.includes("--version");
     if (repoSub === undefined ? !repoWantsHelp : !knownRepoSubs.has(repoSub)) {
-      if (repoSub === undefined) {
+      if (repoSub === undefined && !repoJson) {
         repoCli.outputHelp();
       } else {
         outputError(
-          { json: repoArgs.includes("--json"), command: "repo" },
+          { json: repoJson, command: "repo" },
           EXIT_USAGE,
-          `unknown repo subcommand "${repoSub}" — run \`universe repo --help\``,
+          repoSub === undefined
+            ? "missing repo subcommand — run `universe repo --help`"
+            : `unknown repo subcommand "${repoSub}" — run \`universe repo --help\``,
         );
       }
       exitWithCode(EXIT_USAGE);
       return;
     }
-    repoCli.parse(["node", "universe-repo", ...repoArgs]);
+    try {
+      repoCli.parse(["node", "universe-repo", ...repoArgs]);
+    } catch (err: unknown) {
+      handleActionError("repo", repoJson, err);
+    }
     return;
   }
 
