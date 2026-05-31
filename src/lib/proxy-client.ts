@@ -257,12 +257,19 @@ export class ProxyError extends CliError {
   readonly exitCode: number;
   readonly status: number;
   readonly code: string;
+  readonly requestId?: string;
 
-  constructor(status: number, code: string, message: string) {
+  constructor(
+    status: number,
+    code: string,
+    message: string,
+    requestId?: string,
+  ) {
     super(message);
     this.status = status;
     this.code = code;
     this.exitCode = mapExitCode(status);
+    this.requestId = requestId;
   }
 }
 
@@ -305,7 +312,7 @@ function mapExitCode(status: number): number {
 export function wrapProxyError(
   command: string,
   err: unknown,
-): { code: number; message: string } {
+): { code: number; message: string; kind?: string; requestId?: string } {
   if (err instanceof ProxyError) {
     let message = `${command} failed (${err.code}): ${err.message}`;
     if (err.code === "user_unauthorized") {
@@ -320,7 +327,12 @@ export function wrapProxyError(
         "$GITHUB_TOKEN / $GH_TOKEN override `gh auth token` — run `universe whoami` to check the active identity source, " +
         "then unset them or re-authorize the token (Configure SSO).";
     }
-    return { code: err.exitCode, message };
+    return {
+      code: err.exitCode,
+      message,
+      kind: err.code,
+      requestId: err.requestId,
+    };
   }
   if (err instanceof CliError) {
     return { code: err.exitCode, message: err.message };
@@ -381,11 +393,15 @@ async function readErrorEnvelope(
   };
 }
 
-function throwProxyError(status: number, env: ErrorEnvelopeFields): never {
+function throwProxyError(
+  status: number,
+  env: ErrorEnvelopeFields,
+  requestId?: string,
+): never {
   if (status === 409 && env.code === "alias_drift") {
     throw new AliasDriftError(env.message, env.current ?? "");
   }
-  throw new ProxyError(status, env.code, env.message);
+  throw new ProxyError(status, env.code, env.message, requestId);
 }
 
 function stripTrailingSlash(url: string): string {
@@ -452,8 +468,9 @@ export function createProxyClient(cfg: ProxyClientConfig): ProxyClient {
       translateFetchError(err);
     }
     if (!response.ok) {
+      const requestId = response.headers.get("x-request-id") ?? undefined;
       const env = await readErrorEnvelope(response);
-      throwProxyError(response.status, env);
+      throwProxyError(response.status, env, requestId);
     }
     // 204 no-content: cast empty
     if (response.status === 204) {

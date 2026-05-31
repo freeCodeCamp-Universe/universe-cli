@@ -27,6 +27,8 @@ export interface OutputErrorOptions {
    * spy without monkey-patching the clack module.
    */
   logError?: (msg: string) => void;
+  kind?: string;
+  requestId?: string;
 }
 
 export function outputSuccess(
@@ -60,6 +62,8 @@ export function outputError(
       code,
       redactedMessage,
       redactedIssues,
+      opts.kind,
+      opts.requestId,
     );
     // opts.extras passes through redactObject so a future caller who
     // stuffs a token / credential into the extras map doesn't leak it.

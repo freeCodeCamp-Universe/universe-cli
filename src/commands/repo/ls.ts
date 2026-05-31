@@ -64,9 +64,16 @@ export async function ls(
       message(formatRepoTable(rows, empty));
     }
   } catch (err) {
-    const { code, message: msg } = wrapProxyError(command, err);
+    const {
+      code,
+      message: msg,
+      kind,
+      requestId,
+    } = wrapProxyError(command, err);
     outputError({ json: options.json, command }, code, msg, {
       logError: error,
+      kind,
+      requestId,
     });
     exit(code);
   }

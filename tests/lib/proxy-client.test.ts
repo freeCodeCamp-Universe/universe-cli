@@ -1307,3 +1307,31 @@ describe("repo response validation (H2)", () => {
     ).resolves.toMatchObject({ id: "req_1", status: "pending" });
   });
 });
+
+describe("error correlation (M5/M6)", () => {
+  it("captures X-Request-ID from an error response into ProxyError", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          error: { code: "user_unauthorized", message: "nope" },
+        }),
+        {
+          status: 403,
+          headers: {
+            "content-type": "application/json",
+            "x-request-id": "req-xyz-123",
+          },
+        },
+      ),
+    );
+    const client = createProxyClient({
+      baseUrl,
+      getAuthToken,
+      fetch: fetchMock,
+    });
+    const err = (await client.whoami().catch((e: unknown) => e)) as ProxyError;
+    expect(err).toBeInstanceOf(ProxyError);
+    expect(err.code).toBe("user_unauthorized");
+    expect(err.requestId).toBe("req-xyz-123");
+  });
+});

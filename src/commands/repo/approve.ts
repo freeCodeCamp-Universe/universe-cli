@@ -97,9 +97,11 @@ export async function approve(
       );
     }
   } catch (err) {
-    const { code, message } = wrapProxyError(command, err);
+    const { code, message, kind, requestId } = wrapProxyError(command, err);
     outputError({ json: options.json, command }, code, message, {
       logError: error,
+      kind,
+      requestId,
     });
     exit(code);
     return;

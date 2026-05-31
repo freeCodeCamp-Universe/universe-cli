@@ -181,4 +181,19 @@ describe("outputError", () => {
     const parsed = JSON.parse(stdoutSpy.mock.calls[0][0] as string);
     expect(parsed.error.issues).toEqual(["one", "two"]);
   });
+
+  it("includes kind and requestId in the JSON error envelope", () => {
+    const stdoutSpy = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation(() => true);
+    const ctx: OutputContext = { json: true, command: "repo ls" };
+    outputError(ctx, 12, "denied", {
+      kind: "user_unauthorized",
+      requestId: "req-1",
+    });
+
+    const parsed = JSON.parse(stdoutSpy.mock.calls[0][0] as string);
+    expect(parsed.error.kind).toBe("user_unauthorized");
+    expect(parsed.error.requestId).toBe("req-1");
+  });
 });

@@ -56,9 +56,16 @@ export async function status(
       message(humanRow(row));
     }
   } catch (err) {
-    const { code, message: msg } = wrapProxyError(command, err);
+    const {
+      code,
+      message: msg,
+      kind,
+      requestId,
+    } = wrapProxyError(command, err);
     outputError({ json: options.json, command }, code, msg, {
       logError: error,
+      kind,
+      requestId,
     });
     exit(code);
   }
