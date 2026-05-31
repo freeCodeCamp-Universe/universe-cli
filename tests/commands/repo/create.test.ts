@@ -100,6 +100,18 @@ describe("repo create command", () => {
     );
   });
 
+  it("coerces a numeric option value to a string (CA-2)", async () => {
+    const deps = mkDeps();
+    await create(
+      { json: true, name: "my-repo", description: 2026 as unknown as string },
+      deps,
+    );
+    const proxy = deps.createProxyClient.mock.results[0]?.value;
+    expect(proxy.createRepoRequest).toHaveBeenCalledWith(
+      expect.objectContaining({ description: "2026" }),
+    );
+  });
+
   it("requires a name in non-interactive mode", async () => {
     const deps = mkDeps();
     await expect(create({ json: false }, deps)).rejects.toThrow("__exit__");

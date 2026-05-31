@@ -67,6 +67,19 @@ describe("repo reject command", () => {
     });
   });
 
+  it("stringifies a numeric --reason (CA-3)", async () => {
+    const deps = mkDeps();
+    await reject(
+      { json: true, id: "req_001", reason: 42 as unknown as string },
+      deps,
+    );
+    const proxy = deps.createProxyClient.mock.results[0]?.value;
+    expect(proxy.rejectRepoRequest).toHaveBeenCalledWith({
+      id: "req_001",
+      reason: "42",
+    });
+  });
+
   it("requires an id", async () => {
     const deps = mkDeps();
     await expect(reject({ json: false, id: "" }, deps)).rejects.toThrow(

@@ -54,9 +54,13 @@ export async function reject(
       }
     }
 
+    const reason =
+      options.reason === undefined
+        ? undefined
+        : String(options.reason).trim() || undefined;
     const row = await client.rejectRepoRequest({
       id: options.id,
-      reason: options.reason,
+      reason,
     });
 
     if (options.json) {

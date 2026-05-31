@@ -24,9 +24,9 @@ export interface RepoCreateOptions {
   yes?: boolean;
 }
 
-function blankToUndefined(s: string | undefined): string | undefined {
-  if (s === undefined) return undefined;
-  const t = s.trim();
+function blankToUndefined(s: unknown): string | undefined {
+  if (s === undefined || s === null) return undefined;
+  const t = String(s).trim();
   return t === "" ? undefined : t;
 }
 
