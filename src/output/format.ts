@@ -71,6 +71,8 @@ export function outputError(
       : envelope;
     process.stdout.write(JSON.stringify(payload) + "\n");
   } else {
-    (opts.logError ?? ((m: string) => log.error(m)))(redactedMessage);
+    (
+      opts.logError ?? ((m: string) => log.error(m, { output: process.stderr }))
+    )(redactedMessage);
   }
 }

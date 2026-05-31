@@ -73,7 +73,9 @@ describe("outputError", () => {
     const ctx: OutputContext = { json: false, command: "deploy" };
     outputError(ctx, 11, "config not found");
 
-    expect(logSpy).toHaveBeenCalledWith("config not found");
+    expect(logSpy).toHaveBeenCalledWith("config not found", {
+      output: process.stderr,
+    });
   });
 
   it("redacts credentials in error messages (json mode)", () => {
