@@ -212,6 +212,25 @@ universe repo reject <id> --reason "out of scope"
 
 If GitHub creation fails after approval (e.g. the App lacks `Contents:read` on a template), the command reports `approved, but repository creation failed` with the error and exits non-zero — the request shows `failed` and its name is freed for a retry. A request another admin already resolved returns *already resolved* (no double-creation).
 
+### Scripting (`--json`)
+
+Every repo subcommand accepts `--json` (structured envelope on **stdout**; human-readable errors go to **stderr**, so `… --json | jq` stays clean). `--yes` skips the confirm prompt and is required in a non-TTY/CI session. A create → approve flow:
+
+```sh
+id=$(universe repo create my-app --visibility private --yes --json | jq -r .id)
+universe repo approve "$id" --yes --json
+```
+
+On failure the envelope is `{"success":false,"error":{"code":<exit>,"kind":"<machine code>","requestId":"<id>"},…}`: `error.kind` is the stable artemis label (e.g. `user_unauthorized`) and `error.requestId`, when present, is the server correlation id to quote in a support request. Exit codes a script will see:
+
+| Code | Meaning                                        |
+| ---- | ---------------------------------------------- |
+| 0    | success                                        |
+| 10   | usage / your input (bad flag, 400 / 404 / 409) |
+| 12   | re-authenticate (401 / 403)                    |
+| 13   | server or network (5xx, timeout, 422)          |
+| 18   | confirmation declined                          |
+
 ## When something breaks
 
 | Symptom                                      | Try                                                                                                                                                                                                                                                                                                                                                                                  |

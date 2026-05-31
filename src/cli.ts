@@ -158,7 +158,10 @@ export function run(argv = process.argv) {
     const repoCli = cac("universe repo");
 
     repoCli
-      .command("create [name]", "Request a new repository (staff only)")
+      .command(
+        "create [name]",
+        "Request a new repository under freeCodeCamp-Universe (staff only)",
+      )
       .option("--json", "Output as JSON")
       .option("--visibility <vis>", "public or private (default: private)")
       .option("--description <text>", "Repository description")
@@ -166,7 +169,8 @@ export function run(argv = process.argv) {
         "--template <name>",
         "Org template repo to generate from; omit for a blank repo",
       )
-      .option("--yes", "Skip prompts + confirmation (required for non-TTY)")
+      .option("--yes", "Skip confirmation prompts (required for non-TTY/CI)")
+      .example("universe repo create my-app --visibility private --yes")
       .action(
         async (
           name: string | undefined,
@@ -221,7 +225,8 @@ export function run(argv = process.argv) {
         "Approve a pending request — creates the repo (admin only)",
       )
       .option("--json", "Output as JSON")
-      .option("--yes", "Skip the confirmation prompt")
+      .option("--yes", "Skip confirmation prompts (required for non-TTY/CI)")
+      .example("universe repo approve req_abc123 --yes --json")
       .action(async (id: string, flags: { json?: boolean; yes?: boolean }) => {
         try {
           await repoApprove({
@@ -238,7 +243,8 @@ export function run(argv = process.argv) {
       .command("reject <id>", "Reject a pending request (admin only)")
       .option("--json", "Output as JSON")
       .option("--reason <text>", "Reason shown to the requester")
-      .option("--yes", "Skip the confirmation prompt")
+      .option("--yes", "Skip confirmation prompts (required for non-TTY/CI)")
+      .example('universe repo reject req_abc123 --reason "out of scope" --yes')
       .action(
         async (
           id: string,
