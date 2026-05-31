@@ -48,7 +48,7 @@ function findFirstPositional(args: readonly string[]): number {
 
 export function run(argv = process.argv) {
   installExitNotice(version);
-  void refreshIfStale();
+  void refreshIfStale().catch(() => {});
 
   const args = argv.slice(2);
   const firstPosIdx = findFirstPositional(args);
