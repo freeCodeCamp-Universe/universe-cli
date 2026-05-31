@@ -49,6 +49,7 @@ export interface ProxyClientConfig {
    * AbortSignal.any when both are present).
    */
   timeoutMs?: number;
+  debug?: boolean;
 }
 
 /**
@@ -412,6 +413,7 @@ export function createProxyClient(cfg: ProxyClientConfig): ProxyClient {
   const base = stripTrailingSlash(cfg.baseUrl);
   const fetchImpl = cfg.fetch ?? globalThis.fetch.bind(globalThis);
   const timeoutMs = cfg.timeoutMs ?? DEFAULT_FETCH_TIMEOUT_MS;
+  const debug = cfg.debug ?? false;
 
   /**
    * withTimeoutSignal returns a new RequestInit whose signal aborts
@@ -461,11 +463,17 @@ export function createProxyClient(cfg: ProxyClientConfig): ProxyClient {
     init: RequestInit,
     validate?: (raw: unknown) => void,
   ): Promise<T> {
+    const startedAt = debug ? Date.now() : 0;
     let response: Response;
     try {
       response = await fetchImpl(url, withTimeoutSignal(init));
     } catch (err) {
       translateFetchError(err);
+    }
+    if (debug) {
+      process.stderr.write(
+        `[universe] ${init.method ?? "GET"} ${url} -> ${response.status} (${Date.now() - startedAt}ms)\n`,
+      );
     }
     if (!response.ok) {
       const requestId = response.headers.get("x-request-id") ?? undefined;

@@ -1335,3 +1335,47 @@ describe("error correlation (M5/M6)", () => {
     expect(err.requestId).toBe("req-xyz-123");
   });
 });
+
+describe("debug trace (L2)", () => {
+  it("writes a redacted round-trip trace to stderr when debug is on", async () => {
+    const errSpy = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation(() => true);
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        jsonResponse(200, { login: "a", authorizedSites: [] }),
+      );
+    const client = createProxyClient({
+      baseUrl,
+      getAuthToken,
+      fetch: fetchMock,
+      debug: true,
+    });
+    await client.whoami();
+    const out = errSpy.mock.calls.map((c) => String(c[0])).join("");
+    errSpy.mockRestore();
+    expect(out).toContain("[universe]");
+    expect(out).toContain("-> 200");
+  });
+
+  it("writes nothing to stderr when debug is off", async () => {
+    const errSpy = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation(() => true);
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        jsonResponse(200, { login: "a", authorizedSites: [] }),
+      );
+    const client = createProxyClient({
+      baseUrl,
+      getAuthToken,
+      fetch: fetchMock,
+    });
+    await client.whoami();
+    const called = errSpy.mock.calls.length;
+    errSpy.mockRestore();
+    expect(called).toBe(0);
+  });
+});

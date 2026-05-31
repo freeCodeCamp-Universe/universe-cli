@@ -76,6 +76,7 @@ export async function setupClient(deps: RepoCommandDeps): Promise<{
     baseUrl,
     getAuthToken: () => identity.token,
     timeoutMs: parseFetchTimeoutMs(env),
+    debug: Boolean(env["UNIVERSE_DEBUG"]),
   });
   return { client, identitySource: identity.source };
 }
