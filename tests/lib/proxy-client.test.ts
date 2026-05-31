@@ -1238,3 +1238,71 @@ describe("wrapProxyError authz hint", () => {
     expect(message).not.toMatch(/read:org/);
   });
 });
+
+describe("repo response validation (H2)", () => {
+  it("rejects a createRepoRequest body missing required fields with exit 13", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, {}));
+    const client = createProxyClient({
+      baseUrl,
+      getAuthToken,
+      fetch: fetchMock,
+    });
+    await expect(
+      client.createRepoRequest({ name: "x", visibility: "private" }),
+    ).rejects.toMatchObject({
+      code: "malformed_response",
+      exitCode: EXIT_STORAGE,
+    });
+  });
+
+  it("rejects a null createRepoRequest body", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, null));
+    const client = createProxyClient({
+      baseUrl,
+      getAuthToken,
+      fetch: fetchMock,
+    });
+    await expect(
+      client.createRepoRequest({ name: "x", visibility: "private" }),
+    ).rejects.toBeInstanceOf(ProxyError);
+  });
+
+  it("rejects an approve result missing the request row with exit 13", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(jsonResponse(200, { outcome: "ok" }));
+    const client = createProxyClient({
+      baseUrl,
+      getAuthToken,
+      fetch: fetchMock,
+    });
+    await expect(
+      client.approveRepoRequest({ id: "req_1" }),
+    ).rejects.toMatchObject({
+      code: "malformed_response",
+      exitCode: EXIT_STORAGE,
+    });
+  });
+
+  it("accepts a well-formed RepoRow", async () => {
+    const row = {
+      id: "req_1",
+      name: "x",
+      owner: "freeCodeCamp-Universe",
+      visibility: "private",
+      status: "pending",
+      requestedBy: "alice",
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-01T00:00:00Z",
+    };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, row));
+    const client = createProxyClient({
+      baseUrl,
+      getAuthToken,
+      fetch: fetchMock,
+    });
+    await expect(
+      client.createRepoRequest({ name: "x", visibility: "private" }),
+    ).resolves.toMatchObject({ id: "req_1", status: "pending" });
+  });
+});

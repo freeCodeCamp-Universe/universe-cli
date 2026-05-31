@@ -4,6 +4,12 @@ import {
   EXIT_STORAGE,
   EXIT_USAGE,
 } from "../output/exit-codes.js";
+import {
+  repoApproveResultSchema,
+  repoRowArraySchema,
+  repoRowSchema,
+  repoTemplatesResponseSchema,
+} from "../commands/repo/schema.js";
 
 /**
  * Typed fetch wrapper for the artemis deploy proxy.
@@ -430,7 +436,11 @@ export function createProxyClient(cfg: ProxyClientConfig): ProxyClient {
     return `Bearer ${tok}`;
   }
 
-  async function call<T>(url: string, init: RequestInit): Promise<T> {
+  async function call<T>(
+    url: string,
+    init: RequestInit,
+    validate?: (raw: unknown) => void,
+  ): Promise<T> {
     let response: Response;
     try {
       response = await fetchImpl(url, withTimeoutSignal(init));
@@ -445,7 +455,29 @@ export function createProxyClient(cfg: ProxyClientConfig): ProxyClient {
     if (response.status === 204) {
       return undefined as T;
     }
-    return (await response.json()) as T;
+    let raw: unknown;
+    try {
+      raw = await response.json();
+    } catch {
+      throw new ProxyError(
+        0,
+        "malformed_response",
+        "proxy returned a non-JSON response body",
+      );
+    }
+    if (validate) {
+      try {
+        validate(raw);
+      } catch (err) {
+        const detail = err instanceof Error ? err.message : "invalid shape";
+        throw new ProxyError(
+          0,
+          "malformed_response",
+          `proxy returned an unexpected response shape: ${detail}`,
+        );
+      }
+    }
+    return raw as T;
   }
 
   return {
@@ -630,15 +662,19 @@ export function createProxyClient(cfg: ProxyClientConfig): ProxyClient {
       if (req.template !== undefined && req.template !== "") {
         body.template = req.template;
       }
-      return call<RepoRow>(`${base}/api/repo`, {
-        method: "POST",
-        headers: {
-          Authorization: await userBearer(),
-          Accept: "application/json",
-          "Content-Type": "application/json",
+      return call<RepoRow>(
+        `${base}/api/repo`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: await userBearer(),
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(body),
         },
-        body: JSON.stringify(body),
-      });
+        (raw) => repoRowSchema.parse(raw),
+      );
     },
 
     async listRepoRequests(req) {
@@ -647,50 +683,66 @@ export function createProxyClient(cfg: ProxyClientConfig): ProxyClient {
       if (req?.mine) params.set("mine", "1");
       const qs = params.toString();
       const url = `${base}/api/repos${qs ? `?${qs}` : ""}`;
-      return call<RepoRow[]>(url, {
-        method: "GET",
-        headers: {
-          Authorization: await userBearer(),
-          Accept: "application/json",
+      return call<RepoRow[]>(
+        url,
+        {
+          method: "GET",
+          headers: {
+            Authorization: await userBearer(),
+            Accept: "application/json",
+          },
         },
-      });
+        (raw) => repoRowArraySchema.parse(raw),
+      );
     },
 
     async getRepoRequest(id) {
       const url = `${base}/api/repo/${encodeURIComponent(id)}`;
-      return call<RepoRow>(url, {
-        method: "GET",
-        headers: {
-          Authorization: await userBearer(),
-          Accept: "application/json",
+      return call<RepoRow>(
+        url,
+        {
+          method: "GET",
+          headers: {
+            Authorization: await userBearer(),
+            Accept: "application/json",
+          },
         },
-      });
+        (raw) => repoRowSchema.parse(raw),
+      );
     },
 
     async approveRepoRequest(req) {
       const url = `${base}/api/repo/${encodeURIComponent(req.id)}/approve`;
-      return call<RepoApproveResult>(url, {
-        method: "POST",
-        headers: {
-          Authorization: await userBearer(),
-          Accept: "application/json",
+      return call<RepoApproveResult>(
+        url,
+        {
+          method: "POST",
+          headers: {
+            Authorization: await userBearer(),
+            Accept: "application/json",
+          },
         },
-      });
+        (raw) => repoApproveResultSchema.parse(raw),
+      );
     },
 
     async rejectRepoRequest(req) {
       const url = `${base}/api/repo/${encodeURIComponent(req.id)}/reject`;
       const body: Record<string, unknown> = {};
       if (req.reason !== undefined) body.reason = req.reason;
-      return call<RepoRow>(url, {
-        method: "POST",
-        headers: {
-          Authorization: await userBearer(),
-          Accept: "application/json",
-          "Content-Type": "application/json",
+      return call<RepoRow>(
+        url,
+        {
+          method: "POST",
+          headers: {
+            Authorization: await userBearer(),
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(body),
         },
-        body: JSON.stringify(body),
-      });
+        (raw) => repoRowSchema.parse(raw),
+      );
     },
 
     async listRepoTemplates() {
@@ -703,6 +755,7 @@ export function createProxyClient(cfg: ProxyClientConfig): ProxyClient {
             Accept: "application/json",
           },
         },
+        (raw) => repoTemplatesResponseSchema.parse(raw),
       );
       return res.templates ?? [];
     },

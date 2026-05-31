@@ -67,3 +67,14 @@ export const repoRowSchema = z.object({
   updatedAt: z.string(),
 });
 export type RepoRow = z.infer<typeof repoRowSchema>;
+
+export const repoRowArraySchema = z.array(repoRowSchema);
+
+export const repoApproveResultSchema = z.object({
+  outcome: z.enum(["ok", "approved_failed"]),
+  request: repoRowSchema,
+});
+
+export const repoTemplatesResponseSchema = z.object({
+  templates: z.array(z.string()),
+});
