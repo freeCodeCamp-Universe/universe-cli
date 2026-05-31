@@ -31,11 +31,14 @@ export async function reject(
   const prompts = deps.prompts ?? defaultRepoPrompts;
   const isTTY = deps.isTTY ?? Boolean(process.stdout.isTTY);
 
+  let identitySource: string | undefined;
   try {
     if (!options.id || options.id.trim().length === 0) {
       throw new UsageError("request id is required (positional argument)");
     }
-    const { client, identitySource } = await setupClient(deps);
+    const setup = await setupClient(deps);
+    const client = setup.client;
+    identitySource = setup.identitySource;
 
     // Confirmation required unless --yes / --json; a non-TTY human
     // session must pass --yes rather than silently rejecting.
@@ -89,6 +92,7 @@ export async function reject(
       logError: error,
       kind,
       requestId,
+      extras: identitySource ? { identitySource } : undefined,
     });
     exit(code);
   }

@@ -32,6 +32,7 @@ export async function ls(
   const error = deps.logError ?? ((s: string) => log.error(s));
   const exit = deps.exit ?? exitWithCode;
 
+  let identitySource: string | undefined;
   try {
     if (
       options.status !== undefined &&
@@ -41,7 +42,9 @@ export async function ls(
         `invalid --status "${options.status}": must be one of ${LS_STATUSES.join(", ")}`,
       );
     }
-    const { client, identitySource } = await setupClient(deps);
+    const setup = await setupClient(deps);
+    const client = setup.client;
+    identitySource = setup.identitySource;
     const rows = await client.listRepoRequests({
       status: options.status,
       mine: options.mine ?? false,
@@ -74,6 +77,7 @@ export async function ls(
       logError: error,
       kind,
       requestId,
+      extras: identitySource ? { identitySource } : undefined,
     });
     exit(code);
   }

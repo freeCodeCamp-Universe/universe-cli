@@ -82,6 +82,7 @@ export async function create(
   // automation (--json) — the only mode where we gather + confirm.
   const canPrompt = !options.json && !options.yes && isTTY;
 
+  let identitySource = "";
   try {
     // Identity/client setup is deferred until after local validation and
     // the non-TTY `--yes` gate, so a missing name / bad option / missing
@@ -89,7 +90,6 @@ export async function create(
     // interactive template prompt still needs a client, so prompting paths
     // set it up just before that prompt.
     let client: ProxyClient | undefined;
-    let identitySource = "";
     const ensureClient = async (): Promise<ProxyClient> => {
       if (!client) {
         const setup = await setupClient(deps);
@@ -220,6 +220,7 @@ export async function create(
       logError: error,
       kind,
       requestId,
+      extras: identitySource ? { identitySource } : undefined,
     });
     exit(code);
   }

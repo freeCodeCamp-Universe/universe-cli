@@ -43,11 +43,14 @@ export async function status(
   const error = deps.logError ?? ((s: string) => log.error(s));
   const exit = deps.exit ?? exitWithCode;
 
+  let identitySource: string | undefined;
   try {
     if (!options.id || options.id.trim().length === 0) {
       throw new UsageError("request id is required (positional argument)");
     }
-    const { client, identitySource } = await setupClient(deps);
+    const setup = await setupClient(deps);
+    const client = setup.client;
+    identitySource = setup.identitySource;
     const row = await client.getRepoRequest(options.id);
 
     if (options.json) {
@@ -66,6 +69,7 @@ export async function status(
       logError: error,
       kind,
       requestId,
+      extras: identitySource ? { identitySource } : undefined,
     });
     exit(code);
   }

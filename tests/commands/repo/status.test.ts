@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { status } from "../../../src/commands/repo/status.js";
+import { ProxyError } from "../../../src/lib/proxy-client.js";
 
 function repoRow(over: Record<string, unknown> = {}) {
   return {
@@ -81,6 +82,30 @@ describe("repo status command", () => {
     expect(env.command).toBe("repo status");
     expect(env.request.id).toBe("req_001");
     expect(env.request.status).toBe("active");
+  });
+
+  it("includes identitySource and error.kind in the JSON error envelope", async () => {
+    const stdout: string[] = [];
+    const writeSpy = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation((c: unknown) => {
+        stdout.push(String(c));
+        return true;
+      });
+    const proxy = mkProxy();
+    proxy.getRepoRequest = vi
+      .fn()
+      .mockRejectedValue(new ProxyError(403, "user_unauthorized", "denied"));
+    const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
+    await expect(status({ json: true, id: "req_001" }, deps)).rejects.toThrow(
+      "__exit__",
+    );
+    writeSpy.mockRestore();
+
+    const env = JSON.parse(stdout.join("").trim());
+    expect(env.success).toBe(false);
+    expect(env.error.kind).toBe("user_unauthorized");
+    expect(env.identitySource).toBe("env_GITHUB_TOKEN");
   });
 
   it("renders a human key/value block", async () => {

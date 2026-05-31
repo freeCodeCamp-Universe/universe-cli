@@ -31,11 +31,14 @@ export async function approve(
   const isTTY = deps.isTTY ?? Boolean(process.stdout.isTTY);
 
   let creationFailure: Record<string, unknown> | undefined;
+  let identitySource: string | undefined;
   try {
     if (!options.id || options.id.trim().length === 0) {
       throw new UsageError("request id is required (positional argument)");
     }
-    const { client, identitySource } = await setupClient(deps);
+    const setup = await setupClient(deps);
+    const client = setup.client;
+    identitySource = setup.identitySource;
 
     // Confirmation is required unless --yes (explicit opt-out) or --json
     // (automation path). A non-TTY human session cannot prompt, so it
@@ -102,6 +105,7 @@ export async function approve(
       logError: error,
       kind,
       requestId,
+      extras: identitySource ? { identitySource } : undefined,
     });
     exit(code);
     return;
