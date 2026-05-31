@@ -71,6 +71,7 @@ export async function whoami(
         buildEnvelope("whoami", true, {
           login: result.login,
           identitySource: identity.source,
+          proxyUrl: baseUrl,
           authorizedSitesCount: count,
         }),
       );
@@ -83,6 +84,7 @@ export async function whoami(
         [
           `Logged in as: ${result.login}`,
           `Identity source: ${identity.source}`,
+          `Proxy: ${baseUrl}`,
           sitesLine,
         ].join("\n"),
       );

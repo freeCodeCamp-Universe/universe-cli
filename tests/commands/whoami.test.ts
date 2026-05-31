@@ -90,6 +90,7 @@ describe("whoami command", () => {
     expect(env.login).toBe("alice");
     expect(env.authorizedSitesCount).toBe(2);
     expect(env.identitySource).toBe("env_GITHUB_TOKEN");
+    expect(env.proxyUrl).toBe("https://uploads.freecode.camp");
     // Regression: the full site list belongs in `sites ls --mine`, not
     // in the identity envelope. See deploy preflight + whoami split.
     expect(env.authorizedSites).toBeUndefined();
