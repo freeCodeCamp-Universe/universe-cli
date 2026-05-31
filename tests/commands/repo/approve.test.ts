@@ -159,7 +159,9 @@ describe("repo approve command", () => {
     expect(env.id).toBe("req_001");
     expect(env.repo).toBe("freeCodeCamp-Universe/alpha");
     expect(env.status).toBe("failed");
-    expect(env.error).toContain("missing Contents:read");
+    expect(env.error.code).toBe(13);
+    expect(env.error.message).toContain("repository creation failed");
+    expect(env.creationError).toContain("missing Contents:read");
   });
 
   it("requires --yes in a non-interactive (non-TTY) session", async () => {

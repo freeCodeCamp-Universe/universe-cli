@@ -30,7 +30,7 @@ export async function approve(
   const prompts = deps.prompts ?? defaultRepoPrompts;
   const isTTY = deps.isTTY ?? Boolean(process.stdout.isTTY);
 
-  let jsonFailureEnvelope: Record<string, unknown> | undefined;
+  let creationFailure: Record<string, unknown> | undefined;
   try {
     if (!options.id || options.id.trim().length === 0) {
       throw new UsageError("request id is required (positional argument)");
@@ -64,12 +64,12 @@ export async function approve(
           `approved, but repository creation failed: ${row.error ?? "unknown"} (${row.owner}/${row.name}, requested by ${row.requestedBy})`,
         );
       }
-      jsonFailureEnvelope = {
+      creationFailure = {
         outcome: res.outcome,
         id: row.id,
         repo: `${row.owner}/${row.name}`,
         status: row.status,
-        error: row.error ?? "unknown",
+        creationError: row.error ?? "unknown",
         requestedBy: row.requestedBy,
         identitySource,
       };
@@ -105,8 +105,13 @@ export async function approve(
     return;
   }
 
-  if (jsonFailureEnvelope) {
-    emitJson(buildEnvelope(command, false, jsonFailureEnvelope));
+  if (creationFailure) {
+    outputError(
+      { json: true, command },
+      EXIT_STORAGE,
+      "approved, but repository creation failed",
+      { logError: error, extras: creationFailure },
+    );
     exit(EXIT_STORAGE);
   }
 }
