@@ -10,7 +10,31 @@ The whole lifecycle, in order:
 1. **Deploy to preview** — build and upload; the proxy returns a preview URL.
 1. **Promote to production** — re-point the production alias; roll back if needed.
 
-Steps 1–3 set an app up once; 4–5 repeat every release. If your repo exists and the slug is registered, skip to [step 4](#4-build--deploy-to-preview).
+Steps 1–3 set an app up once; 4–5 repeat every release. If your repo exists and the slug is registered, skip to [Build & deploy to preview](#3-build--deploy-to-preview).
+
+## Contents
+
+**Set up once**
+
+- [Prerequisites](#prerequisites)
+- [1. Log in](#1-log-in)
+- [2. Set up `platform.yaml`](#2-set-up-platformyaml)
+- [Creating a repository](#creating-a-repository) — request, approve, or migrate a personal repo
+- [Site registry](#site-registry) — register the slug before its first deploy
+
+**Every release**
+
+- [3. Build & deploy to preview](#3-build--deploy-to-preview)
+- [4. Inspect deploys](#4-inspect-deploys)
+- [5. Promote to production](#5-promote-to-production)
+- [6. Roll back](#6-roll-back)
+
+**Reference**
+
+- [Common scenarios](#common-scenarios)
+- [CI & automation](#ci--automation)
+- [Identity & SSO](#identity--sso)
+- [When something breaks](#when-something-breaks)
 
 ## Prerequisites
 
@@ -175,6 +199,8 @@ universe sites rm <slug>                                # delete entry (R2 bytes
 Staff request a new repo in `freeCodeCamp-Universe`; the request enters an approval queue; an admin approves it and the proxy creates the repo via the Apollo-11 GitHub App. (Replaces the old Google Chat / Windmill flow — same outcome, from your terminal. No GitHub App key ever touches your machine.)
 
 A request carries a **status**: `pending → approved → active` on success, `pending → rejected` when declined, `approved → failed` when GitHub creation breaks after approval.
+
+> Already started the repo on your **personal** account? Don't use GitHub's transfer — see [Migrating a repo you already started](others/repo-transfers.md). Request it here, re-point your remote, push.
 
 ### Request a repo (staff)
 
