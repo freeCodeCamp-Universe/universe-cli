@@ -18,7 +18,11 @@ import { status as repoStatus } from "./commands/repo/status.js";
 import { type OutputContext, outputError } from "./output/format.js";
 import { EXIT_USAGE, exitWithCode } from "./output/exit-codes.js";
 import { CliError } from "./errors.js";
-import { installExitNotice, refreshIfStale } from "./lib/update-notifier.js";
+import {
+  installExitNotice,
+  refreshIfStale,
+  spawnRefresh,
+} from "./lib/update-notifier.js";
 
 declare const __VERSION__: string;
 const version = typeof __VERSION__ !== "undefined" ? __VERSION__ : "0.0.0";
@@ -56,7 +60,7 @@ export async function run(argv = process.argv) {
   const args = argv.slice(2);
   const versionRequested = isVersionRequest(args);
   if (!versionRequested) {
-    void refreshIfStale().catch(() => {});
+    spawnRefresh();
   }
 
   const firstPosIdx = findFirstPositional(args);

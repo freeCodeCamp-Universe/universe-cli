@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mkdtemp, readFile, rm, writeFile, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { spawn } from "node:child_process";
 import {
   cachePath,
   compareVersions,
@@ -11,12 +12,23 @@ import {
   isDisabled,
   readCache,
   refreshIfStale,
+  REFRESH_FLAG,
+  spawnRefresh,
 } from "../../src/lib/update-notifier.js";
+
+vi.mock("node:child_process", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:child_process")>();
+  return { ...actual, spawn: vi.fn(() => ({ unref: vi.fn() })) };
+});
+
+const mockSpawn = vi.mocked(spawn);
 
 let tmp: string;
 const origXdg = process.env["XDG_CONFIG_HOME"];
 const origHome = process.env["HOME"];
 const origDisable = process.env["UNIVERSE_NO_UPDATE_CHECK"];
+const origTtl = process.env["UNIVERSE_UPDATE_TTL_MS"];
+const origUrl = process.env["UNIVERSE_UPDATE_URL"];
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -37,6 +49,9 @@ beforeEach(async () => {
   tmp = await mkdtemp(join(tmpdir(), "universe-cli-upd-"));
   process.env["XDG_CONFIG_HOME"] = tmp;
   delete process.env["UNIVERSE_NO_UPDATE_CHECK"];
+  delete process.env["UNIVERSE_UPDATE_TTL_MS"];
+  delete process.env["UNIVERSE_UPDATE_URL"];
+  mockSpawn.mockClear();
 });
 
 afterEach(async () => {
@@ -45,6 +60,10 @@ afterEach(async () => {
   if (origHome !== undefined) process.env["HOME"] = origHome;
   if (origDisable === undefined) delete process.env["UNIVERSE_NO_UPDATE_CHECK"];
   else process.env["UNIVERSE_NO_UPDATE_CHECK"] = origDisable;
+  if (origTtl === undefined) delete process.env["UNIVERSE_UPDATE_TTL_MS"];
+  else process.env["UNIVERSE_UPDATE_TTL_MS"] = origTtl;
+  if (origUrl === undefined) delete process.env["UNIVERSE_UPDATE_URL"];
+  else process.env["UNIVERSE_UPDATE_URL"] = origUrl;
   vi.unstubAllGlobals();
   await rm(tmp, { recursive: true, force: true });
 });
@@ -243,20 +262,20 @@ describe("refreshIfStale", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("skips fetch when cache age is just under the 6h TTL", async () => {
+  it("skips fetch when cache age is just under the 1h TTL", async () => {
     const now = 1_000_000_000_000;
-    const sixHours = 6 * 60 * 60 * 1000;
-    await seedCache("0.8.0", now - sixHours + 1000);
+    const oneHour = 60 * 60 * 1000;
+    await seedCache("0.8.0", now - oneHour + 1000);
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
     await refreshIfStale(now);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("fetches when cache age just exceeds the 6h TTL", async () => {
+  it("fetches when cache age just exceeds the 1h TTL", async () => {
     const now = 1_000_000_000_000;
-    const sixHours = 6 * 60 * 60 * 1000;
-    await seedCache("0.7.0", now - sixHours - 1000);
+    const oneHour = 60 * 60 * 1000;
+    await seedCache("0.7.0", now - oneHour - 1000);
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValueOnce(jsonResponse(200, { version: "0.9.0" })),
@@ -331,5 +350,93 @@ describe("formatNotice", () => {
     expect(out).toContain("\x1b[");
     expect(out).toContain("0.7.0");
     expect(out).toContain("0.8.0");
+  });
+});
+
+describe("UNIVERSE_UPDATE_TTL_MS override", () => {
+  it("skips fetch when cache age is under the overridden TTL", async () => {
+    const now = 1_000_000_000_000;
+    process.env["UNIVERSE_UPDATE_TTL_MS"] = String(10 * 60 * 1000);
+    await seedCache("0.8.0", now - 5 * 60 * 1000);
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    await refreshIfStale(now);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("fetches when cache age exceeds the overridden TTL", async () => {
+    const now = 1_000_000_000_000;
+    process.env["UNIVERSE_UPDATE_TTL_MS"] = String(10 * 60 * 1000);
+    await seedCache("0.7.0", now - 20 * 60 * 1000);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValueOnce(jsonResponse(200, { version: "0.9.0" })),
+    );
+    await refreshIfStale(now);
+    expect(await readCache()).toEqual({ latest: "0.9.0", lastCheck: now });
+  });
+
+  it("ignores a non-numeric override and uses the default", async () => {
+    const now = 1_000_000_000_000;
+    process.env["UNIVERSE_UPDATE_TTL_MS"] = "garbage";
+    await seedCache("0.8.0", now - 30 * 60 * 1000);
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    await refreshIfStale(now);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("UNIVERSE_UPDATE_URL override", () => {
+  it("fetches from the overridden URL", async () => {
+    process.env["UNIVERSE_UPDATE_URL"] = "https://example.test/latest";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(200, { version: "3.0.0" }));
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await fetchLatest()).toBe("3.0.0");
+    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://example.test/latest");
+  });
+});
+
+describe("spawnRefresh", () => {
+  const now = 1_000_000_000_000;
+
+  it("does not spawn when disabled", () => {
+    process.env["UNIVERSE_NO_UPDATE_CHECK"] = "1";
+    spawnRefresh(now);
+    expect(mockSpawn).not.toHaveBeenCalled();
+  });
+
+  it("does not spawn when cache is fresh", async () => {
+    await seedCache("0.8.0", now - 60_000);
+    spawnRefresh(now);
+    expect(mockSpawn).not.toHaveBeenCalled();
+  });
+
+  it("spawns a detached worker when cache is stale", async () => {
+    await seedCache("0.8.0", now - 2 * 60 * 60 * 1000);
+    spawnRefresh(now);
+    expect(mockSpawn).toHaveBeenCalledTimes(1);
+    const [, args, opts] = mockSpawn.mock.calls[0] as [
+      string,
+      string[],
+      { detached?: boolean; stdio?: string },
+    ];
+    expect(args).toContain(REFRESH_FLAG);
+    expect(opts).toMatchObject({ detached: true, stdio: "ignore" });
+  });
+
+  it("spawns when no cache exists", () => {
+    spawnRefresh(now);
+    expect(mockSpawn).toHaveBeenCalledTimes(1);
+  });
+
+  it("unrefs the child so the parent can exit", async () => {
+    await seedCache("0.8.0", now - 2 * 60 * 60 * 1000);
+    spawnRefresh(now);
+    const child = mockSpawn.mock.results[0]?.value as { unref: () => void };
+    expect(child.unref).toHaveBeenCalled();
   });
 });

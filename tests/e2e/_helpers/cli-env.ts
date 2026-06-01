@@ -48,6 +48,7 @@ export async function makeCliEnv(opts: CliEnvOptions): Promise<CliEnv> {
     XDG_CONFIG_HOME: xdgDir,
     UNIVERSE_PROXY_URL: opts.proxyUrl,
     NO_COLOR: "1",
+    UNIVERSE_NO_UPDATE_CHECK: "1",
   };
   // PATH is required for the spawned-binary smoke layer to locate `node`.
   // Read-only access; we never mutate process.env (SPEC §V8).

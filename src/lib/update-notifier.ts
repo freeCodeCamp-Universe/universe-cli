@@ -1,4 +1,5 @@
-import { readFileSync } from "node:fs";
+import { spawn } from "node:child_process";
+import { readFileSync, writeSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
@@ -10,8 +11,24 @@ const APP_DIR = "universe-cli";
 const CACHE_FILE = "update-check.json";
 const PKG_NAME = "@freecodecamp/universe-cli";
 const NPM_LATEST_URL = `https://registry.npmjs.org/${PKG_NAME}/latest`;
-const TTL_MS = 6 * 60 * 60 * 1000;
+const DEFAULT_TTL_MS = 60 * 60 * 1000;
 const FETCH_TIMEOUT_MS = 3_000;
+
+export const REFRESH_FLAG = "--refresh-worker";
+
+function ttlMs(): number {
+  const raw = process.env["UNIVERSE_UPDATE_TTL_MS"];
+  if (raw !== undefined) {
+    const n = Number.parseInt(raw, 10);
+    if (Number.isFinite(n) && n >= 0) return n;
+  }
+  return DEFAULT_TTL_MS;
+}
+
+function latestUrl(): string {
+  const override = process.env["UNIVERSE_UPDATE_URL"];
+  return override && override.length > 0 ? override : NPM_LATEST_URL;
+}
 
 interface CacheShape {
   readonly latest: string;
@@ -91,7 +108,7 @@ export async function fetchLatest(): Promise<string | null> {
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch(NPM_LATEST_URL, {
+    const res = await fetch(latestUrl(), {
       signal: ctl.signal,
       headers: { accept: "application/json" },
     });
@@ -136,7 +153,7 @@ export async function refreshIfStale(
   if (isDisabled()) return;
   if (!options.force) {
     const cache = await readCache();
-    if (cache !== null && now - cache.lastCheck < TTL_MS) return;
+    if (cache !== null && now - cache.lastCheck < ttlMs()) return;
   }
   const latest = await fetchLatest();
   if (latest === null) return;
@@ -145,6 +162,28 @@ export async function refreshIfStale(
   } catch {
     // Non-fatal: next run retries.
   }
+}
+
+export function spawnRefresh(now: number = Date.now()): void {
+  if (isDisabled()) return;
+  const cache = readCacheSync();
+  if (cache !== null && now - cache.lastCheck < ttlMs()) return;
+  try {
+    const entry = process.argv[1];
+    const args = entry ? [entry, REFRESH_FLAG] : [REFRESH_FLAG];
+    const child = spawn(process.execPath, args, {
+      detached: true,
+      stdio: "ignore",
+      env: process.env,
+    });
+    child.unref();
+  } catch {
+    void 0;
+  }
+}
+
+export async function runRefreshWorker(): Promise<void> {
+  await refreshIfStale(Date.now(), { force: true });
 }
 
 export function getNoticeSync(current: string): UpdateNotice | null {
@@ -196,7 +235,12 @@ export function installExitNotice(current: string): void {
     printed = true;
     const n = getNoticeSync(current);
     if (n === null) return;
-    process.stderr.write(formatNotice(n));
+    // writeSync: stderr.write async on POSIX pipes, dropped in `exit`. https://nodejs.org/api/process.html#a-note-on-process-io
+    try {
+      writeSync(2, formatNotice(n));
+    } catch {
+      void 0;
+    }
   };
   process.on("beforeExit", emit);
   process.on("exit", emit);

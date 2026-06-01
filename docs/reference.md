@@ -7,7 +7,7 @@ Every `universe` command, flag, exit code, and environment variable. Task walkth
 - **`--json`** — accepted by every command. Envelope on **stdout**; human errors on **stderr**, so `… --json | jq` stays clean. Required in non-TTY/CI for commands that otherwise prompt.
 - **`--help` / `-h`**, **`--version` / `-v`** — per-command help and version.
 - **Namespaces** — `static`, `sites`, `repo` group verbs; global flags may precede the namespace token (`universe --json static deploy`).
-- **Auto-update check** — on exit the CLI checks npm for a newer version (cached 6 h, 3 s timeout, background) and prints a notice to **stderr** only. Disable with `UNIVERSE_NO_UPDATE_CHECK=1`.
+- **Auto-update check** — a detached background process checks npm for a newer version (cached 1 h, override `UNIVERSE_UPDATE_TTL_MS`; 3 s timeout) and the next run prints a notice to **stderr** only. Survives error/exit paths. Disable with `UNIVERSE_NO_UPDATE_CHECK=1`.
 
 ## Commands
 
@@ -91,15 +91,16 @@ artemis validates every bearer with `GET /user` and authorizes via `GET /user/te
 
 ## Environment
 
-| Env                         | Default                         | Scope        | Purpose                                                         |
-| --------------------------- | ------------------------------- | ------------ | --------------------------------------------------------------- |
-| `GITHUB_TOKEN` / `GH_TOKEN` | —                               | all          | Identity sources 1–2. Must be user-scoped.                      |
-| `UNIVERSE_PROXY_URL`        | `https://uploads.freecode.camp` | all          | Point at a different artemis host (staging, mirror).            |
-| `UNIVERSE_FETCH_TIMEOUT_MS` | `30000`                         | all          | Per-request timeout to artemis, ms. `0` disables.               |
-| `UNIVERSE_NO_UPDATE_CHECK`  | —                               | all          | `1`/`true` disables the background update check.                |
-| `UNIVERSE_DEBUG`            | —                               | all          | `1`/`true` logs raw proxy request/response. Verbose; debugging. |
-| `NO_COLOR`                  | —                               | all          | Standard; suppresses color in the update notice.                |
-| `UNIVERSE_GH_CLIENT_ID`     | baked-in App client id          | `login` only | Override the device-flow GitHub App (fork / self-host tenants). |
-| `XDG_CONFIG_HOME`           | `~/.config`                     | login/logout | Base dir for the token store (`<base>/universe-cli/token`).     |
+| Env                         | Default                         | Scope        | Purpose                                                            |
+| --------------------------- | ------------------------------- | ------------ | ------------------------------------------------------------------ |
+| `GITHUB_TOKEN` / `GH_TOKEN` | —                               | all          | Identity sources 1–2. Must be user-scoped.                         |
+| `UNIVERSE_PROXY_URL`        | `https://uploads.freecode.camp` | all          | Point at a different artemis host (staging, mirror).               |
+| `UNIVERSE_FETCH_TIMEOUT_MS` | `30000`                         | all          | Per-request timeout to artemis, ms. `0` disables.                  |
+| `UNIVERSE_NO_UPDATE_CHECK`  | —                               | all          | `1`/`true` disables the background update check.                   |
+| `UNIVERSE_UPDATE_TTL_MS`    | `3600000`                       | all          | Update-check cache TTL, ms. Lower = fresher; `0` checks every run. |
+| `UNIVERSE_DEBUG`            | —                               | all          | `1`/`true` logs raw proxy request/response. Verbose; debugging.    |
+| `NO_COLOR`                  | —                               | all          | Standard; suppresses color in the update notice.                   |
+| `UNIVERSE_GH_CLIENT_ID`     | baked-in App client id          | `login` only | Override the device-flow GitHub App (fork / self-host tenants).    |
+| `XDG_CONFIG_HOME`           | `~/.config`                     | login/logout | Base dir for the token store (`<base>/universe-cli/token`).        |
 
 The baked-in client id is **public** — the device flow uses no `client_secret`, so embedding it leaks nothing. No setting is ever read from a `.env` file.
