@@ -1,159 +1,49 @@
 name: Release
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
-    inputs:
-      version:
-        description: "Explicit version (e.g., 0.6.0). Leave empty to derive from `bump`."
-        required: false
-        type: string
-        default: ""
-      bump:
-        description: "Bump strategy when `version` is empty"
-        required: false
-        type: choice
-        options:
-          - auto-patch
-          - minor
-          - major
-        default: auto-patch
-      notes:
-        description: "Override changelog body (markdown). Empty = auto-generate from commits since the last tag."
-        required: false
-        type: string
-        default: ""
+
+permissions: {}
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
-  preflight:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    outputs:
-      version: ${{ steps.resolve.outputs.version }}
-    steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
-      - name: Resolve version
-        id: resolve
-        env:
-          INPUT_VERSION: ${{ inputs.version }}
-          INPUT_BUMP: ${{ inputs.bump }}
-        run: |
-          if [ -n "$INPUT_VERSION" ]; then
-            VERSION="$INPUT_VERSION"
-          else
-            CURRENT=$(node -p "require('./package.json').version")
-            # Strip any -prerelease/+build suffix before incrementing.
-            CORE="${CURRENT%%-*}"
-            CORE="${CORE%%+*}"
-            IFS='.' read -r MAJOR MINOR PATCH <<<"$CORE"
-            case "$INPUT_BUMP" in
-              auto-patch) VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))" ;;
-              minor)      VERSION="${MAJOR}.$((MINOR + 1)).0" ;;
-              major)      VERSION="$((MAJOR + 1)).0.0" ;;
-              *)          echo "::error::Unknown bump strategy: $INPUT_BUMP"; exit 1 ;;
-            esac
-            echo "Bumped $CURRENT -> $VERSION via $INPUT_BUMP."
-          fi
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-      - uses: ./.github/actions/validate-version
-        with:
-          version: ${{ steps.resolve.outputs.version }}
-
-  bump:
-    needs: preflight
+  # release-please reads Conventional Commits on main and maintains a Release
+  # PR that bumps package.json + CHANGELOG.md. Merging that PR cuts the git tag
+  # + GitHub Release, sets release_created, and triggers the gated jobs below.
+  # Everything stays in THIS workflow (no tag-triggered second workflow), so a
+  # GITHUB_TOKEN-created tag never needs a PAT to fan out. bump-minor-pre-major
+  # (config) keeps a pre-1.0 breaking change at minor, not 1.0.0.
+  release-please:
+    name: Maintain release PR
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: write
     outputs:
-      sha: ${{ steps.commit.outputs.sha }}
-      version: ${{ needs.preflight.outputs.version }}
-    env:
-      VERSION: ${{ needs.preflight.outputs.version }}
-      NOTES: ${{ inputs.notes }}
+      release_created: ${{ steps.rp.outputs.release_created }}
+      version: ${{ steps.rp.outputs.version }}
+      tag_name: ${{ steps.rp.outputs.tag_name }}
+      sha: ${{ steps.rp.outputs.sha }}
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+      - id: rp
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
-          ref: main
-          token: ${{ secrets.GITHUB_TOKEN }}
-          # git-cliff walks the commit graph back to the last tag.
-          fetch-depth: 0
-          fetch-tags: true
-      - uses: pnpm/action-setup@b307475762933b98ed359c036b0e51f26b63b74b
-      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
-        with:
-          node-version: "24"
-          cache: "pnpm"
-      - name: Bump package.json if needed
-        run: |
-          CURRENT=$(node -p "require('./package.json').version")
-          if [ "$CURRENT" != "$VERSION" ]; then
-            pnpm version "$VERSION" --no-git-tag-version
-          fi
-      - name: Render changelog section from git-cliff
-        if: inputs.notes == ''
-        uses: orhun/git-cliff-action@f50e11560dce63f7c33227798f90b924471a88b5
-        with:
-          config: cliff.toml
-          args: --tag v${{ needs.preflight.outputs.version }} --unreleased
-        env:
-          OUTPUT: /tmp/new-section.md
-      - name: Fallback when git-cliff body is empty
-        if: inputs.notes == ''
-        run: |
-          # cliff emits just the heading when no feat/fix commits exist since
-          # the last tag (e.g. a docs-only patch). Synthesise a generic body
-          # so the GitHub Release page isn't blank.
-          if ! grep -qE '^### ' /tmp/new-section.md; then
-            DATE=$(date -u +%Y-%m-%d)
-            {
-              printf '## [%s] - %s\n\n' "$VERSION" "$DATE"
-              printf 'Maintenance release. See the commit log for details.\n'
-            } > /tmp/new-section.md
-          fi
-      - name: Render changelog section from notes input
-        if: inputs.notes != ''
-        run: |
-          DATE=$(date -u +%Y-%m-%d)
-          {
-            printf '## [%s] - %s\n\n' "$VERSION" "$DATE"
-            printf '%s\n' "$NOTES"
-          } > /tmp/new-section.md
-      - name: Insert section into CHANGELOG.md
-        run: |
-          if grep -qE "^## \[${VERSION//./\\.}\]" CHANGELOG.md; then
-            echo "CHANGELOG already has ## [$VERSION]; leaving untouched."
-            exit 0
-          fi
-          awk '
-            !inserted && /^## \[[0-9]/ {
-              while ((getline line < "/tmp/new-section.md") > 0) print line
-              print ""
-              inserted=1
-            }
-            { print }
-          ' CHANGELOG.md > CHANGELOG.md.new
-          mv CHANGELOG.md.new CHANGELOG.md
-      - name: Commit and push
-        id: commit
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if git diff --quiet; then
-            echo "No version/CHANGELOG changes; release commit not needed."
-            echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          git add package.json CHANGELOG.md
-          git commit -m "chore: release v$VERSION"
-          git push origin main
-          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
 
   test:
-    needs: bump
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true'
     uses: ./.github/workflows/test.yml
 
   build:
-    needs: [bump, test]
+    needs: [release-please, test]
+    if: needs.release-please.outputs.release_created == 'true'
     permissions:
       contents: read
     strategy:
@@ -171,7 +61,9 @@ jobs:
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
         with:
-          ref: ${{ needs.bump.outputs.sha }}
+          # Build the exact commit release-please tagged, not branch HEAD, so
+          # the binaries match the published tag + GitHub Release.
+          ref: ${{ needs.release-please.outputs.sha }}
       - uses: pnpm/action-setup@b307475762933b98ed359c036b0e51f26b63b74b
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
@@ -200,21 +92,24 @@ jobs:
             ${{ matrix.artifact }}
             ${{ matrix.artifact }}.sha256
 
+  # npm publish stays INLINE here with id-token: write. The npm Trusted
+  # Publisher binding matches on org + repo + this workflow's filename
+  # (release.yml) + environment — moving publish into a reusable/workflow_call
+  # would flip the OIDC subject to the caller and break the binding.
   publish:
-    needs: [bump, test]
+    needs: [release-please, test]
+    if: needs.release-please.outputs.release_created == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write
-    env:
-      VERSION: ${{ needs.bump.outputs.version }}
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
         with:
-          ref: ${{ needs.bump.outputs.sha }}
+          ref: ${{ needs.release-please.outputs.sha }}
       - uses: ./.github/actions/validate-version
         with:
-          version: ${{ needs.bump.outputs.version }}
+          version: ${{ needs.release-please.outputs.version }}
       - uses: pnpm/action-setup@b307475762933b98ed359c036b0e51f26b63b74b
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
@@ -223,79 +118,28 @@ jobs:
           registry-url: "https://registry.npmjs.org"
       - run: pnpm install --frozen-lockfile
       - run: pnpm tsup
-      - run: npm version "$VERSION" --no-git-tag-version --allow-same-version
-      # G1 — derive npm dist-tag from the version. Stable releases land
-      # on `latest`; prereleases on `alpha` / `beta` / `next` so that
-      # `npm i -g @freecodecamp/universe-cli` keeps resolving to the
-      # last stable for unflagged consumers.
-      - name: Resolve npm dist-tag
-        id: npmtag
-        run: |
-          case "$VERSION" in
-            *-alpha*) echo "tag=alpha" >> "$GITHUB_OUTPUT" ;;
-            *-beta*)  echo "tag=beta"  >> "$GITHUB_OUTPUT" ;;
-            *-rc*)    echo "tag=next"  >> "$GITHUB_OUTPUT" ;;
-            *)        echo "tag=latest" >> "$GITHUB_OUTPUT" ;;
-          esac
-      - run: npm publish --provenance --access public --tag ${{ steps.npmtag.outputs.tag }}
+      # package.json is already at the release version (release-please bumped it
+      # on the tagged commit). Stable-only: dist-tag is always `latest`.
+      # --provenance is implicit under Trusted Publishing; kept explicit.
+      - run: npm publish --provenance --access public --tag latest
 
-  release:
-    needs: [bump, build, publish]
+  upload:
+    needs: [release-please, build, publish]
+    if: needs.release-please.outputs.release_created == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    env:
-      VERSION: ${{ needs.bump.outputs.version }}
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
-        with:
-          ref: ${{ needs.bump.outputs.sha }}
-      - uses: ./.github/actions/validate-version
-        with:
-          version: ${{ needs.bump.outputs.version }}
-      - name: Tag release
-        run: |
-          git tag "v$VERSION"
-          git push origin "v$VERSION"
       - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0
         with:
           merge-multiple: true
-      - name: Extract changelog section
+      - name: Upload binaries to the release
         env:
-          VERSION_PATTERN: ${{ needs.bump.outputs.version }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          awk -v version="$VERSION_PATTERN" '
-            $0 == "## [" version "]" || index($0, "## [" version "]") == 1 { flag=1; next }
-            /^## \[/ { flag=0 }
-            flag
-          ' CHANGELOG.md > RELEASE_NOTES.md
-          # Reject whitespace-only bodies — they make the GitHub Release blank.
-          if ! grep -q '[^[:space:]]' RELEASE_NOTES.md; then
-            echo "ERROR: CHANGELOG.md section for version $VERSION_PATTERN is empty or whitespace-only" >&2
-            exit 1
-          fi
-      # G2 — flag prereleases so the GitHub UI badges them and `latest
-      # release` API stays pinned to the last stable.
-      - name: Resolve prerelease flag
-        id: prerelease
-        run: |
-          if [[ "$VERSION" == *-* ]]; then
-            echo "flag=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "flag=false" >> "$GITHUB_OUTPUT"
-          fi
-      - name: Create release
-        uses: softprops/action-gh-release@6da8fa9354ddfdc4aeace5fc48d7f679b5214090
-        with:
-          tag_name: "v${{ needs.bump.outputs.version }}"
-          prerelease: ${{ steps.prerelease.outputs.flag }}
-          body_path: RELEASE_NOTES.md
-          files: |
-            universe-darwin-arm64
-            universe-darwin-arm64.sha256
-            universe-darwin-amd64
-            universe-darwin-amd64.sha256
-            universe-linux-amd64
-            universe-linux-amd64.sha256
-            universe-linux-arm64
-            universe-linux-arm64.sha256
+          gh release upload "${{ needs.release-please.outputs.tag_name }}" \
+            universe-darwin-arm64 universe-darwin-arm64.sha256 \
+            universe-darwin-amd64 universe-darwin-amd64.sha256 \
+            universe-linux-amd64 universe-linux-amd64.sha256 \
+            universe-linux-arm64 universe-linux-arm64.sha256 \
+            --repo "${{ github.repository }}"

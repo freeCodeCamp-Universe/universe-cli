@@ -2,41 +2,42 @@
 
 For release maintainers cutting a new `@freecodecamp/universe-cli` version. Build / test commands and pre-commit gates live in [`README.md`](README.md) under "Build & test".
 
-Releases are manual — trigger the workflow when ready. Patch versions auto-increment from `package.json`; feature and major bumps require operator input.
+Releases are automated with [release-please](https://github.com/googleapis/release-please). You never pick a version or edit the changelog by hand — release-please derives both from Conventional Commits and keeps a standing **Release PR** open. Cutting a release = **merging that PR**.
 
 ## Prerequisites
 
-- **npm Trusted Publisher** — the `@freecodecamp/universe-cli` package on npm must have GitHub Actions configured as a trusted publisher (Owner: `freeCodeCamp-Universe`, Repository: `universe-cli`, Workflow: `release.yml`). Configure at https://www.npmjs.com/package/@freecodecamp/universe-cli/access.
-- No npm token is required — the workflow authenticates via OIDC.
+- **npm Trusted Publisher** — the `@freecodecamp/universe-cli` package on npm must have GitHub Actions configured as a trusted publisher (Owner: `freeCodeCamp-Universe`, Repository: `universe-cli`, Workflow: `release.yml`). Configure at https://www.npmjs.com/package/@freecodecamp/universe-cli/access. **Do not rename `release.yml`** — the binding is by workflow filename; renaming breaks publishing.
+- No npm token is required — the workflow authenticates via OIDC, and provenance attestations are generated automatically.
 
 ## Cut a release
 
-Go to **Actions** → **Release** → **Run workflow**. The form has three inputs:
+1. Land your `feat:` / `fix:` commits on `main` using Conventional Commits (see table below).
+1. release-please keeps a **Release PR** open — titled `chore(main): release X.Y.Z` — carrying the computed version bump (`package.json`) and the generated `CHANGELOG.md`. It refreshes on every push to `main`.
+1. When ready to ship, **review and merge the Release PR**.
+1. On merge, release-please tags `vX.Y.Z` + creates the GitHub Release, then the same workflow tests, builds binaries, publishes to npm, and attaches the binaries.
 
-| Input     | When to set it                                                                                                                                       |
-| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `version` | Set for explicit cuts — e.g. `0.6.0` for a minor, `1.0.0` for a major, or `0.6.0-rc.1` for a prerelease. Leave **empty** to derive from `bump`.      |
-| `bump`    | Only used when `version` is empty. `auto-patch` (default) increments the current package.json patch by 1. `minor` / `major` zero the lower segments. |
-| `notes`   | Optional. Markdown that becomes the body of the auto-inserted CHANGELOG section. Leave empty to auto-generate the body from commits via `git-cliff`. |
+There are no `version` / `bump` inputs — the version is computed from commit types:
 
-Common patterns:
+| Commit type                                | Bump            | Example                  |
+| ------------------------------------------ | --------------- | ------------------------ |
+| `fix:`                                     | patch           | `0.8.0` → `0.8.1`        |
+| `feat:`                                    | minor           | `0.8.1` → `0.9.0`        |
+| `feat!:` / `BREAKING CHANGE:`              | minor (pre-1.0) | breaking stays 0.x minor |
+| `chore:` / `docs:` / `refactor:` / `test:` | none            | no release               |
 
-- **Patch (e.g. `0.5.0` → `0.5.1`)** — leave everything default. Click Run workflow.
-- **Minor (e.g. `0.5.x` → `0.6.0`)** — set `bump=minor`, leave `version` empty.
-- **Major (e.g. `0.x.y` → `1.0.0`)** — set `bump=major`, leave `version` empty.
-- **Prerelease / explicit version** — type the full version (e.g. `1.0.0-rc.1`) into `version`. The `bump` input is ignored.
-- **Hand-written release notes** — paste markdown into `notes`. It replaces the auto-generated changelog body for that release only.
+> **Pre-1.0:** `bump-minor-pre-major: true` (in [`release-please-config.json`](../release-please-config.json)) bumps the **minor** on a breaking change, not the major — a stray `feat!` can't jump us to `1.0.0`. Cut `1.0.0` deliberately with a `Release-As: 1.0.0` commit footer once the API is stable.
 
-The CHANGELOG section is generated from Conventional Commits since the last `v*` tag (see [`cliff.toml`](../cliff.toml) for the parser map). Releases with no `feat:` / `fix:` commits get a generic "Maintenance release" body — override with the `notes` input if you want something specific.
+> **Prereleases** (`-rc` / `-beta`) are **not** part of this flow. If one is ever needed, use a `Release-As: X.Y.Z-rc.1` commit footer.
 
-## What the workflow does
+## What the workflow does (`release.yml`)
 
-1. **preflight** — resolves the final version (from `version` or `bump + package.json`) and validates the semver shape.
-1. **bump** — updates `package.json`, renders the new CHANGELOG section (via `git-cliff` or `notes`), commits as `chore: release vX.Y.Z`, pushes to `main`.
-1. **test** — reusable `test.yml` runs `pnpm vitest run` + `pnpm tsc --noEmit`.
-1. **build** — matrix builds Node SEA binaries for four platforms (see below).
-1. **publish** — `npm publish --provenance` via Trusted Publisher OIDC. Dist-tag derived from the version: `alpha` / `beta` / `next` for prereleases, `latest` for stable.
-1. **release** — git-tags `vX.Y.Z`, extracts the new CHANGELOG section as the release body, and uploads binaries + SHA256 checksums to the GitHub Release. Prereleases are flagged so they don't shadow `latest`.
+1. **release-please** — reads Conventional Commits on `main`, maintains the Release PR. On merge: tags `vX.Y.Z`, creates the GitHub Release, sets `release_created`.
+1. **test** *(gated on `release_created`)* — reusable `test.yml`: `pnpm vitest run` + `pnpm tsc --noEmit`.
+1. **build** *(gated)* — matrix builds Node SEA binaries for four platforms (see below) at the tagged commit.
+1. **publish** *(gated)* — `npm publish --provenance --access public --tag latest` via Trusted Publisher OIDC, **inline** in this workflow (the OIDC subject must be `release.yml`).
+1. **upload** *(gated)* — `gh release upload` attaches the binaries + SHA256 checksums to the GitHub Release.
+
+Every post-release job is gated on `needs.release-please.outputs.release_created == 'true'` and runs in this single workflow — no tag-triggered second workflow, so no PAT is needed (a `GITHUB_TOKEN`-created tag cannot trigger a downstream workflow).
 
 ## Binaries
 
@@ -47,6 +48,4 @@ The CHANGELOG section is generated from Conventional Commits since the last `v*`
 | Linux x64           | `universe-linux-amd64`  |
 | Linux ARM64         | `universe-linux-arm64`  |
 
-Each binary is a Node SEA (Single Executable Application) — no Node.js install required at runtime. macOS binaries are ad-hoc codesigned.
-
-Then build locally (`pnpm build` then the SEA steps from `release.yml`) and attach the binaries to the GitHub Release by hand. npm publish via Trusted Publisher will not work outside Actions — defer to the next time the workflow runs.
+Each binary is a Node SEA (Single Executable Application) — no Node.js install required at runtime. macOS binaries are ad-hoc codesigned. The workflow produces and attaches them automatically on release; npm publish via Trusted Publisher only works inside GitHub Actions.
