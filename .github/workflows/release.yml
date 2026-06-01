@@ -39,6 +39,11 @@ jobs:
   test:
     needs: release-please
     if: needs.release-please.outputs.release_created == 'true'
+    # Reusable test.yml declares `contents: read`; a caller granting less (the
+    # top-level `{}`) makes the call an illegal permission elevation → the whole
+    # workflow startup-fails. Grant the called workflow's declared maximum here.
+    permissions:
+      contents: read
     uses: ./.github/workflows/test.yml
 
   build:
