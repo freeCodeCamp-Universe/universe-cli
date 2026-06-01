@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.1](https://github.com/freeCodeCamp-Universe/universe-cli/compare/universe-cli-v0.8.0...universe-cli-v0.8.1) (2026-06-01)
+
+
+### Bug Fixes
+
+* **update-notifier:** 6h TTL + --version force-check ([2036bb8](https://github.com/freeCodeCamp-Universe/universe-cli/commit/2036bb84b890f748f2362a88156662441fc1bdb0))
+
 ## [0.8.0](https://github.com/freeCodeCamp-Universe/universe-cli/compare/universe-cli-v0.7.2...universe-cli-v0.8.0) (2026-06-01)
 
 
