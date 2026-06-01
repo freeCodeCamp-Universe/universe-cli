@@ -10,7 +10,7 @@ const APP_DIR = "universe-cli";
 const CACHE_FILE = "update-check.json";
 const PKG_NAME = "@freecodecamp/universe-cli";
 const NPM_LATEST_URL = `https://registry.npmjs.org/${PKG_NAME}/latest`;
-const TTL_MS = 24 * 60 * 60 * 1000;
+const TTL_MS = 6 * 60 * 60 * 1000;
 const FETCH_TIMEOUT_MS = 3_000;
 
 interface CacheShape {
@@ -129,10 +129,15 @@ function parseVersion(s: string): readonly [number, number, number] | null {
   return [nums[0] as number, nums[1] as number, nums[2] as number] as const;
 }
 
-export async function refreshIfStale(now: number = Date.now()): Promise<void> {
+export async function refreshIfStale(
+  now: number = Date.now(),
+  options: { readonly force?: boolean } = {},
+): Promise<void> {
   if (isDisabled()) return;
-  const cache = await readCache();
-  if (cache !== null && now - cache.lastCheck < TTL_MS) return;
+  if (!options.force) {
+    const cache = await readCache();
+    if (cache !== null && now - cache.lastCheck < TTL_MS) return;
+  }
   const latest = await fetchLatest();
   if (latest === null) return;
   try {

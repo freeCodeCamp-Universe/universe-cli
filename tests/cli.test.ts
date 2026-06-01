@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { run } from "../src/cli.js";
+import { run, isVersionRequest } from "../src/cli.js";
 
 vi.mock("../src/output/format.js", async () => {
   const actual = await vi.importActual<
@@ -28,6 +28,24 @@ import { exitWithCode } from "../src/output/exit-codes.js";
 
 const mockOutputError = vi.mocked(outputError);
 const mockExitWithCode = vi.mocked(exitWithCode);
+
+describe("isVersionRequest", () => {
+  it("returns true for --version", () => {
+    expect(isVersionRequest(["--version"])).toBe(true);
+  });
+
+  it("returns true for -v", () => {
+    expect(isVersionRequest(["-v"])).toBe(true);
+  });
+
+  it("returns true when --version follows a namespace token", () => {
+    expect(isVersionRequest(["static", "--version"])).toBe(true);
+  });
+
+  it("returns false for a normal command", () => {
+    expect(isVersionRequest(["whoami"])).toBe(false);
+  });
+});
 
 describe("CLI module", () => {
   it("exports a run function", () => {
@@ -107,8 +125,13 @@ describe("top-level CLI", () => {
         "utf8",
       ),
     );
-    run(["node", "universe", "--version"]);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response("{}", { status: 500 })),
+    );
+    await run(["node", "universe", "--version"]);
     expect(output).toContain(pkg.version);
+    vi.unstubAllGlobals();
   });
 });
 

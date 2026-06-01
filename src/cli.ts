@@ -46,11 +46,19 @@ function findFirstPositional(args: readonly string[]): number {
   return -1;
 }
 
-export function run(argv = process.argv) {
+export function isVersionRequest(args: readonly string[]): boolean {
+  return args.includes("--version") || args.includes("-v");
+}
+
+export async function run(argv = process.argv) {
   installExitNotice(version);
-  void refreshIfStale().catch(() => {});
 
   const args = argv.slice(2);
+  const versionRequested = isVersionRequest(args);
+  if (!versionRequested) {
+    void refreshIfStale().catch(() => {});
+  }
+
   const firstPosIdx = findFirstPositional(args);
   const namespace = firstPosIdx >= 0 ? args[firstPosIdx] : undefined;
   const isStatic = namespace === "static";
@@ -463,5 +471,9 @@ export function run(argv = process.argv) {
     cli.help();
     cli.version(version);
     cli.parse(argv);
+  }
+
+  if (versionRequested) {
+    await refreshIfStale(Date.now(), { force: true });
   }
 }

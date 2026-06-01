@@ -3,4 +3,4 @@ import { run } from "./cli.js";
 import { installFatalHandlers } from "./lib/fatal.js";
 
 installFatalHandlers();
-run();
+void run();

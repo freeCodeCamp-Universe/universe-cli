@@ -224,6 +224,47 @@ describe("refreshIfStale", () => {
     expect(cache).toEqual({ latest: "0.9.0", lastCheck: now });
   });
 
+  it("with force: true, fetches even when cache is fresh (< TTL)", async () => {
+    const now = 1_000_000_000_000;
+    await seedCache("0.8.0", now - 60_000);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValueOnce(jsonResponse(200, { version: "0.9.0" })),
+    );
+    await refreshIfStale(now, { force: true });
+    expect(await readCache()).toEqual({ latest: "0.9.0", lastCheck: now });
+  });
+
+  it("with force: true, still skips when disabled", async () => {
+    process.env["UNIVERSE_NO_UPDATE_CHECK"] = "1";
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    await refreshIfStale(1_000_000_000_000, { force: true });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("skips fetch when cache age is just under the 6h TTL", async () => {
+    const now = 1_000_000_000_000;
+    const sixHours = 6 * 60 * 60 * 1000;
+    await seedCache("0.8.0", now - sixHours + 1000);
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    await refreshIfStale(now);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("fetches when cache age just exceeds the 6h TTL", async () => {
+    const now = 1_000_000_000_000;
+    const sixHours = 6 * 60 * 60 * 1000;
+    await seedCache("0.7.0", now - sixHours - 1000);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValueOnce(jsonResponse(200, { version: "0.9.0" })),
+    );
+    await refreshIfStale(now);
+    expect(await readCache()).toEqual({ latest: "0.9.0", lastCheck: now });
+  });
+
   it("does not write cache when fetch fails", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValueOnce(new Error("network")));
     await refreshIfStale();
