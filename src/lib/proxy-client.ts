@@ -245,6 +245,7 @@ export interface ProxyClient {
   getRepoRequest(id: string): Promise<RepoRow>;
   approveRepoRequest(req: { id: string }): Promise<RepoApproveResult>;
   rejectRepoRequest(req: { id: string; reason?: string }): Promise<RepoRow>;
+  deleteRepoRequest(req: { id: string }): Promise<void>;
   listRepoTemplates(): Promise<string[]>;
 }
 
@@ -772,6 +773,17 @@ export function createProxyClient(cfg: ProxyClientConfig): ProxyClient {
         },
         (raw) => repoRowSchema.parse(raw),
       );
+    },
+
+    async deleteRepoRequest(req) {
+      const url = `${base}/api/repo/${encodeURIComponent(req.id)}`;
+      return call<void>(url, {
+        method: "DELETE",
+        headers: {
+          Authorization: await userBearer(),
+          Accept: "application/json",
+        },
+      });
     },
 
     async listRepoTemplates() {

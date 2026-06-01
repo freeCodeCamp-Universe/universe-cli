@@ -14,6 +14,7 @@ import { approve as repoApprove } from "./commands/repo/approve.js";
 import { create as repoCreate } from "./commands/repo/create.js";
 import { ls as repoLs } from "./commands/repo/ls.js";
 import { reject as repoReject } from "./commands/repo/reject.js";
+import { rm as repoRm } from "./commands/repo/rm.js";
 import { status as repoStatus } from "./commands/repo/status.js";
 import { type OutputContext, outputError } from "./output/format.js";
 import { EXIT_USAGE, exitWithCode } from "./output/exit-codes.js";
@@ -293,6 +294,25 @@ export async function run(argv = process.argv) {
         }
       });
 
+    repoCli
+      .command(
+        "rm <id>",
+        "Delete a request, freeing its repo name (admin only)",
+      )
+      .option("--json", "Output as JSON")
+      .option("--yes", "Skip confirmation prompts (required for non-TTY/CI)")
+      .action(async (id: string, flags: { json?: boolean; yes?: boolean }) => {
+        try {
+          await repoRm({
+            json: flags.json ?? false,
+            id,
+            yes: flags.yes ?? false,
+          });
+        } catch (err: unknown) {
+          handleActionError("repo rm", flags.json ?? false, err);
+        }
+      });
+
     repoCli.help();
     repoCli.version(version);
 
@@ -302,6 +322,7 @@ export async function run(argv = process.argv) {
       "approve",
       "reject",
       "status",
+      "rm",
     ]);
     const repoValueFlags = new Set([
       "--visibility",

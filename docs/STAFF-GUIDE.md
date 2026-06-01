@@ -238,9 +238,12 @@ Resolving requests requires the approver team (`apollo-11-approvers`). Approval 
 ```sh
 universe repo approve <id>                 # confirms, then creates via the Apollo-11 App
 universe repo reject <id> --reason "out of scope"
+universe repo rm <id>                       # delete a request, freeing its repo name
 ```
 
 If GitHub creation fails after approval (e.g. the App lacks `Contents:read` on a template), `approve` reports `approved, but repository creation failed`, exits `STORAGE` (13), and the request moves to `failed` with its name freed for a retry. A request another admin already resolved returns `409`; the guard prevents double-creation.
+
+`repo rm` deletes a request record and frees its name — use it to clear an `active`/`failed` row whose GitHub repo no longer exists. It removes only the queue record, never a GitHub repo. (Creating over such a stale name now also self-heals: artemis verifies the repo is gone and reconciles the claim.) Find the blocking record with `universe repo ls --all`.
 
 ## CI & automation
 

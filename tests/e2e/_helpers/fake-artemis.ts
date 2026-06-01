@@ -847,6 +847,27 @@ async function handle(
     return;
   }
 
+  if (method === "DELETE" && repoPath.startsWith("/api/repo/")) {
+    if (!repoRecord) {
+      logAndSend(callLog, method, path, authorization, body, res, 401, {
+        error: { code: "unauth", message: "bad token" },
+      });
+      return;
+    }
+    const id = repoPath.slice("/api/repo/".length);
+    if (!state.repoRequests.has(id)) {
+      logAndSend(callLog, method, path, authorization, body, res, 404, {
+        error: { code: "not_found", message: "repo request not found" },
+      });
+      return;
+    }
+    state.repoRequests.delete(id);
+    res.statusCode = 204;
+    res.end();
+    callLog.push({ method, path, authorization, status: 204, body });
+    return;
+  }
+
   if (
     method === "POST" &&
     repoPath.startsWith("/api/repo/") &&

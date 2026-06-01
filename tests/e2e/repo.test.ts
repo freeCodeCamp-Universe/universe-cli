@@ -3,6 +3,7 @@ import { approve } from "../../src/commands/repo/approve.js";
 import { create } from "../../src/commands/repo/create.js";
 import { ls } from "../../src/commands/repo/ls.js";
 import { reject } from "../../src/commands/repo/reject.js";
+import { rm } from "../../src/commands/repo/rm.js";
 import { status } from "../../src/commands/repo/status.js";
 import { type CliEnv, makeCliEnv } from "./_helpers/cli-env.js";
 import { type FakeArtemis, startFakeArtemis } from "./_helpers/fake-artemis.js";
@@ -137,6 +138,28 @@ describe("repo E2E (real proxy-client + real identity chain)", () => {
     expect(dup.captured.code).toBe(10); // EXIT_USAGE
     const errorBlock = dup.envelope!["error"] as { message: string };
     expect(errorBlock.message).toContain("already_exists");
+  });
+
+  it("deletes a request, freeing the name to re-create", async () => {
+    const created = await run(
+      create as never,
+      { json: true, name: "tmp-del" },
+      env.env,
+    );
+    const id = created.envelope!["id"] as string;
+
+    const removed = await run(rm as never, { json: true, id }, env.env);
+    expect(removed.captured.code).toBeUndefined();
+    expect(removed.envelope!["deleted"]).toBe(true);
+    expect(server.state.repoRequests.has(id)).toBe(false);
+
+    const again = await run(
+      create as never,
+      { json: true, name: "tmp-del" },
+      env.env,
+    );
+    expect(again.captured.code).toBeUndefined();
+    expect(again.envelope!["status"]).toBe("pending");
   });
 
   it("returns 409 already_resolved on a double approval (EXIT_USAGE)", async () => {

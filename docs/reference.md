@@ -50,8 +50,9 @@ Deploy ids are `YYYYMMDD-HHMMSS-<gitsha>` (or `nogit-<ts>` outside a git repo). 
 | `universe repo status <id>`   | `--json`                                                                                         | One request's lifecycle state.                                                                                                |
 | `universe repo approve <id>`  | `--yes`, `--json`                                                                                | Approve → create via the Apollo-11 App (approver team). Synchronous.                                                          |
 | `universe repo reject <id>`   | `--reason <text>`, `--yes`, `--json`                                                             | Reject a pending request (approver team).                                                                                     |
+| `universe repo rm <id>`       | `--yes`, `--json`                                                                                | Delete a request, freeing its repo name (approver team). Removes only the queue record, not any GitHub repo.                  |
 
-`--visibility` defaults to `private`; `--description` ≤350 chars; repo name `^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$`. Status machine: `pending → approved → active` / `approved → failed` / `pending → rejected`; the approve outcome is `ok` or `approved_failed`. authz: create/ls/status → `staff`; approve/reject → `apollo-11-approvers`. Source: `src/commands/repo/`.
+`--visibility` defaults to `private`; `--description` ≤350 chars; repo name `^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$`. Status machine: `pending → approved → active` / `approved → failed` / `pending → rejected`; the approve outcome is `ok` or `approved_failed`. authz: create/ls/status → `staff`; approve/reject/rm → `apollo-11-approvers`. A create that hits `already_exists` self-heals when the claimed name's GitHub repo was deleted (artemis reconciles the stale claim); otherwise `repo rm <id>` clears it. Source: `src/commands/repo/`.
 
 ## Exit codes
 
