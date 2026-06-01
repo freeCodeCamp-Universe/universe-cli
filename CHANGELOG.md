@@ -4,6 +4,101 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0](https://github.com/freeCodeCamp-Universe/universe-cli/compare/universe-cli-v0.7.2...universe-cli-v0.8.0) (2026-06-01)
+
+
+### ⚠ BREAKING CHANGES
+
+* **identity:** identity chain now prefers the `universe login` device-flow token (slot 3) over `gh auth token` (slot 4). CI is unaffected — `$GITHUB_TOKEN` / `$GH_TOKEN` env vars (slots 1+2) still win. Staff using `gh` as fallback continue to work when no `universe login` token exists.
+
+### Features
+
+* **client:** add getAlias() to proxy-client ([1450434](https://github.com/freeCodeCamp-Universe/universe-cli/commit/14504349baf23f1c11d2e7a9490c20af1b978033))
+* **client:** extend promote/rollback schema + AliasDriftError ([0cebc30](https://github.com/freeCodeCamp-Universe/universe-cli/commit/0cebc30fcffe422488ec9f42585ebed58b123089))
+* **cli:** guard top-level unhandled errors ([330bd21](https://github.com/freeCodeCamp-Universe/universe-cli/commit/330bd213684f8cc789c7db29c7ea0942bdcf88a2))
+* **cli:** wire login/logout/whoami top-level ([ff85afe](https://github.com/freeCodeCamp-Universe/universe-cli/commit/ff85afef11aa7b498c3aa07d3b363dc155821613))
+* **commands:** add login (device flow) ([045aedc](https://github.com/freeCodeCamp-Universe/universe-cli/commit/045aedcc324195b6396da2b8523eeb07bfe15c2e))
+* **commands:** add logout ([759ea1a](https://github.com/freeCodeCamp-Universe/universe-cli/commit/759ea1a84267c28a9de975b09701411353a50961))
+* **commands:** add ls + wire static ns ([392e88e](https://github.com/freeCodeCamp-Universe/universe-cli/commit/392e88e72deda7a289c2118ecf89c879446fac04))
+* **commands:** add whoami ([18b2871](https://github.com/freeCodeCamp-Universe/universe-cli/commit/18b287100f52644bb18d89527b053891ae658037))
+* **commands:** rewrite deploy for artemis proxy ([2fe7c22](https://github.com/freeCodeCamp-Universe/universe-cli/commit/2fe7c2213e8e45ea9017c426193bf769e044f7e4))
+* **commands:** rewrite promote + rollback for proxy ([bd02b9e](https://github.com/freeCodeCamp-Universe/universe-cli/commit/bd02b9efbcb090409aa272a78c883181bbe65f73))
+* **identity:** prefer device-flow over gh CLI ([37b9281](https://github.com/freeCodeCamp-Universe/universe-cli/commit/37b92816a6da454eced93cebbede80f0a2c92893))
+* implement static deploy CLI (Epic 0-2) ([12db222](https://github.com/freeCodeCamp-Universe/universe-cli/commit/12db222f00702bcc46ac402216ce15f0464f4cdd))
+* **lib:** add build runner for platform.yaml ([99581b0](https://github.com/freeCodeCamp-Universe/universe-cli/commit/99581b0ad1ee13d8c09ebd0f6e08763d9746203a))
+* **lib:** add GitHub OAuth device flow ([99be630](https://github.com/freeCodeCamp-Universe/universe-cli/commit/99be6309a03689a5bd0affa2c42827004762cbe5))
+* **lib:** add gitignore-style ignore filter ([50b8ced](https://github.com/freeCodeCamp-Universe/universe-cli/commit/50b8ced2d26a85fee65e45143d82e3bb7eff890d))
+* **lib:** add identity priority chain (Q10) ([9f304d6](https://github.com/freeCodeCamp-Universe/universe-cli/commit/9f304d6b70c2b73a32d95cc933d1c609ec4e2cb8))
+* **lib:** add platform.yaml v2 schema + parser ([8788648](https://github.com/freeCodeCamp-Universe/universe-cli/commit/8788648c8bbb0ccc9fe2b989fa9a26382d5b0591))
+* **lib:** add proxy-client for artemis API ([ccc71ab](https://github.com/freeCodeCamp-Universe/universe-cli/commit/ccc71abf057fc91ee8a7ee33f85a3b5eabc6e9ba))
+* **lib:** add token-store for device-flow auth ([7438612](https://github.com/freeCodeCamp-Universe/universe-cli/commit/74386123658f2bac4f54e38336a2a5192b198958))
+* **lib:** add upload to proxy plane ([73bf894](https://github.com/freeCodeCamp-Universe/universe-cli/commit/73bf8941594b507acf4b667f6e465621d93881bb))
+* **login:** bake default GH OAuth client_id ([0a3f1ce](https://github.com/freeCodeCamp-Universe/universe-cli/commit/0a3f1ce8d83edbf3974f54e8336350a8e8e3b715))
+* **login:** warn when authorized site count is zero ([84df1d5](https://github.com/freeCodeCamp-Universe/universe-cli/commit/84df1d5ef7947a07e052d7d5536963e6046967e3))
+* **output:** surface proxy error kind + request id ([deb1b46](https://github.com/freeCodeCamp-Universe/universe-cli/commit/deb1b4609a2ccdae854dfd98b5caefafd463a66a))
+* **promote:** pre-flight getAlias + body-pin POST ([f476208](https://github.com/freeCodeCamp-Universe/universe-cli/commit/f476208f3386c06eef6e2ded05515ca7dda5b538))
+* **promote:** surface 409 alias_drift + one-shot retry ([d260fd0](https://github.com/freeCodeCamp-Universe/universe-cli/commit/d260fd0228e1ad3bcdd4818a316744d80d52cc37))
+* **proxy-client:** add 4 registry methods ([3fce262](https://github.com/freeCodeCamp-Universe/universe-cli/commit/3fce262d17c26f2e119ed9939ff7b8392ca08984))
+* **proxy:** UNIVERSE_DEBUG round-trip trace to stderr ([a0c1338](https://github.com/freeCodeCamp-Universe/universe-cli/commit/a0c133880f54228da7d2387d6f1392e0f1e123ce))
+* publish to npm with OIDC provenance ([f6a090e](https://github.com/freeCodeCamp-Universe/universe-cli/commit/f6a090eb7ec09ee60a7bfc90d270f6ba39589c9d))
+* **repo:** add repo approve command ([d205f9a](https://github.com/freeCodeCamp-Universe/universe-cli/commit/d205f9a5101f9b11c5019730f9bee65c51a3996c))
+* **repo:** add repo command shared helpers ([6545d6a](https://github.com/freeCodeCamp-Universe/universe-cli/commit/6545d6a7e2252622c35fbefb7c3bfd473fcb7ebf))
+* **repo:** add repo create command ([7d47e70](https://github.com/freeCodeCamp-Universe/universe-cli/commit/7d47e7038d86bff22bec9a06932c4446cd148804))
+* **repo:** add repo ls command ([7582f20](https://github.com/freeCodeCamp-Universe/universe-cli/commit/7582f200dc91be53f8b07feb70a55dc933f7187a))
+* **repo:** add repo reject command ([cdb5137](https://github.com/freeCodeCamp-Universe/universe-cli/commit/cdb51376bb38f86e0e4f16f975e7cd7157735eba))
+* **repo:** add repo status command ([380c5ea](https://github.com/freeCodeCamp-Universe/universe-cli/commit/380c5eaf50e6b3b26bcf3aeee9044d0250505f0b))
+* **repo:** add repo-request proxy-client methods ([5b0c444](https://github.com/freeCodeCamp-Universe/universe-cli/commit/5b0c4446147f5065c971a26049b9ad73b96bab50))
+* **repo:** add repo-request zod schema ([142d3be](https://github.com/freeCodeCamp-Universe/universe-cli/commit/142d3bedd71b1d793129b70f83f16a055a3f4482))
+* **repo:** include identitySource in error envelopes ([ba2956e](https://github.com/freeCodeCamp-Universe/universe-cli/commit/ba2956ebcc115927a5634d54708e4e7150451d7e))
+* **repo:** structured json envelope for approved_failed approve ([ac6c904](https://github.com/freeCodeCamp-Universe/universe-cli/commit/ac6c904fbc3cbe19a34f827f911381808d069801))
+* **repo:** wire repo namespace dispatch ([9d940a6](https://github.com/freeCodeCamp-Universe/universe-cli/commit/9d940a626844bf660c6e19fa78466d7b749fffbd))
+* **rollback:** pre-flight getAlias + CAS expectedCurrent ([5e3d26d](https://github.com/freeCodeCamp-Universe/universe-cli/commit/5e3d26d6a17bd3ceb477b16be5157540d6a2b980))
+* **sites:** register/ls/update/rm commands ([d10342a](https://github.com/freeCodeCamp-Universe/universe-cli/commit/d10342a7fda305c26dd62eba6445c5008010abae))
+* Tier 1 hardening (T1.1, T1.2, T1.3a, T1.6) ([475ec3f](https://github.com/freeCodeCamp-Universe/universe-cli/commit/475ec3fdd9d29e602ff39c5ce39a53242c8579bf))
+* Tier 1 security hardening (T1.3b, T1.4, T1.4b, T1.4c, T1.5) ([2610b47](https://github.com/freeCodeCamp-Universe/universe-cli/commit/2610b47548995d05336453ad64cdf2fb785279f8))
+* Tier 2 hygiene (T2.1-T2.9) — ship v0.3.0 ([ea20726](https://github.com/freeCodeCamp-Universe/universe-cli/commit/ea20726d68777b74d76fbff0874c324244c0dd66))
+* universe platform QOL ([#10](https://github.com/freeCodeCamp-Universe/universe-cli/issues/10)) ([5d69f87](https://github.com/freeCodeCamp-Universe/universe-cli/commit/5d69f87d6e2c799a7dc15a47f0c2b7fb02522c83))
+* v0.5.0 - sites --mine + UX fixes + docs ([e573e94](https://github.com/freeCodeCamp-Universe/universe-cli/commit/e573e94810b6f541e986c8d71d4f194d1a1cc0ce))
+* **whoami:** surface resolved proxy url ([ffcd0c8](https://github.com/freeCodeCamp-Universe/universe-cli/commit/ffcd0c88e7300c0ff2c43dd837edce9e643649f9))
+
+
+### Bug Fixes
+
+* add update notice, strip comments ([78813f2](https://github.com/freeCodeCamp-Universe/universe-cli/commit/78813f2cb7c4a7133d08b3de22730a8dcc518963))
+* **ci:** allow same version in npm publish job ([0eb49f8](https://github.com/freeCodeCamp-Universe/universe-cli/commit/0eb49f81a474b4e6b85cec68f6d50f0801f0806b))
+* **ci:** bundle all deps for SEA, fix macOS binary signing ([0173ed8](https://github.com/freeCodeCamp-Universe/universe-cli/commit/0173ed87f56d0cd299cf3c7058d32746820c01ff))
+* **ci:** remove duplicate pnpm version — use packageManager field ([6a720bc](https://github.com/freeCodeCamp-Universe/universe-cli/commit/6a720bc4e3f15ef1b665a417023c5a506658fd5d))
+* **ci:** upgrade npm to 11+ for Trusted Publisher OIDC ([4e5700e](https://github.com/freeCodeCamp-Universe/universe-cli/commit/4e5700e707b591dac99ff5db0f538bd5df40ca59))
+* **ci:** use Node 24 for publish job, drop npm self-upgrade step ([a1f7125](https://github.com/freeCodeCamp-Universe/universe-cli/commit/a1f7125c6abb7603087a0bd948eda1f5b53ff19c))
+* **cli:** actionable hint on user_unauthorized ([294468d](https://github.com/freeCodeCamp-Universe/universe-cli/commit/294468dadb92811143891b9dcfb25123e871cfc4))
+* **cli:** catch cac parse errors in repo dispatch ([78b81b2](https://github.com/freeCodeCamp-Universe/universe-cli/commit/78b81b26bc0bf00eb705290dbfffdea030990e25))
+* **client:** widen DEPLOY_ID_RE to server parity ([f3dd1a5](https://github.com/freeCodeCamp-Universe/universe-cli/commit/f3dd1a575d5e503edd7b9c8b4082df146952bf4d))
+* **cli:** error on unknown repo subcommand instead of silent exit 0 ([0da1bbc](https://github.com/freeCodeCamp-Universe/universe-cli/commit/0da1bbc6540b0bce5f8e37b3dab92734eb157e60))
+* **config:** reject consecutive hyphens in site name (D19) ([fe3d0b7](https://github.com/freeCodeCamp-Universe/universe-cli/commit/fe3d0b7ef395a52c86c0757464da6e8a4767b5d4))
+* **deploy:** cap inline auth list at 10 entries ([76cebe9](https://github.com/freeCodeCamp-Universe/universe-cli/commit/76cebe95efc302d7bd81ab99b05b5b64facfae95))
+* **deploy:** pin --from &lt;id&gt; in preview next-hint ([37af29d](https://github.com/freeCodeCamp-Universe/universe-cli/commit/37af29df46a0dc60edcdf37804d8769fa5f91f37))
+* **deploy:** self-contained preflight error UX ([c0ea74e](https://github.com/freeCodeCamp-Universe/universe-cli/commit/c0ea74e8dc79660b213f6af39a0abf8056c79de1))
+* **deploy:** silence info+warn under --json (B2) ([6c61708](https://github.com/freeCodeCamp-Universe/universe-cli/commit/6c61708b91a3764ad8d3b04ad2b704f18deda3a3))
+* improve command output UX and add credential setup docs ([aad38e0](https://github.com/freeCodeCamp-Universe/universe-cli/commit/aad38e05155e808cce52c7f1f3cd55a26bfabc73))
+* **lib:** tsc clean for whoami + identity ([ae9c477](https://github.com/freeCodeCamp-Universe/universe-cli/commit/ae9c4776be92345792378c27c18625d8ea34bdc2))
+* **ls:** sort deploys newest-first ([99f7fff](https://github.com/freeCodeCamp-Universe/universe-cli/commit/99f7fffff1ec3c1774b02451a93d92e8d7b33ab7))
+* **output:** route human error messages to stderr ([931b110](https://github.com/freeCodeCamp-Universe/universe-cli/commit/931b110cfcbc3533d1c1b21c9a64b36691c882b7))
+* pin node versions ([5b3451c](https://github.com/freeCodeCamp-Universe/universe-cli/commit/5b3451cef4e39b9cba7fd94a3ee4afa6ae690a87))
+* pin postject as devDependency, use pnpm exec in CI ([782230d](https://github.com/freeCodeCamp-Universe/universe-cli/commit/782230dc97859b504c133e37f4c4a569de49fcb6))
+* **pkg:** add repository field required by npm provenance validation ([3e15f64](https://github.com/freeCodeCamp-Universe/universe-cli/commit/3e15f64e6a70970984502f2a797b1659833c390b))
+* **proxy:** name target host in network/timeout errors ([8ba8a25](https://github.com/freeCodeCamp-Universe/universe-cli/commit/8ba8a2535e13f7acf32c9eb5a64c8cccc9c0fd2a))
+* **proxy:** validate repo response shapes at client boundary ([06e040d](https://github.com/freeCodeCamp-Universe/universe-cli/commit/06e040d016a99dbb5159976a9125985fd0a49282))
+* **release:** grant reusable test job contents:read ([0bb6102](https://github.com/freeCodeCamp-Universe/universe-cli/commit/0bb6102cdab0a163fc8fb2d1ad0698505858ddd7))
+* replace tinyglobby with Node built-in readdirSync for SEA compatibility ([4c7556a](https://github.com/freeCodeCamp-Universe/universe-cli/commit/4c7556aa524dcd111e7d11ff7e982446f9da8713))
+* **repo:** coerce numeric create/reject options to strings ([b050207](https://github.com/freeCodeCamp-Universe/universe-cli/commit/b0502073623250a4ef64ad95334e7f70256389ac))
+* **repo:** require --yes in non-TTY + standard error envelope ([bc1b521](https://github.com/freeCodeCamp-Universe/universe-cli/commit/bc1b521bba332a959256c9145df7a424b3fec16b))
+* **repo:** standardize approved_failed error envelope ([d09e7da](https://github.com/freeCodeCamp-Universe/universe-cli/commit/d09e7da3bcce1cae7a49d1c90a9d2dacfbdc3a60))
+* **repo:** validate create input before client setup ([7b13ff8](https://github.com/freeCodeCamp-Universe/universe-cli/commit/7b13ff863648cc576aa0bef4032cbad0812af4b4))
+* **repo:** validate ls --status against allowed set ([099a044](https://github.com/freeCodeCamp-Universe/universe-cli/commit/099a0447234f2697d49cfb63f2b3047ac925f093))
+* resolve doc inconsistencies and simplify user experience ([33bf49a](https://github.com/freeCodeCamp-Universe/universe-cli/commit/33bf49ab3d4382673fb0294c57fd7cfb12b2663f))
+* split tsup config — ESM normal, CJS bundles all deps for SEA ([1e5f209](https://github.com/freeCodeCamp-Universe/universe-cli/commit/1e5f2092151d6ed0d98f3ef68f3b555ea8222bf0))
+* **static:** warn on prod-only alias divergence ([75f71e9](https://github.com/freeCodeCamp-Universe/universe-cli/commit/75f71e9ab28c226b914a3c1bfd7187aa8aa55424))
+
 ## [Unreleased]
 
 
