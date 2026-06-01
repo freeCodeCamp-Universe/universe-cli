@@ -216,7 +216,11 @@ export async function create(
     }
   } catch (err) {
     const { code, message, kind, requestId } = wrapProxyError(command, err);
-    outputError({ json: options.json, command }, code, message, {
+    const display =
+      kind === "already_exists" && !options.json
+        ? `${message}\n  → run \`universe repo ls --status all\` to find the existing request (it may be active or failed)`
+        : message;
+    outputError({ json: options.json, command }, code, display, {
       logError: error,
       kind,
       requestId,

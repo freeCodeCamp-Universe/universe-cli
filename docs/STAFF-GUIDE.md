@@ -225,6 +225,7 @@ Track it:
 
 ```sh
 universe repo ls                 # pending queue (default)
+universe repo ls --all           # every state — shorthand for --status all
 universe repo ls --status all    # any of pending|approved|active|rejected|failed|all
 universe repo ls --mine          # only your requests
 universe repo status <id>        # one request's full state

@@ -43,13 +43,13 @@ Deploy ids are `YYYYMMDD-HHMMSS-<gitsha>` (or `nogit-<ts>` outside a git repo). 
 
 ### `repo` — repository requests + approval queue
 
-| Command                       | Flags                                                                                            | Purpose                                                                                             |
-| ----------------------------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------- |
-| `universe repo create [name]` | `--visibility <public\|private>`, `--template <repo>`, `--description <text>`, `--yes`, `--json` | Request a repo under `freeCodeCamp-Universe` (staff). Prompts when bare; `--yes` required non-TTY.  |
-| `universe repo ls`            | `--status <state>`, `--mine`, `--json`                                                           | List requests. `--status` ∈ `pending\|approved\|active\|rejected\|failed\|all` (default `pending`). |
-| `universe repo status <id>`   | `--json`                                                                                         | One request's lifecycle state.                                                                      |
-| `universe repo approve <id>`  | `--yes`, `--json`                                                                                | Approve → create via the Apollo-11 App (approver team). Synchronous.                                |
-| `universe repo reject <id>`   | `--reason <text>`, `--yes`, `--json`                                                             | Reject a pending request (approver team).                                                           |
+| Command                       | Flags                                                                                            | Purpose                                                                                                                       |
+| ----------------------------- | ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| `universe repo create [name]` | `--visibility <public\|private>`, `--template <repo>`, `--description <text>`, `--yes`, `--json` | Request a repo under `freeCodeCamp-Universe` (staff). Prompts when bare; `--yes` required non-TTY.                            |
+| `universe repo ls`            | `--status <state>`, `--all`, `--mine`, `--json`                                                  | List requests. `--status` ∈ `pending\|approved\|active\|rejected\|failed\|all` (default `pending`); `--all` = `--status all`. |
+| `universe repo status <id>`   | `--json`                                                                                         | One request's lifecycle state.                                                                                                |
+| `universe repo approve <id>`  | `--yes`, `--json`                                                                                | Approve → create via the Apollo-11 App (approver team). Synchronous.                                                          |
+| `universe repo reject <id>`   | `--reason <text>`, `--yes`, `--json`                                                             | Reject a pending request (approver team).                                                                                     |
 
 `--visibility` defaults to `private`; `--description` ≤350 chars; repo name `^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$`. Status machine: `pending → approved → active` / `approved → failed` / `pending → rejected`; the approve outcome is `ok` or `approved_failed`. authz: create/ls/status → `staff`; approve/reject → `apollo-11-approvers`. Source: `src/commands/repo/`.
 

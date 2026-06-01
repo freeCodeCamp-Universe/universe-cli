@@ -21,6 +21,7 @@ export interface RepoLsOptions {
   status?: string;
   /** Filter to the caller's own requests. */
   mine?: boolean;
+  all?: boolean;
 }
 
 export async function ls(
@@ -34,22 +35,23 @@ export async function ls(
 
   let identitySource: string | undefined;
   try {
+    const requestedStatus = options.all ? "all" : options.status;
     if (
-      options.status !== undefined &&
-      !(LS_STATUSES as readonly string[]).includes(options.status)
+      requestedStatus !== undefined &&
+      !(LS_STATUSES as readonly string[]).includes(requestedStatus)
     ) {
       throw new UsageError(
-        `invalid --status "${options.status}": must be one of ${LS_STATUSES.join(", ")}`,
+        `invalid --status "${requestedStatus}": must be one of ${LS_STATUSES.join(", ")}`,
       );
     }
     const setup = await setupClient(deps);
     const client = setup.client;
     identitySource = setup.identitySource;
     const rows = await client.listRepoRequests({
-      status: options.status,
+      status: requestedStatus,
       mine: options.mine ?? false,
     });
-    const status = options.status ?? "pending";
+    const status = requestedStatus ?? "pending";
 
     if (options.json) {
       emitJson(

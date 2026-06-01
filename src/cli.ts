@@ -217,13 +217,20 @@ export async function run(argv = process.argv) {
         "pending | approved | active | rejected | failed | all",
       )
       .option("--mine", "Only requests you submitted")
+      .option("--all", "Show every state (shorthand for --status all)")
       .action(
-        async (flags: { json?: boolean; status?: string; mine?: boolean }) => {
+        async (flags: {
+          json?: boolean;
+          status?: string;
+          mine?: boolean;
+          all?: boolean;
+        }) => {
           try {
             await repoLs({
               json: flags.json ?? false,
               status: flags.status,
               mine: flags.mine ?? false,
+              all: flags.all ?? false,
             });
           } catch (err: unknown) {
             handleActionError("repo ls", flags.json ?? false, err);

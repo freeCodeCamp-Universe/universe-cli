@@ -118,4 +118,38 @@ describe("repo ls command", () => {
       mine: false,
     });
   });
+
+  it("maps --all to status 'all'", async () => {
+    const deps = mkDeps();
+    await ls({ json: false, all: true }, deps);
+    const proxy = deps.createProxyClient.mock.results[0]?.value;
+    expect(proxy.listRepoRequests).toHaveBeenCalledWith({
+      status: "all",
+      mine: false,
+    });
+  });
+
+  it("--all overrides an explicit --status", async () => {
+    const deps = mkDeps();
+    await ls({ json: false, status: "pending", all: true }, deps);
+    const proxy = deps.createProxyClient.mock.results[0]?.value;
+    expect(proxy.listRepoRequests).toHaveBeenCalledWith({
+      status: "all",
+      mine: false,
+    });
+  });
+
+  it("maps a proxy error to its exit code", async () => {
+    const { ProxyError } = await import("../../../src/lib/proxy-client.js");
+    const proxy = mkProxy();
+    proxy.listRepoRequests = vi
+      .fn()
+      .mockRejectedValue(new ProxyError(403, "user_unauthorized", "denied"));
+    const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
+    await expect(ls({ json: false }, deps)).rejects.toThrow("__exit__");
+    expect(deps.exit).toHaveBeenCalledWith(12); // EXIT_CREDENTIALS
+    expect(deps.logError).toHaveBeenCalledWith(
+      expect.stringContaining("user_unauthorized"),
+    );
+  });
 });

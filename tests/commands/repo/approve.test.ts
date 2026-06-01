@@ -173,4 +173,29 @@ describe("repo approve command", () => {
     expect(proxy.approveRepoRequest).not.toHaveBeenCalled();
     expect(deps.exit).toHaveBeenCalledWith(10); // EXIT_USAGE
   });
+
+  it("surfaces a getRepoRequest 404 before the confirm prompt", async () => {
+    const { ProxyError } = await import("../../../src/lib/proxy-client.js");
+    const proxy = mkProxy();
+    proxy.getRepoRequest = vi
+      .fn()
+      .mockRejectedValue(new ProxyError(404, "not_found", "no such request"));
+    const prompts = {
+      text: vi.fn(),
+      select: vi.fn(),
+      confirm: vi.fn(),
+      isCancel: vi.fn().mockReturnValue(false),
+    };
+    const deps = mkDeps({
+      createProxyClient: vi.fn().mockReturnValue(proxy),
+      isTTY: true,
+      prompts,
+    });
+    await expect(approve({ json: false, id: "ghost" }, deps)).rejects.toThrow(
+      "__exit__",
+    );
+    expect(deps.exit).toHaveBeenCalledWith(10); // EXIT_USAGE
+    expect(prompts.confirm).not.toHaveBeenCalled();
+    expect(proxy.approveRepoRequest).not.toHaveBeenCalled();
+  });
 });

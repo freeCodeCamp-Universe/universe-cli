@@ -259,4 +259,103 @@ describe("repo create command", () => {
     );
     expect(deps.resolveIdentity).not.toHaveBeenCalled();
   });
+
+  it("hints at `repo ls --status all` on already_exists (human mode)", async () => {
+    const { ProxyError } = await import("../../../src/lib/proxy-client.js");
+    const proxy = mkProxy();
+    proxy.createRepoRequest = vi
+      .fn()
+      .mockRejectedValue(
+        new ProxyError(409, "already_exists", "already pending or active"),
+      );
+    const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
+    await expect(
+      create({ json: false, name: "dup", yes: true }, deps),
+    ).rejects.toThrow("__exit__");
+    expect(deps.exit).toHaveBeenCalledWith(10);
+    expect(deps.logError).toHaveBeenCalledWith(
+      expect.stringContaining("repo ls --status all"),
+    );
+  });
+
+  it("omits the hint in JSON mode (machine output stays clean)", async () => {
+    const stdout: string[] = [];
+    const writeSpy = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation((c: unknown) => {
+        stdout.push(String(c));
+        return true;
+      });
+    const { ProxyError } = await import("../../../src/lib/proxy-client.js");
+    const proxy = mkProxy();
+    proxy.createRepoRequest = vi
+      .fn()
+      .mockRejectedValue(
+        new ProxyError(409, "already_exists", "already pending or active"),
+      );
+    const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
+    await expect(
+      create({ json: true, name: "dup", yes: true }, deps),
+    ).rejects.toThrow("__exit__");
+    writeSpy.mockRestore();
+    const env = JSON.parse(stdout.join("").trim());
+    expect(env.error.message).not.toContain("repo ls --status all");
+    expect(env.error.kind).toBe("already_exists");
+  });
+
+  it("surfaces already_exists after the full interactive flow", async () => {
+    const { ProxyError } = await import("../../../src/lib/proxy-client.js");
+    const proxy = mkProxy();
+    proxy.listRepoTemplates = vi.fn().mockResolvedValue([]);
+    proxy.createRepoRequest = vi
+      .fn()
+      .mockRejectedValue(
+        new ProxyError(409, "already_exists", "already pending or active"),
+      );
+    const prompts = mkPrompts({
+      text: vi
+        .fn()
+        .mockResolvedValueOnce("testing") // name
+        .mockResolvedValueOnce("") // description
+        .mockResolvedValueOnce(""), // template (free text)
+      select: vi.fn().mockResolvedValueOnce("private"), // visibility
+      confirm: vi.fn().mockResolvedValue(true),
+    });
+    const deps = mkDeps({
+      createProxyClient: vi.fn().mockReturnValue(proxy),
+      isTTY: true,
+      prompts,
+    });
+    await expect(create({ json: false }, deps)).rejects.toThrow("__exit__");
+    expect(proxy.createRepoRequest).toHaveBeenCalled();
+    expect(deps.exit).toHaveBeenCalledWith(10);
+    expect(deps.logError).toHaveBeenCalledWith(
+      expect.stringContaining("repo ls --status all"),
+    );
+  });
+
+  it("falls back to free-text template when listRepoTemplates throws", async () => {
+    const proxy = mkProxy();
+    proxy.listRepoTemplates = vi
+      .fn()
+      .mockRejectedValue(new Error("network unreachable"));
+    const prompts = mkPrompts({
+      text: vi
+        .fn()
+        .mockResolvedValueOnce("my-repo") // name
+        .mockResolvedValueOnce("") // description
+        .mockResolvedValueOnce("custom-template"), // template (free-text fallback)
+      select: vi.fn().mockResolvedValueOnce("private"), // visibility
+      confirm: vi.fn().mockResolvedValue(true),
+    });
+    const deps = mkDeps({
+      createProxyClient: vi.fn().mockReturnValue(proxy),
+      isTTY: true,
+      prompts,
+    });
+    await create({ json: false }, deps);
+    expect(proxy.createRepoRequest).toHaveBeenCalledWith(
+      expect.objectContaining({ template: "custom-template" }),
+    );
+  });
 });
