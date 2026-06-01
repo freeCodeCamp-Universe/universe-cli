@@ -11,7 +11,7 @@
     "prepare": "husky"
   },
   "author": "Mrugesh Mohapatra <noreply@mrugesh.dev> (https://mrugesh.dev/)",
-  "license": "ISC",
+  "license": "BSD-3-Clause",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/freeCodeCamp-Universe/universe-cli.git"

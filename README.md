@@ -1,6 +1,6 @@
 # Universe CLI
 
-Static site deployment for the freeCodeCamp Universe platform.
+A CLI for freeCodeCamp staff and operators to deploy, manage and maintain constellation apps on the freeCodeCamp Universe Platform.
 
 ## Install
 
@@ -52,82 +52,23 @@ Verify:
 universe --version
 ```
 
-## CLI surface
-
-Top-level (cross-cutting):
+## Quickstart
 
 ```sh
-universe login            # GitHub OAuth device flow → ~/.config/universe-cli/token
-universe logout           # delete stored token
-universe whoami           # echo current login + authorized-sites count
-universe --version        # CLI version
+universe login          # GitHub OAuth device flow
+# add a platform.yaml at your repo root with: site: my-site
+universe static deploy  # upload the build to a new preview deploy
+universe static promote # point production at that deploy
 ```
 
-Static-site verbs (namespaced under `static`):
+## Docs
 
-```sh
-universe static deploy [--promote] [--dir <path>]
-universe static promote [--from <deployId>]
-universe static rollback --to <deployId>
-universe static ls [--site <site>]
-```
+Start with the [Staff Guide](docs/STAFF-GUIDE.md). See the [command reference](docs/reference.md), the [`platform.yaml` schema](docs/platform-yaml.md), or [architecture & internals](docs/README.md).
 
-Static-app registry (namespaced under `sites`, staff-gated writes):
+## License
 
-```sh
-universe sites ls [--mine]                          # list registered sites; `--mine` filters to your authorized set
-universe sites register <slug> [--team=<name>...]   # create new entry (staff; defaults --team to staff)
-universe sites update <slug> --team=<name>...       # replace teams list (staff)
-universe sites rm <slug>                            # delete entry (staff; R2 deploy bytes untouched)
-```
+Copyright © 2014 freeCodeCamp.org
 
-Repository creation + approval queue (namespaced under `repo`):
+The content of this repository is bound by the following license:
 
-```sh
-universe repo create [name] [--visibility public|private] [--template <repo>] [--description <text>] [--yes]
-                                                    # request a repo in freeCodeCamp-Universe (staff; prompts when run bare)
-universe repo ls [--status <state>] [--mine]        # list requests (default: pending; state ∈ pending|approved|active|rejected|failed|all)
-universe repo status <id>                           # show one request's lifecycle state
-universe repo approve <id> [--yes]                  # approve → creates the repo via the Apollo-11 App (admin)
-universe repo reject <id> [--reason <text>] [--yes] # reject a pending request (admin)
-```
-
-Repo requests enter an artemis-owned approval queue (independent of the legacy Windmill flow). The Apollo-11 GitHub App key lives in the cluster, never the CLI — the CLI only carries your GitHub bearer.
-
-All commands support `--json` for CI integration.
-
-## Identity (priority chain)
-
-The CLI resolves a GitHub identity in this order — first match wins:
-
-1. `$GITHUB_TOKEN` / `$GH_TOKEN` env (CI explicit)
-1. Device-flow stored token at `~/.config/universe-cli/token` (`universe login`)
-1. `gh auth token` shell-out (laptop fallback when no `universe login` token)
-
-CI runners must export `$GITHUB_TOKEN` explicitly. artemis validates the bearer via GitHub `GET /user`, then authorizes server-side against the Valkey-backed registry. Run `universe whoami` to see which slot resolved; inspect the sites you can deploy to with `universe sites ls --mine`.
-
-## Configuration (`platform.yaml`)
-
-Every site has a `platform.yaml` at its repo root. Minimal valid file:
-
-```yaml
-site: my-site
-```
-
-Full schema reference (every field, defaults, validation rules): [`docs/platform-yaml.md`](docs/platform-yaml.md).
-
-No credential fields. The proxy holds the R2 admin key; the CLI never reads or writes one.
-
-## Common flows
-
-Full operator walkthrough (login → deploy → promote → rollback, CI shape, registry admin, troubleshooting) lives in [`docs/STAFF-GUIDE.md`](docs/STAFF-GUIDE.md).
-
-## Environment overrides
-
-| Env                         | Default                                        | Purpose                                                    |
-| --------------------------- | ---------------------------------------------- | ---------------------------------------------------------- |
-| `UNIVERSE_PROXY_URL`        | `https://uploads.freecode.camp`                | Override proxy host (staging etc.)                         |
-| `UNIVERSE_GH_CLIENT_ID`     | _baked-in freeCodeCamp-Universe GitHub App id_ | Override GitHub App client id (fork tenants, `login` only) |
-| `GITHUB_TOKEN` / `GH_TOKEN` | —                                              | Slot 1 of identity chain                                   |
-
-The shipped binary embeds the `freeCodeCamp-Universe` GitHub App client id (public; device flow uses no `client_secret`), so `universe login` works out of the box for staff once the App is installed on their org. Fork operators and self-hosted mirror tenants set `UNIVERSE_GH_CLIENT_ID` to their own GitHub App's id — env value wins when set.
+- The computer software is licensed under the [BSD-3-Clause](LICENSE) license.

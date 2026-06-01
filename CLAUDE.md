@@ -1,10 +1,10 @@
 # universe-cli
 
-Staff-facing TypeScript CLI for deploying, promoting, and rolling back static sites on the freeCodeCamp Universe platform. CLI talks to the **artemis** deploy proxy (`uploads.freecode.camp`); R2 admin credentials never leave the cluster.
+Staff-facing TypeScript CLI to deploy/promote/rollback static sites on freeCodeCamp Universe. Talks to the **artemis** proxy (`uploads.freecode.camp`); R2 admin keys never leave the cluster.
 
 ## Doc Index
 
-- **Ownership model** — [`~/DEV/fCC-U/Universe/CLAUDE.md`](../Universe/CLAUDE.md) is the source of truth for which team owns which doc across the platform.
-- **Field notes** — historical journal frozen at [`Universe/spike/field-notes/archive/2026-05-10/universe-cli.md`](../Universe/spike/field-notes/archive/2026-05-10/universe-cli.md). New findings open a fresh file under [`Universe/spike/field-notes/`](../Universe/spike/field-notes/) per its README — do not extend the archive, and do not write findings into this repo.
-- **Authoritative spec** — [`~/DEV/fCC-U/Universe/decisions/016-deploy-proxy.md`](../Universe/decisions/016-deploy-proxy.md) (ADR-016). Defines CLI ↔ artemis contract, identity priority chain, and per-site authorization model.
-- **Contributor overview** — [`docs/README.md`](docs/README.md): architecture, repo layout, build & test, internal conventions, upstream specs, cross-repo runbooks, field notes. Read this first when changing CLI code. Sibling docs (each with explicit audience banner): [`docs/STAFF-GUIDE.md`](docs/STAFF-GUIDE.md) (staff guide: deploy, site registry, repo creation), [`docs/platform-yaml.md`](docs/platform-yaml.md) (site-author schema reference), [`docs/RELEASING.md`](docs/RELEASING.md) (release-maintainer playbook).
+- **Ownership** — [`Universe/CLAUDE.md`](../Architecture/CLAUDE.md): which team owns which platform doc.
+- **Spec** — [ADR-016](../Architecture/decisions/016-deploy-proxy.md): CLI ↔ artemis contract, identity chain, per-site authz.
+- **Field notes** — archive frozen at [`Universe/spike/field-notes/archive/2026-05-10/universe-cli.md`](../Architecture/spike/field-notes/archive/2026-05-10/universe-cli.md). New findings → fresh file under [`Universe/spike/field-notes/`](../Architecture/spike/field-notes/). Never extend the archive or write findings into this repo.
+- **Docs** — flat `docs/` (5 files): [`docs/README.md`](docs/README.md) = overview + architecture + dev + conventions (read before changing CLI code); `STAFF-GUIDE.md` = staff/admin/CI workflows; `reference.md` = commands, exit codes, identity, env; `platform-yaml.md` = schema; `RELEASING.md` = release flow.
