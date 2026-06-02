@@ -75,6 +75,8 @@ describe("repo rm command", () => {
     expect(env.command).toBe("repo rm");
     expect(env.success).toBe(true);
     expect(env.deleted).toBe(true);
+    expect(env.id).toBe("req_001");
+    expect(env.identitySource).toBe("env_GITHUB_TOKEN");
   });
 
   it("requires an id", async () => {
@@ -100,6 +102,12 @@ describe("repo rm command", () => {
     expect(proxy.getRepoRequest).toHaveBeenCalledWith("req_001");
     expect(prompts.confirm).toHaveBeenCalledTimes(1);
     expect(proxy.deleteRepoRequest).toHaveBeenCalledWith({ id: "req_001" });
+    expect(deps.logSuccess).toHaveBeenCalledWith(
+      expect.stringContaining("req_001"),
+    );
+    expect(deps.logSuccess).toHaveBeenCalledWith(
+      expect.stringContaining("free"),
+    );
   });
 
   it("aborts with EXIT_CONFIRM when the confirm is declined", async () => {
@@ -157,7 +165,14 @@ describe("repo rm command", () => {
     expect(proxy.deleteRepoRequest).not.toHaveBeenCalled();
   });
 
-  it("maps a delete proxy error to its exit code", async () => {
+  it("maps a delete proxy error and emits the JSON error envelope", async () => {
+    const stdout: string[] = [];
+    const writeSpy = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation((c: unknown) => {
+        stdout.push(String(c));
+        return true;
+      });
     const { ProxyError } = await import("../../../src/lib/proxy-client.js");
     const proxy = mkProxy();
     proxy.deleteRepoRequest = vi
@@ -167,6 +182,12 @@ describe("repo rm command", () => {
     await expect(rm({ json: true, id: "ghost" }, deps)).rejects.toThrow(
       "__exit__",
     );
+    writeSpy.mockRestore();
     expect(deps.exit).toHaveBeenCalledWith(10);
+    const env = JSON.parse(stdout.join("").trim());
+    expect(env.success).toBe(false);
+    expect(env.error.kind).toBe("not_found");
+    expect(env.error.message).toContain("not_found");
+    expect(env.identitySource).toBe("env_GITHUB_TOKEN");
   });
 });

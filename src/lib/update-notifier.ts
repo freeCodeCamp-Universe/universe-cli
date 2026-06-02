@@ -14,7 +14,7 @@ const NPM_LATEST_URL = `https://registry.npmjs.org/${PKG_NAME}/latest`;
 const DEFAULT_TTL_MS = 60 * 60 * 1000;
 const FETCH_TIMEOUT_MS = 3_000;
 
-export const REFRESH_FLAG = "--refresh-worker";
+export const REFRESH_ENV = "UNIVERSE_REFRESH_WORKER";
 
 function ttlMs(): number {
   const raw = process.env["UNIVERSE_UPDATE_TTL_MS"];
@@ -170,11 +170,11 @@ export function spawnRefresh(now: number = Date.now()): void {
   if (cache !== null && now - cache.lastCheck < ttlMs()) return;
   try {
     const entry = process.argv[1];
-    const args = entry ? [entry, REFRESH_FLAG] : [REFRESH_FLAG];
+    const args = entry ? [entry] : [];
     const child = spawn(process.execPath, args, {
       detached: true,
       stdio: "ignore",
-      env: process.env,
+      env: { ...process.env, [REFRESH_ENV]: "1" },
     });
     child.unref();
   } catch {
@@ -225,8 +225,6 @@ export function formatNotice(
   return lines.join("\n");
 }
 
-// Dual-hook: `exit` covers process.exit() from exitWithCode (skips beforeExit),
-// `beforeExit` covers natural drain. `printed` guards against double-fire.
 export function installExitNotice(current: string): void {
   if (isDisabled()) return;
   let printed = false;

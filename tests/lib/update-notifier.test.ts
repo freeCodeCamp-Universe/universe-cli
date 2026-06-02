@@ -3,6 +3,7 @@ import { mkdtemp, readFile, rm, writeFile, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { spawn } from "node:child_process";
+import { writeSync } from "node:fs";
 import {
   cachePath,
   compareVersions,
@@ -10,9 +11,10 @@ import {
   formatNotice,
   getNoticeSync,
   isDisabled,
+  installExitNotice,
   readCache,
   refreshIfStale,
-  REFRESH_FLAG,
+  REFRESH_ENV,
   spawnRefresh,
 } from "../../src/lib/update-notifier.js";
 
@@ -21,7 +23,13 @@ vi.mock("node:child_process", async (importOriginal) => {
   return { ...actual, spawn: vi.fn(() => ({ unref: vi.fn() })) };
 });
 
+vi.mock("node:fs", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs")>();
+  return { ...actual, writeSync: vi.fn() };
+});
+
 const mockSpawn = vi.mocked(spawn);
+const mockWriteSync = vi.mocked(writeSync);
 
 let tmp: string;
 const origXdg = process.env["XDG_CONFIG_HOME"];
@@ -415,17 +423,18 @@ describe("spawnRefresh", () => {
     expect(mockSpawn).not.toHaveBeenCalled();
   });
 
-  it("spawns a detached worker when cache is stale", async () => {
+  it("spawns a detached worker (env signal, entry script) when stale", async () => {
     await seedCache("0.8.0", now - 2 * 60 * 60 * 1000);
     spawnRefresh(now);
     expect(mockSpawn).toHaveBeenCalledTimes(1);
     const [, args, opts] = mockSpawn.mock.calls[0] as [
       string,
       string[],
-      { detached?: boolean; stdio?: string },
+      { detached?: boolean; stdio?: string; env?: NodeJS.ProcessEnv },
     ];
-    expect(args).toContain(REFRESH_FLAG);
     expect(opts).toMatchObject({ detached: true, stdio: "ignore" });
+    expect(opts.env?.[REFRESH_ENV]).toBe("1");
+    if (process.argv[1]) expect(args[0]).toBe(process.argv[1]);
   });
 
   it("spawns when no cache exists", () => {
@@ -438,5 +447,66 @@ describe("spawnRefresh", () => {
     spawnRefresh(now);
     const child = mockSpawn.mock.results[0]?.value as { unref: () => void };
     expect(child.unref).toHaveBeenCalled();
+  });
+
+  it("swallows a spawn failure without throwing", async () => {
+    await seedCache("0.8.0", now - 2 * 60 * 60 * 1000);
+    mockSpawn.mockImplementationOnce(() => {
+      throw new Error("EAGAIN");
+    });
+    expect(() => spawnRefresh(now)).not.toThrow();
+  });
+});
+
+describe("installExitNotice", () => {
+  let handlers: Record<string, () => void>;
+  let onSpy: ReturnType<typeof vi.spyOn>;
+
+  function capture(current: string): void {
+    handlers = {};
+    onSpy = vi
+      .spyOn(process, "on")
+      .mockImplementation(
+        (ev: string | symbol, fn: (...a: never[]) => void) => {
+          handlers[String(ev)] = fn as () => void;
+          return process;
+        },
+      );
+    installExitNotice(current);
+    onSpy.mockRestore();
+  }
+
+  beforeEach(() => mockWriteSync.mockClear());
+
+  it("writes the notice once across both hooks (printed guard)", async () => {
+    await seedCache("0.8.0", Date.now());
+    capture("0.7.0");
+    handlers["exit"]?.();
+    handlers["beforeExit"]?.();
+    expect(mockWriteSync).toHaveBeenCalledTimes(1);
+    expect(mockWriteSync.mock.calls[0]?.[0]).toBe(2);
+  });
+
+  it("does not register or write when disabled", () => {
+    process.env["UNIVERSE_NO_UPDATE_CHECK"] = "1";
+    capture("0.7.0");
+    expect(handlers["exit"]).toBeUndefined();
+    expect(mockWriteSync).not.toHaveBeenCalled();
+  });
+
+  it("writes nothing when current is already latest", async () => {
+    await seedCache("0.7.0", Date.now());
+    capture("0.7.0");
+    handlers["exit"]?.();
+    expect(mockWriteSync).not.toHaveBeenCalled();
+  });
+
+  it("does not propagate when writeSync throws", async () => {
+    await seedCache("0.8.0", Date.now());
+    mockWriteSync.mockImplementationOnce(() => {
+      throw new Error("EBADF");
+    });
+    capture("0.7.0");
+    expect(() => handlers["exit"]?.()).not.toThrow();
   });
 });

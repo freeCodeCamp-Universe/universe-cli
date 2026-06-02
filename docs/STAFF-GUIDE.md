@@ -243,7 +243,7 @@ universe repo rm <id>                       # delete a request, freeing its repo
 
 If GitHub creation fails after approval (e.g. the App lacks `Contents:read` on a template), `approve` reports `approved, but repository creation failed`, exits `STORAGE` (13), and the request moves to `failed` with its name freed for a retry. A request another admin already resolved returns `409`; the guard prevents double-creation.
 
-`repo rm` deletes a request record and frees its name — use it to clear an `active`/`failed` row whose GitHub repo no longer exists. It removes only the queue record, never a GitHub repo. (Creating over such a stale name now also self-heals: artemis verifies the repo is gone and reconciles the claim.) Find the blocking record with `universe repo ls --all`.
+`repo rm` deletes a request record. Use it to clear a stuck `active` row whose GitHub repo no longer exists (an `active` request is the only terminal state that still holds the name claim; `failed`/`rejected` already freed their name on resolution, so `repo rm` on those just removes a leftover record). It removes only the queue record, never a GitHub repo. Creating over a stale `active` name also self-heals: artemis verifies the repo is gone and reconciles the claim (the stale row is marked `failed`, not deleted, so its audit trail survives). Find the blocking record with `universe repo ls --all`.
 
 ## CI & automation
 
