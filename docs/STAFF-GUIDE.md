@@ -233,7 +233,7 @@ universe repo status <id>        # one request's full state
 
 ### Approve or reject (admin)
 
-Resolving requests requires the approver team (`apollo-11-approvers`). Approval creates the repo synchronously, so the outcome is inline:
+Resolving requests requires the approver team (`gh-artemis-approvers`). Approval creates the repo synchronously, so the outcome is inline:
 
 ```sh
 universe repo approve <id>                 # confirms, then creates via the Apollo-11 App
