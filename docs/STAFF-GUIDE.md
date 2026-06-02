@@ -178,6 +178,32 @@ Production points at that id; the old deploy stays in storage, so rollback is no
 UNIVERSE_PROXY_URL=https://uploads.staging.freecode.camp universe static deploy
 ```
 
+### Rename a site slug
+
+There is **no in-place rename** — the proxy has no slug-rename endpoint, and the CLI never holds the R2 admin key, so it cannot move deployed bytes. A rename is "register the new slug, redeploy, drop the old one":
+
+```sh
+universe sites ls --mine                              # note the OLD slug's teams
+universe sites register <new-slug> --team=<same,teams>  # 1. claim the new slug
+```
+
+Then point the repo at it and ship:
+
+```sh
+universe init --force --site <new-slug>   # rewrite platform.yaml `site:` (or edit it by hand)
+universe static deploy                    # 2. deploy under <new-slug>
+# check https://<new-slug>.preview.freecode.camp
+universe static promote                   # 3. go live on https://<new-slug>.freecode.camp
+```
+
+Once the new hostname serves correctly and you've updated any DNS, links, and CI referencing the old name:
+
+```sh
+universe sites rm <old-slug>              # 4. drop the old entry; its R2 bytes age out via cron
+```
+
+Deploy history does not carry over — the new slug starts fresh. There is no redirect from the old hostname, so cut over links once production is verified.
+
 ### Sign out
 
 ```sh

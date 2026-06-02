@@ -42,7 +42,7 @@ Deploy ids are `YYYYMMDD-HHMMSS-<gitsha>` (or `nogit-<ts>` outside a git repo). 
 | `universe sites update <slug>`   | `--team <name>` (required), `--json` | Replace the teams list (staff).                                 |
 | `universe sites rm <slug>`       | `--json`                             | Delete the entry (staff). R2 bytes untouched; age out via cron. |
 
-`--team` is comma-separated and repeatable; values are GitHub team slugs in `freeCodeCamp-Universe`. Slug `^[a-z][a-z0-9-]{0,62}$`, team `^[a-z0-9][a-z0-9_-]{0,38}$`. Source: `src/commands/sites/`.
+`--team` is comma-separated and repeatable; values are GitHub team slugs in `freeCodeCamp-Universe`. Slug `^[a-z][a-z0-9-]{0,62}$`, team `^[a-z0-9][a-z0-9_-]{0,38}$`. There is no in-place slug **rename** (no server primitive, and the CLI can't move R2 bytes) — `register` the new slug, redeploy under it, then `rm` the old one; full recipe in [STAFF-GUIDE.md](STAFF-GUIDE.md#rename-a-site-slug). Source: `src/commands/sites/`.
 
 ### `repo` — repository requests + approval queue
 
