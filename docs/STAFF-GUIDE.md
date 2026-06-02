@@ -69,7 +69,13 @@ The split is deliberate: `whoami` stays compact even when you're on dozens of te
 
 ## 2. Set up `platform.yaml`
 
-At your repo root, the only config the CLI reads:
+At your repo root, the only config the CLI reads. Scaffold it with one command:
+
+```sh
+universe init
+```
+
+`init` derives the slug from your git `origin` remote (or the directory name), infers a `build.command` from `package.json`, and prompts to confirm — pass `--yes` to skip the prompts in CI. It writes:
 
 ```yaml
 site: my-site

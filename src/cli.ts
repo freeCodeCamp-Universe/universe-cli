@@ -1,5 +1,6 @@
 import { Command } from "commander";
 import { deploy } from "./commands/deploy.js";
+import { init } from "./commands/init.js";
 import { login } from "./commands/login.js";
 import { logout } from "./commands/logout.js";
 import { ls } from "./commands/ls.js";
@@ -369,6 +370,34 @@ export async function run(argv = process.argv): Promise<void> {
         });
       } catch (err: unknown) {
         handleActionError("ls", opts.json ?? false, err);
+      }
+    });
+
+  cli
+    .command("init")
+    .description("Scaffold a platform.yaml in the current directory")
+    .option("--site <slug>", "Override the derived site slug")
+    .option("--dir <path>", "Build output directory to upload (default: dist)")
+    .option("--force", "Overwrite an existing platform.yaml")
+    .option("--yes", "Skip prompts; write derived defaults (non-TTY/CI)")
+    .action(async (_opts, cmd: Command) => {
+      const opts = cmd.optsWithGlobals<{
+        json?: boolean;
+        site?: string;
+        dir?: string;
+        force?: boolean;
+        yes?: boolean;
+      }>();
+      try {
+        await init({
+          json: opts.json ?? false,
+          site: opts.site,
+          dir: opts.dir,
+          force: opts.force ?? false,
+          yes: opts.yes ?? false,
+        });
+      } catch (err: unknown) {
+        handleActionError("init", opts.json ?? false, err);
       }
     });
 

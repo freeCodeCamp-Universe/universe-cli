@@ -8,7 +8,7 @@ The only config the CLI reads. It lives at your repo root and tells `universe st
 site: my-site
 ```
 
-A complete, valid file: no build step (ship pre-built artifacts), uploads `dist/` to preview.
+A complete, valid file: no build step (ship pre-built artifacts), uploads `dist/` to preview. Run `universe init` to generate this file with the `site` and `build` fields pre-filled from your repo.
 
 ## Full example
 

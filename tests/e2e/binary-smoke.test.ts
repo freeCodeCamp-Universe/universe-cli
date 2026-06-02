@@ -99,6 +99,21 @@ describe("binary smoke matrix (10 verbs × 1 happy-path)", () => {
     );
   }, 60_000);
 
+  it("init --json --yes", async () => {
+    resetState(server);
+    const project = await makeProject("smoke-init");
+    projects.push(project);
+    const r = await runBinary(
+      ["init", "--json", "--yes", "--force", "--site", "smoke-init"],
+      env.env,
+      project.dir,
+    );
+    expect(r.exitCode, `stderr=${r.stderr}\nstdout=${r.stdout}`).toBe(0);
+    expect((JSON.parse(r.stdout.trim()) as { command: string }).command).toBe(
+      "init",
+    );
+  }, 60_000);
+
   it("static ls --json --site <site>", async () => {
     resetState(server);
     server.state.registry.set(SITE, row(SITE));
