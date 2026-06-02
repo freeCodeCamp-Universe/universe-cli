@@ -156,6 +156,8 @@ universe static promote --from 20260511-091422-abc1234
 
 `--from` rewrites **only** the production alias (it uses the rollback primitive); preview is left untouched.
 
+If you'd rather promote right after checking preview, `universe static deploy --promote` works too — and when your tree is clean and the preview is already at the current commit, it promotes that same build instead of uploading a duplicate. So `deploy` → check preview → `deploy --promote` ships exactly what you reviewed, with no second deploy of the same hash.
+
 ## 6. Roll back
 
 Rollback is an alias rewrite, not a redeploy. Pick a past id with `universe static ls`, then:

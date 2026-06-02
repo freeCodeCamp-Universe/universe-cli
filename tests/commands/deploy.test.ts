@@ -769,7 +769,7 @@ describe("deploy command (proxy plane)", () => {
       expect(deps.logWarn).not.toHaveBeenCalled();
     });
 
-    it("skips the side-call and warn in --json mode", async () => {
+    it("skips the post-finalize divergence warn in --json mode", async () => {
       const proxy = mkProxy();
       proxy.deployFinalize.mockResolvedValue({
         url: "https://my-site.freecode.camp",
@@ -784,7 +784,9 @@ describe("deploy command (proxy plane)", () => {
         createProxyClient: vi.fn().mockReturnValue(proxy),
       });
       await deploy({ json: true, promote: true }, deps);
-      expect(proxy.getAlias).not.toHaveBeenCalled();
+      expect(proxy.deployFinalize).toHaveBeenCalledWith(
+        expect.objectContaining({ mode: "production" }),
+      );
       expect(deps.logWarn).not.toHaveBeenCalled();
     });
 
@@ -812,6 +814,100 @@ describe("deploy command (proxy plane)", () => {
       await deploy({ json: false, promote: true }, deps);
       expect(deps.logSuccess).toHaveBeenCalled();
       expect(deps.exit).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("promote dedup — same hash (#8)", () => {
+    it("promotes the existing preview when sha matches, skipping build/upload", async () => {
+      const proxy = mkProxy();
+      proxy.getAlias.mockResolvedValue({
+        url: "https://my-site.preview.freecode.camp",
+        deployId: "20260512-120000-abc1234",
+      });
+      proxy.sitePromote.mockResolvedValue({
+        url: "https://my-site.freecode.camp",
+        deployId: "20260512-120000-abc1234",
+      });
+      const deps = mkDeps({
+        createProxyClient: vi.fn().mockReturnValue(proxy),
+      });
+      await deploy({ json: false, promote: true }, deps);
+      expect(proxy.getAlias).toHaveBeenCalledWith({
+        site: "my-site",
+        mode: "preview",
+      });
+      expect(deps.runBuild).not.toHaveBeenCalled();
+      expect(proxy.deployInit).not.toHaveBeenCalled();
+      expect(deps.uploadFiles).not.toHaveBeenCalled();
+      expect(proxy.sitePromote).toHaveBeenCalledWith({
+        site: "my-site",
+        deployId: "20260512-120000-abc1234",
+      });
+      const msg = deps.logSuccess.mock.calls[0]?.[0] ?? "";
+      expect(msg).toContain("20260512-120000-abc1234");
+      expect(msg).toContain("production");
+    });
+
+    it("emits reusedPreview in the JSON envelope", async () => {
+      const proxy = mkProxy();
+      proxy.getAlias.mockResolvedValue({
+        url: "https://my-site.preview.freecode.camp",
+        deployId: "20260512-120000-abc1234",
+      });
+      proxy.sitePromote.mockResolvedValue({
+        url: "https://my-site.freecode.camp",
+        deployId: "20260512-120000-abc1234",
+      });
+      const deps = mkDeps({
+        createProxyClient: vi.fn().mockReturnValue(proxy),
+      });
+      const stdout: string[] = [];
+      const writeSpy = vi
+        .spyOn(process.stdout, "write")
+        .mockImplementation((chunk: unknown) => {
+          stdout.push(String(chunk));
+          return true;
+        });
+      await deploy({ json: true, promote: true }, deps);
+      writeSpy.mockRestore();
+
+      const env = JSON.parse(stdout.join("").trim());
+      expect(env.command).toBe("deploy");
+      expect(env.reusedPreview).toBe(true);
+      expect(env.mode).toBe("production");
+      expect(env.deployId).toBe("20260512-120000-abc1234");
+      expect(deps.runBuild).not.toHaveBeenCalled();
+    });
+
+    it("does NOT dedup when the working tree is dirty", async () => {
+      const proxy = mkProxy();
+      proxy.getAlias.mockResolvedValue({
+        url: "https://my-site.preview.freecode.camp",
+        deployId: "20260512-120000-abc1234",
+      });
+      const deps = mkDeps({
+        getGitState: vi
+          .fn()
+          .mockReturnValue({ hash: "abc1234567", dirty: true }),
+        createProxyClient: vi.fn().mockReturnValue(proxy),
+      });
+      await deploy({ json: false, promote: true }, deps);
+      expect(deps.runBuild).toHaveBeenCalled();
+      expect(proxy.sitePromote).not.toHaveBeenCalled();
+    });
+
+    it("does NOT dedup when the preview sha differs from HEAD", async () => {
+      const proxy = mkProxy();
+      proxy.getAlias.mockResolvedValue({
+        url: "https://my-site.preview.freecode.camp",
+        deployId: "20260512-120000-zzz9999",
+      });
+      const deps = mkDeps({
+        createProxyClient: vi.fn().mockReturnValue(proxy),
+      });
+      await deploy({ json: false, promote: true }, deps);
+      expect(deps.runBuild).toHaveBeenCalled();
+      expect(proxy.sitePromote).not.toHaveBeenCalled();
     });
   });
 });

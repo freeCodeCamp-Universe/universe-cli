@@ -107,6 +107,11 @@ function syntheticSha(): string {
   return `nogit-${Date.now().toString(36)}`;
 }
 
+function deployIdSha(deployId: string): string | null {
+  const m = /^\d{8}-\d{6}-(\S+)$/.exec(deployId);
+  return m?.[1] ?? null;
+}
+
 /**
  * Re-throws a proxy error with a prefixed message but preserves the
  * original status + code so the outer catch maps to the correct exit
@@ -271,6 +276,56 @@ export async function deploy(
       );
     }
     const sha = git.hash ?? syntheticSha();
+
+    if (options.promote && !git.dirty && git.hash) {
+      let preview: { deployId: string } | null = null;
+      try {
+        preview = await client.getAlias({
+          site: config.site,
+          mode: "preview",
+        });
+      } catch {
+        preview = null;
+      }
+      const previewSha = preview ? deployIdSha(preview.deployId) : null;
+      if (preview && previewSha && git.hash.startsWith(previewSha)) {
+        let promoted;
+        try {
+          promoted = await client.sitePromote({
+            site: config.site,
+            deployId: preview.deployId,
+          });
+        } catch (err) {
+          rethrowProxy("promote existing preview failed", err);
+        }
+        if (options.json) {
+          emitJson(
+            buildEnvelope("deploy", true, {
+              deployId: promoted.deployId,
+              url: promoted.url,
+              mode: "production",
+              site: config.site,
+              sha,
+              reusedPreview: true,
+              identitySource: identity.source,
+            }),
+          );
+        } else {
+          success(
+            [
+              `Promoted existing preview ${promoted.deployId} to production`,
+              ``,
+              `  Site:        ${config.site}`,
+              `  Deploy:      ${promoted.deployId}`,
+              `  Production:  ${promoted.url}`,
+              ``,
+              `Preview was already at this commit (${previewSha}); skipped rebuild and re-upload.`,
+            ].join("\n"),
+          );
+        }
+        return;
+      }
+    }
 
     const outputDir = options.dir ?? config.build.output;
     const buildResult = await build({

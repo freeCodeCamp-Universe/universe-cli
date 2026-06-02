@@ -244,6 +244,55 @@ describe("static deploy --promote E2E (alpha trip-wire for B1)", () => {
     expect(out).toContain("Preview alias unchanged.");
   });
 
+  it("--promote reuses the existing preview when HEAD is unchanged (#8)", async () => {
+    const site = "my-site";
+    server.state.tokens.set(token, {
+      login: "alice",
+      authorizedSites: [site],
+    });
+    server.state.registry.set(site, {
+      slug: site,
+      teams: ["staff"],
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-01T00:00:00Z",
+      createdBy: "alice",
+    });
+    env = await makeCliEnv({ proxyUrl: server.url, githubToken: token });
+
+    const project = await makeProject({
+      site,
+      files: { "index.html": "<html>v1</html>" },
+    });
+    projects.push(project);
+
+    const first = await runDeploy(env.env, project.dir, {
+      json: true,
+      promote: false,
+    });
+    const previewId = first.envelope!["deployId"] as string;
+    expect(server.state.aliases.preview.get(site)).toBe(previewId);
+
+    const second = await runDeploy(env.env, project.dir, {
+      json: true,
+      promote: true,
+    });
+
+    expect(second.captured.code).toBeUndefined();
+    expect(second.envelope!["reusedPreview"]).toBe(true);
+    expect(second.envelope!["mode"]).toBe("production");
+    expect(second.envelope!["deployId"]).toBe(previewId);
+    expect(server.state.aliases.production.get(site)).toBe(previewId);
+
+    const initCalls = server.callLog.filter(
+      (c) => c.method === "POST" && c.path === "/api/deploy/init",
+    );
+    expect(initCalls).toHaveLength(1);
+    const promoteCalls = server.callLog.filter((c) =>
+      /\/api\/site\/[^/]+\/promote$/.test(c.path),
+    );
+    expect(promoteCalls).toHaveLength(1);
+  });
+
   it("--promote without flag (preview default) leaves production alias untouched", async () => {
     const site = "my-site";
     server.state.tokens.set(token, {
