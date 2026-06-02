@@ -35,7 +35,7 @@ describe("createIgnoreFilter", () => {
     it("node_modules/** matches every file under node_modules", () => {
       const ignore = createIgnoreFilter(["node_modules/**"]);
       expect(ignore("node_modules/foo.js")).toBe(true);
-      expect(ignore("node_modules/lodash/index.js")).toBe(true);
+      expect(ignore("node_modules/lodash/index.cjs")).toBe(true);
       expect(ignore("node_modules/@scope/pkg/dist/index.mjs")).toBe(true);
     });
 

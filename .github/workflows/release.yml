@@ -75,7 +75,7 @@ jobs:
           node-version: "24"
           cache: "pnpm"
       - run: pnpm install --frozen-lockfile
-      - run: pnpm tsup
+      - run: pnpm tsdown
       - name: Generate SEA blob
         run: node --experimental-sea-config sea-config.json
       - name: Create executable
@@ -122,7 +122,7 @@ jobs:
           cache: "pnpm"
           registry-url: "https://registry.npmjs.org"
       - run: pnpm install --frozen-lockfile
-      - run: pnpm tsup
+      - run: pnpm tsdown
       # package.json is already at the release version (release-please bumped it
       # on the tagged commit). Stable-only: dist-tag is always `latest`.
       # --provenance is implicit under Trusted Publishing; kept explicit.
