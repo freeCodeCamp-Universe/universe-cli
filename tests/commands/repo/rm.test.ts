@@ -190,4 +190,32 @@ describe("repo rm command", () => {
     expect(env.error.message).toContain("not_found");
     expect(env.identitySource).toBe("env_GITHUB_TOKEN");
   });
+
+  it("maps a 403 delete error to EXIT_CREDENTIALS", async () => {
+    const { ProxyError } = await import("../../../src/lib/proxy-client.js");
+    const proxy = mkProxy();
+    proxy.deleteRepoRequest = vi
+      .fn()
+      .mockRejectedValue(new ProxyError(403, "user_unauthorized", "forbidden"));
+    const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
+    await expect(rm({ json: true, id: "req_001" }, deps)).rejects.toThrow(
+      "__exit__",
+    );
+    expect(deps.exit).toHaveBeenCalledWith(12);
+  });
+
+  it("maps a 5xx delete error to EXIT_STORAGE", async () => {
+    const { ProxyError } = await import("../../../src/lib/proxy-client.js");
+    const proxy = mkProxy();
+    proxy.deleteRepoRequest = vi
+      .fn()
+      .mockRejectedValue(
+        new ProxyError(502, "repo_store_failed", "bad gateway"),
+      );
+    const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
+    await expect(rm({ json: true, id: "req_001" }, deps)).rejects.toThrow(
+      "__exit__",
+    );
+    expect(deps.exit).toHaveBeenCalledWith(13);
+  });
 });

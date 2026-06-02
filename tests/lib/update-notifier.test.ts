@@ -15,6 +15,7 @@ import {
   readCache,
   refreshIfStale,
   REFRESH_ENV,
+  runRefreshWorker,
   spawnRefresh,
 } from "../../src/lib/update-notifier.js";
 
@@ -455,6 +456,27 @@ describe("spawnRefresh", () => {
       throw new Error("EAGAIN");
     });
     expect(() => spawnRefresh(now)).not.toThrow();
+  });
+});
+
+describe("runRefreshWorker", () => {
+  it("force-refreshes even when cache is fresh", async () => {
+    await seedCache("0.8.0", Date.now() - 60_000);
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(200, { version: "0.9.0" }));
+    vi.stubGlobal("fetch", fetchMock);
+    await runRefreshWorker();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect((await readCache())?.latest).toBe("0.9.0");
+  });
+
+  it("skips when disabled", async () => {
+    process.env["UNIVERSE_NO_UPDATE_CHECK"] = "1";
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    await runRefreshWorker();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 
