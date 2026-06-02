@@ -10,3 +10,6 @@ coverage/
 
 # dossier: internal scratchpad theater tooling
 .scratchpad/
+
+# Claude config
+.claude

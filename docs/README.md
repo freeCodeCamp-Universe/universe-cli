@@ -79,7 +79,7 @@ Running the service — config, route surface, health/observability, failure mod
 
 ```
 src/
-  cli.ts              # cac entry + command wiring
+  cli.ts              # commander entry + command wiring
   errors.ts           # typed error envelope
   index.ts            # bin entry → cli.ts
   commands/           # per-verb handlers (deploy, promote, rollback, ls, login, …)
@@ -88,7 +88,7 @@ src/
   lib/                # platform-yaml, identity, proxy-client, constants
   output/             # exit-codes, JSON envelopes, terminal formatters
 tests/                # unit (mirrors src/) + e2e/ (in-process fake-artemis + spawned-binary smoke)
-dist/                 # tsup output (ESM index.js + CJS index.cjs for SEA)
+dist/                 # tsdown output (CJS index.cjs — bin + SEA)
 ```
 
 ## Build & test
@@ -101,7 +101,7 @@ Node 24+ required.
 | `pnpm lint`       | oxlint.                                                     |
 | `pnpm typecheck`  | `tsc --noEmit`.                                             |
 | `pnpm test`       | vitest run (includes the in-process E2E layer).             |
-| `pnpm build`      | tsup → `dist/`.                                             |
+| `pnpm build`      | tsdown → `dist/`.                                           |
 | `pnpm test:smoke` | Opt-in: real-artemis smoke against `uploads.freecode.camp`. |
 
 A husky `pre-commit` hook runs lint + typecheck + test on every commit.
@@ -117,7 +117,7 @@ Contracts, not style preferences.
 - **Identity is a 4-source chain** (`src/lib/identity.ts`); see [reference.md](reference.md#identity). No secrets, no `.env` reads — credentials come from the chain or `UNIVERSE_PROXY_URL`, never from disk.
 - **Repo authz is org-scoped to `freeCodeCamp-Universe`:** create/ls/status → `staff`; approve/reject → the approver team. artemis probes membership against `GH_REPO_ORG` (distinct from the site-registry `GH_ORG`).
 - **Packaging:** the npm tarball ships `dist/` + `README.md` + `LICENSE`. SEA artifacts (`sea-config.json` + `entitlements.plist` + ad-hoc macOS `codesign`) build the four signed binaries attached to Releases. Release is OIDC-only (Trusted Publisher, no `NPM_TOKEN`) — see [RELEASING.md](RELEASING.md).
-- **E2E layer** (`tests/e2e/`, inside `pnpm test`): in-process tests call handlers directly against a stateful `fake-artemis.ts`; a spawned-binary smoke boots `dist/index.js` to catch loader/tsup/cac regressions; per-test `mkdtemp` `XDG_CONFIG_HOME` keeps runs parallel-safe. `pnpm test:smoke` hits the live proxy (gated on `UNIVERSE_E2E_REAL=1`; needs a pre-registered `UNIVERSE_REAL_SITE`).
+- **E2E layer** (`tests/e2e/`, inside `pnpm test`): in-process tests call handlers directly against a stateful `fake-artemis.ts`; a spawned-binary smoke boots `dist/index.cjs` to catch loader/tsdown/commander regressions; per-test `mkdtemp` `XDG_CONFIG_HOME` keeps runs parallel-safe. `pnpm test:smoke` hits the live proxy (gated on `UNIVERSE_E2E_REAL=1`; needs a pre-registered `UNIVERSE_REAL_SITE`).
 
 ## Where to file work
 
