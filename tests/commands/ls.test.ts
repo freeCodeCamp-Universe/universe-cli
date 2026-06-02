@@ -11,6 +11,7 @@ function mkProxy(): {
   siteDeploys: ReturnType<typeof vi.fn>;
   sitePromote: ReturnType<typeof vi.fn>;
   siteRollback: ReturnType<typeof vi.fn>;
+  getAlias: ReturnType<typeof vi.fn>;
 } {
   return {
     whoami: vi.fn(),
@@ -25,6 +26,7 @@ function mkProxy(): {
       ]),
     sitePromote: vi.fn(),
     siteRollback: vi.fn(),
+    getAlias: vi.fn().mockResolvedValue(null),
   };
 }
 
@@ -114,13 +116,73 @@ describe("ls command", () => {
         deployId: "20260427-141522-abc1234",
         timestamp: "2026-04-27T14:15:22Z",
         sha: "abc1234",
+        state: null,
       },
       {
         deployId: "20260426-101005-def5678",
         timestamp: "2026-04-26T10:10:05Z",
         sha: "def5678",
+        state: null,
       },
     ]);
+    expect(env.aliases).toEqual({ preview: null, production: null });
+  });
+
+  it("annotates STATE from preview/production aliases in JSON", async () => {
+    const proxy = mkProxy();
+    proxy.getAlias.mockImplementation(
+      async (req: { mode: "preview" | "production" }) =>
+        req.mode === "preview"
+          ? {
+              url: "https://my-site.preview.freecode.camp",
+              deployId: "20260427-141522-abc1234",
+            }
+          : {
+              url: "https://my-site.freecode.camp",
+              deployId: "20260426-101005-def5678",
+            },
+    );
+    const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
+
+    const stdout: string[] = [];
+    const writeSpy = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation((chunk: unknown) => {
+        stdout.push(String(chunk));
+        return true;
+      });
+    await ls({ json: true }, deps);
+    writeSpy.mockRestore();
+
+    const env = JSON.parse(stdout.join("").trim());
+    expect(env.deploys[0].state).toBe("preview");
+    expect(env.deploys[1].state).toBe("production");
+    expect(env.aliases).toEqual({
+      preview: "20260427-141522-abc1234",
+      production: "20260426-101005-def5678",
+    });
+  });
+
+  it("marks a deploy that is both preview and production", async () => {
+    const proxy = mkProxy();
+    proxy.getAlias.mockResolvedValue({
+      url: "https://my-site.freecode.camp",
+      deployId: "20260427-141522-abc1234",
+    });
+    const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
+
+    const stdout: string[] = [];
+    const writeSpy = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation((chunk: unknown) => {
+        stdout.push(String(chunk));
+        return true;
+      });
+    await ls({ json: true }, deps);
+    writeSpy.mockRestore();
+
+    const env = JSON.parse(stdout.join("").trim());
+    expect(env.deploys[0].state).toBe("preview+production");
   });
 
   it("prints table header + rows in text mode", async () => {
@@ -130,8 +192,26 @@ describe("ls command", () => {
     expect(msg).toContain("DEPLOY ID");
     expect(msg).toContain("TIMESTAMP");
     expect(msg).toContain("SHA");
+    expect(msg).toContain("STATE");
     expect(msg).toContain("20260427-141522-abc1234");
     expect(msg).toContain("abc1234");
+  });
+
+  it("renders the STATE column value in text mode", async () => {
+    const proxy = mkProxy();
+    proxy.getAlias.mockImplementation(
+      async (req: { mode: "preview" | "production" }) =>
+        req.mode === "preview"
+          ? {
+              url: "https://my-site.preview.freecode.camp",
+              deployId: "20260427-141522-abc1234",
+            }
+          : null,
+    );
+    const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
+    await ls({ json: false }, deps);
+    const msg = deps.logSuccess.mock.calls[0]?.[0] ?? "";
+    expect(msg).toContain("preview");
   });
 
   it("reports empty list cleanly in text mode", async () => {
@@ -230,11 +310,13 @@ describe("ls command", () => {
         deployId: "20260513-120000-nogit-7",
         timestamp: "2026-05-13T12:00:00Z",
         sha: "nogit-7",
+        state: null,
       },
       {
         deployId: "20260512-090000-abc1234",
         timestamp: "2026-05-12T09:00:00Z",
         sha: "abc1234",
+        state: null,
       },
     ]);
   });
@@ -261,6 +343,7 @@ describe("ls command", () => {
       deployId: "weird-id",
       timestamp: null,
       sha: null,
+      state: null,
     });
   });
 });

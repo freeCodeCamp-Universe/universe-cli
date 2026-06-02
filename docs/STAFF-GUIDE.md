@@ -132,6 +132,14 @@ universe static ls
 
 Lists recent deploys for the site in `platform.yaml`; `--site <slug>` inspects another site you can reach. You'll need an id to promote or roll back.
 
+```
+DEPLOY ID                TIMESTAMP            SHA      STATE
+20260513-151634-8741522  2026-05-13 15:16:34  8741522  preview
+20260504-131201-85f8247  2026-05-04 13:12:01  85f8247  production
+```
+
+The `STATE` column tells you at a glance which build each alias points at: `preview`, `production`, `preview+production` (the same build is live on both), or blank for a superseded build. No need to run `promote` just to find out where a deploy stands.
+
 ## 5. Promote to production
 
 When the preview looks good:

@@ -114,6 +114,8 @@ describe("static ls E2E (real proxy-client + real identity chain)", () => {
       { deployId: "20260228-120000-def5678" },
       { deployId: "20260301-091500-abc1234" },
     ]);
+    server.state.aliases.preview.set("my-site", "20260301-091500-abc1234");
+    server.state.aliases.production.set("my-site", "20260228-120000-def5678");
     env = await makeCliEnv({ proxyUrl: server.url, githubToken: token });
 
     const r = await runLsJson(env.env, { json: true, site: "my-site" });
@@ -131,11 +133,20 @@ describe("static ls E2E (real proxy-client + real identity chain)", () => {
     ]);
     expect(deploys[0].timestamp).toBe("2026-03-01T09:15:00Z");
     expect(deploys[0].sha).toBe("abc1234");
+    expect(deploys[0].state).toBe("preview");
+    expect(deploys[1].state).toBe("production");
+    expect(deploys[2].state).toBeNull();
+    expect(r.envelope!["aliases"]).toEqual({
+      preview: "20260301-091500-abc1234",
+      production: "20260228-120000-def5678",
+    });
 
-    expect(server.callLog).toHaveLength(1);
-    expect(server.callLog[0].method).toBe("GET");
-    expect(server.callLog[0].path).toBe("/api/site/my-site/deploys");
-    expect(server.callLog[0].status).toBe(200);
+    const paths = server.callLog.map((c) => c.path).sort();
+    expect(paths).toEqual([
+      "/api/site/my-site/alias/preview",
+      "/api/site/my-site/alias/production",
+      "/api/site/my-site/deploys",
+    ]);
   });
 
   it("emits empty deploys array when site has no deploys", async () => {
@@ -224,7 +235,9 @@ describe("static ls E2E (real proxy-client + real identity chain)", () => {
 
     expect(r.captured.code).toBeUndefined();
     expect(r.envelope!["site"]).toBe("from-flag");
-    expect(server.callLog).toHaveLength(1);
-    expect(server.callLog[0].path).toBe("/api/site/from-flag/deploys");
+    expect(server.callLog).toHaveLength(3);
+    expect(server.callLog.map((c) => c.path)).toContain(
+      "/api/site/from-flag/deploys",
+    );
   });
 });

@@ -45,10 +45,29 @@ function emitJson(envelope: object): void {
   process.stdout.write(JSON.stringify(envelope) + "\n");
 }
 
+type DeployState = "preview" | "production" | "preview+production" | null;
+
 interface ParsedDeploy {
   deployId: string;
   timestamp: string | null;
   sha: string | null;
+}
+
+interface DeployRow extends ParsedDeploy {
+  state: DeployState;
+}
+
+function deployState(
+  deployId: string,
+  previewId: string | null,
+  productionId: string | null,
+): DeployState {
+  const isPreview = deployId === previewId;
+  const isProduction = deployId === productionId;
+  if (isPreview && isProduction) return "preview+production";
+  if (isProduction) return "production";
+  if (isPreview) return "preview";
+  return null;
 }
 
 /**
@@ -96,12 +115,13 @@ async function readSiteFromYaml(
   return config.site;
 }
 
-function formatTable(deploys: ParsedDeploy[]): string {
-  const header = ["DEPLOY ID", "TIMESTAMP", "SHA"];
+function formatTable(deploys: DeployRow[]): string {
+  const header = ["DEPLOY ID", "TIMESTAMP", "SHA", "STATE"];
   const rows = deploys.map((d) => [
     d.deployId,
     d.timestamp ? d.timestamp.replace("T", " ").replace("Z", "") : "—",
     d.sha ?? "—",
+    d.state ?? "—",
   ]);
   const widths = header.map((h, i) =>
     Math.max(h.length, ...rows.map((r) => (r[i] ?? "").length)),
@@ -155,13 +175,30 @@ export async function ls(options: LsOptions, deps: LsDeps = {}): Promise<void> {
     const sorted = [...raw].sort((a, b) =>
       b.deployId.localeCompare(a.deployId),
     );
-    const deploys = sorted.map((d) => parseDeployId(d.deployId));
+    const parsed = sorted.map((d) => parseDeployId(d.deployId));
+
+    let previewId: string | null = null;
+    let productionId: string | null = null;
+    if (parsed.length > 0) {
+      const [preview, production] = await Promise.all([
+        client.getAlias({ site, mode: "preview" }),
+        client.getAlias({ site, mode: "production" }),
+      ]);
+      previewId = preview?.deployId ?? null;
+      productionId = production?.deployId ?? null;
+    }
+
+    const deploys: DeployRow[] = parsed.map((d) => ({
+      ...d,
+      state: deployState(d.deployId, previewId, productionId),
+    }));
 
     if (options.json) {
       emitJson(
         buildEnvelope("ls", true, {
           site,
           deploys,
+          aliases: { preview: previewId, production: productionId },
           identitySource: identity.source,
         }),
       );
