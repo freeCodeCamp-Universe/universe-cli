@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0](https://github.com/freeCodeCamp-Universe/universe-cli/compare/universe-cli-v0.8.1...universe-cli-v0.9.0) (2026-06-02)
+
+
+### Features
+
+* **repo:** add rm command to delete requests ([53259c5](https://github.com/freeCodeCamp-Universe/universe-cli/commit/53259c54b98822629009988e00474f3271f454ef))
+* **repo:** ls --all flag + already_exists hint ([763e197](https://github.com/freeCodeCamp-Universe/universe-cli/commit/763e1971cf1c2136ec975bd8ef0da2961c5ebad2))
+
+
+### Bug Fixes
+
+* **cli:** env-gated refresh worker + harden tests ([284d071](https://github.com/freeCodeCamp-Universe/universe-cli/commit/284d0717ebce77d77269d5449bccb4b1cd387b8a))
+* **update-notifier:** detached refresh worker ([e7877f4](https://github.com/freeCodeCamp-Universe/universe-cli/commit/e7877f4ac53256f8f3efc6435aee8eec476a9f27))
+
 ## [0.8.1](https://github.com/freeCodeCamp-Universe/universe-cli/compare/universe-cli-v0.8.0...universe-cli-v0.8.1) (2026-06-01)
 
 
