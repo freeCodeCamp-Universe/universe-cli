@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0](https://github.com/freeCodeCamp-Universe/universe-cli/compare/universe-cli-v0.9.0...universe-cli-v0.10.0) (2026-06-02)
+
+
+### Features
+
+* **deploy:** reuse preview on --promote of same hash ([#8](https://github.com/freeCodeCamp-Universe/universe-cli/issues/8)) ([5a659e5](https://github.com/freeCodeCamp-Universe/universe-cli/commit/5a659e51c958a9d0b006c56ca2e2ea9cc92de561))
+* **init:** scaffold platform.yaml command ([#5](https://github.com/freeCodeCamp-Universe/universe-cli/issues/5)) ([9bf5c07](https://github.com/freeCodeCamp-Universe/universe-cli/commit/9bf5c0776e1747f81adc9557b0917a8006b8494f))
+* **ls:** show preview/production STATE per deploy ([#7](https://github.com/freeCodeCamp-Universe/universe-cli/issues/7)) ([e1eabe5](https://github.com/freeCodeCamp-Universe/universe-cli/commit/e1eabe57b4722c44ebac14952f9704e575d4657f))
+* replace cac with commander, default to showing help ([#12](https://github.com/freeCodeCamp-Universe/universe-cli/issues/12)) ([139a50c](https://github.com/freeCodeCamp-Universe/universe-cli/commit/139a50c9eda191670bd7dd1c357e363312f2f50e))
+
 ## [0.9.0](https://github.com/freeCodeCamp-Universe/universe-cli/compare/universe-cli-v0.8.1...universe-cli-v0.9.0) (2026-06-02)
 
 
