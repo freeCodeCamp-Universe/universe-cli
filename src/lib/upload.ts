@@ -152,15 +152,11 @@ export async function uploadFiles(
     limit(async () => {
       try {
         const body = await read(file.absPath);
-        // @types/node Buffer is `Buffer<ArrayBufferLike>` while lib.dom
-        // BodyInit reaches for global Uint8Array. Runtime is fine; cast
-        // through unknown to bridge the type worlds.
-        const bodyAsBodyInit = body as unknown as BodyInit;
         await options.client.deployUpload({
           deployId: options.deployId,
           jwt: options.jwt,
           path: file.relPath,
-          body: bodyAsBodyInit,
+          body: body,
           contentType: getContentType(file.relPath),
         });
         uploaded.push(file.relPath);
