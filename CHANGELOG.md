@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.1](https://github.com/freeCodeCamp-Universe/universe-cli/compare/universe-cli-v0.10.0...universe-cli-v0.10.1) (2026-06-03)
+
+
+### Bug Fixes
+
+* use node types, not DOM ([#19](https://github.com/freeCodeCamp-Universe/universe-cli/issues/19)) ([c36daf1](https://github.com/freeCodeCamp-Universe/universe-cli/commit/c36daf1ba30c58ffc5ed44a2ed814ca3bd081f36))
+
 ## [0.10.0](https://github.com/freeCodeCamp-Universe/universe-cli/compare/universe-cli-v0.9.0...universe-cli-v0.10.0) (2026-06-02)
 
 
