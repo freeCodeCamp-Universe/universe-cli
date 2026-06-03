@@ -101,7 +101,7 @@ export interface DeployUploadRequest {
   deployId: string;
   jwt: string;
   path: string;
-  body: BodyInit;
+  body: RequestInit["body"];
   contentType?: string;
 }
 
