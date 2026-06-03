@@ -30,18 +30,18 @@
     "universe": "dist/index.cjs"
   },
   "dependencies": {
-    "@clack/prompts": "^1.2.0",
+    "@clack/prompts": "^1.5.0",
     "commander": "14.0.3",
-    "yaml": "^2.8.3",
-    "zod": "^4.3.6"
+    "yaml": "^2.9.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^24.12.2",
     "husky": "^9.1.7",
-    "oxlint": "^1.60.0",
+    "oxlint": "^1.68.0",
     "postject": "1.0.0-alpha.6",
-    "tsdown": "0.22.0",
-    "tsx": "4.22.3",
+    "tsdown": "0.22.1",
+    "tsx": "4.22.4",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4"
   },
