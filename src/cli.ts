@@ -1,4 +1,5 @@
 import { Command } from "commander";
+import { create } from "./commands/create/index.js";
 import { deploy } from "./commands/deploy.js";
 import { init } from "./commands/init.js";
 import { login } from "./commands/login.js";
@@ -370,6 +371,22 @@ export async function run(argv = process.argv): Promise<void> {
         });
       } catch (err: unknown) {
         handleActionError("ls", opts.json ?? false, err);
+      }
+    });
+
+  cli
+    .command("create")
+    .description("Scaffold a new project locally")
+    .action(async (_opts, cmd: Command) => {
+      const opts = cmd.optsWithGlobals<{
+        json?: boolean;
+      }>();
+      try {
+        await create({
+          json: opts.json ?? false,
+        });
+      } catch (err: unknown) {
+        handleActionError("create", opts.json ?? false, err);
       }
     });
 
