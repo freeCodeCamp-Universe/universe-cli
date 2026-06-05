@@ -1,0 +1,12 @@
+{
+  "postgresql": {
+    "files": {
+      "universe/services/postgresql.md": "PostgreSQL resource selected for {{name}}.\n"
+    }
+  },
+  "redis": {
+    "files": {
+      "universe/services/redis.md": "Redis resource selected for {{name}}.\n"
+    }
+  }
+}

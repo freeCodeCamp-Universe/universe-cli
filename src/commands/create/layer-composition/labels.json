@@ -1,0 +1,26 @@
+{
+  "runtime": {
+    "node": "Node.js",
+    "static_web": "Static (HTML/CSS/JS)"
+  },
+  "framework": {
+    "express": "Express",
+    "html-css-js": "HTML/CSS/JS",
+    "react-vite": "React (Vite)",
+    "tanstack-shadcn": "TanStack + shadcn/ui",
+    "typescript": "TypeScript"
+  },
+  "database": {
+    "postgresql": "PostgreSQL",
+    "redis": "Redis"
+  },
+  "service": {
+    "analytics": "Analytics",
+    "auth": "Auth",
+    "email": "Email"
+  },
+  "packageManager": {
+    "bun": "bun",
+    "pnpm": "pnpm"
+  }
+}
