@@ -161,11 +161,7 @@ export interface DeleteSiteRequest {
 
 export type RepoVisibility = "public" | "private";
 export type RepoRequestStatus =
-  | "pending"
-  | "approved"
-  | "active"
-  | "rejected"
-  | "failed";
+  "pending" | "approved" | "active" | "rejected" | "failed";
 
 /**
  * Canonical repo-request row returned by every `/api/repo*` endpoint.
@@ -295,7 +291,8 @@ export class AliasDriftError extends ProxyError {
 
 function mapExitCode(status: number): number {
   if (status === 401 || status === 403) return EXIT_CREDENTIALS;
-  if (status === 422 || status === 0 || status >= 500) return EXIT_STORAGE;
+  if (status === 429 || status === 422 || status === 0 || status >= 500)
+    return EXIT_STORAGE;
   return EXIT_USAGE;
 }
 

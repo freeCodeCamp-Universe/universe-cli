@@ -612,6 +612,27 @@ describe("createProxyClient", () => {
       expect(err.code).toBe("http_500");
     });
 
+    it("maps status 429 to EXIT_STORAGE exit code", async () => {
+      const fetchMock = vi.fn().mockResolvedValue(
+        jsonResponse(429, {
+          error: {
+            code: "rate_limited",
+            message: "github api rate limited; retry later",
+          },
+        }),
+      );
+      const client = createProxyClient({
+        baseUrl,
+        getAuthToken,
+        fetch: fetchMock,
+      });
+      const err = (await client
+        .whoami()
+        .catch((e: unknown) => e)) as ProxyError;
+      expect(err.exitCode).toBe(EXIT_STORAGE);
+      expect(err.status).toBe(429);
+    });
+
     it("maps status 400 to EXIT_USAGE exit code", async () => {
       const fetchMock = vi.fn().mockResolvedValue(
         jsonResponse(400, {
