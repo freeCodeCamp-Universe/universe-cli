@@ -1,0 +1,16 @@
+{
+  "bun": {
+    "devCmd": ["bun"],
+    "files": {},
+    "lockfile": "bun.lockb",
+    "manifests": ["package.json"],
+    "pmInstall": "RUN npm i -g bun"
+  },
+  "pnpm": {
+    "devCmd": ["pnpm"],
+    "files": {},
+    "lockfile": "pnpm-lock.yaml",
+    "manifests": ["package.json"],
+    "pmInstall": "RUN corepack enable && corepack prepare pnpm@latest --activate"
+  }
+}

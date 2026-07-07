@@ -3,8 +3,11 @@ import type { CreateSelections } from "../prompt/prompt.port.js";
 import type {
   FrameworkLayerData,
   PackageManagerLayerData,
-  RuntimeLayerData,
+  Runtime,
+  RuntimeOption,
 } from "./schemas/layers.js";
+
+type RuntimeEntryData = Runtime[RuntimeOption];
 
 type LayerType = "always" | "frameworks" | "package-managers" | "runtime" | "services";
 
@@ -16,7 +19,7 @@ interface LayerRegistry {
   always: Record<string, LayerData>;
   frameworks: Record<string, FrameworkLayerData>;
   "package-managers": Record<string, PackageManagerLayerData>;
-  runtime: Record<string, RuntimeLayerData>;
+  runtime: Record<string, RuntimeEntryData>;
   services: Record<string, LayerData>;
 }
 

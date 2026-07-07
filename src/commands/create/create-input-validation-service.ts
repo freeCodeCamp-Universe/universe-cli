@@ -6,6 +6,7 @@ import {
   serviceOptions,
 } from "./layer-composition/allowed-configuration.js";
 import type { RuntimeCombinations } from "./layer-composition/allowed-configuration.js";
+import type { Runtime } from "./layer-composition/schemas/layers.js";
 import { RUNTIME_OPTIONS } from "./layer-composition/schemas/layers.js";
 import type { CreateSelections } from "./prompt/prompt.port.js";
 
@@ -20,9 +21,11 @@ interface CreateInputValidator {
 
 class CreateInputValidationService implements CreateInputValidator {
   private readonly pathExists: PathExists;
+  private readonly runtimeData: Runtime;
 
-  constructor(pathExists: PathExists) {
+  constructor(pathExists: PathExists, runtimeData: Runtime) {
     this.pathExists = pathExists;
+    this.runtimeData = runtimeData;
   }
 
   validateCreateInput(input: CreateSelections): CreateSelections {
@@ -55,10 +58,10 @@ class CreateInputValidationService implements CreateInputValidator {
     }
 
     const config: RuntimeCombinations = {
-      databases: databaseOptions(input.runtime),
-      frameworks: frameworkOptions(input.runtime),
-      packageManagers: packageManagerOptions(input.runtime),
-      platformServices: serviceOptions(input.runtime),
+      databases: databaseOptions(this.runtimeData, input.runtime),
+      frameworks: frameworkOptions(this.runtimeData, input.runtime),
+      packageManagers: packageManagerOptions(this.runtimeData, input.runtime),
+      platformServices: serviceOptions(this.runtimeData, input.runtime),
     };
 
     this.validateRuntimeSelections(input, config);

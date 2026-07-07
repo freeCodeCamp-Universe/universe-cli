@@ -1,8 +1,6 @@
 import type { CreateSelections } from "../prompt/prompt.port.js";
 import { buildComposeDevYaml } from "./build-compose-dev-yaml.js";
 import { composeLayerFiles } from "./compose-layer-files.js";
-import databaseLayer from "./layers/database.json" with { type: "json" };
-import serviceLayer from "./layers/service.json" with { type: "json" };
 import { LayerTemplateRenderer } from "./layer-template-renderer.js";
 import type { TemplateContext } from "./layer-template-renderer.js";
 import { getLabel } from "./labels.js";
@@ -13,16 +11,13 @@ import type {
   LayerType,
   ResolvedLayer,
 } from "./resolve-ordered-layers.js";
-
-import alwaysLayer from "./layers/always.json" with { type: "json" };
-import frameworksLayer from "./layers/framework.json" with { type: "json" };
-import packageManagersLayer from "./layers/package-manager.json" with { type: "json" };
-import runtimeLayer from "./layers/runtime.json" with { type: "json" };
+import type { Labels } from "./schemas/labels.js";
 import type {
   FrameworkLayerData,
   PackageManagerLayerData,
   RuntimeLayerData,
 } from "./schemas/layers.js";
+import type { TemplateProvider } from "./template-provider.js";
 
 interface ResolvedLayerSet {
   files: Record<string, string>;
@@ -30,7 +25,10 @@ interface ResolvedLayerSet {
 }
 
 interface LayerComposer {
-  resolveLayers(input: CreateSelections): ResolvedLayerSet;
+  resolveLayers(
+    input: CreateSelections,
+    options?: { forceFetch?: boolean },
+  ): Promise<ResolvedLayerSet>;
 }
 
 interface DockerfileData {
@@ -70,73 +68,77 @@ const renderDockerfile = (data: DockerfileData): string =>
   `${data.devCopySource}\n` +
   `CMD ${JSON.stringify(data.devCmd)}\n`;
 
-const defaultLayerRegistry: LayerRegistry = {
-  always: alwaysLayer,
-  frameworks: frameworksLayer,
-  "package-managers": packageManagersLayer,
-  runtime: runtimeLayer,
-  services: { ...serviceLayer, ...databaseLayer },
+const resolveWithLayers = (
+  input: CreateSelections,
+  layers: LayerRegistry,
+  labels: Labels,
+): ResolvedLayerSet => {
+  const resolvedLayers = resolveOrderedLayers(input, layers);
+
+  const pmPreinstall =
+    input.packageManager === undefined
+      ? undefined
+      : layers["package-managers"][input.packageManager]?.preinstall;
+
+  const composedFiles = composeLayerFiles(resolvedLayers, pmPreinstall);
+
+  const renderer = new LayerTemplateRenderer();
+  const frameworkData = layers.frameworks?.[input.framework];
+
+  const context: TemplateContext = {
+    framework: getLabel(labels, "framework", input.framework),
+    name: input.name,
+    port: frameworkData?.port ?? 0,
+    runtime: getLabel(labels, "runtime", input.runtime),
+  };
+
+  const renderedFiles: Record<string, string> = Object.fromEntries(
+    Object.entries(composedFiles).map(([filePath, content]) => [
+      filePath,
+      renderer.render(content, context),
+    ]),
+  );
+
+  const runtimeData = layers.runtime?.[input.runtime];
+
+  if (
+    runtimeData !== undefined &&
+    frameworkData !== undefined &&
+    input.packageManager !== undefined
+  ) {
+    const pmData = layers["package-managers"][input.packageManager];
+
+    if (pmData !== undefined) {
+      renderedFiles["Dockerfile"] = renderDockerfile(
+        buildDockerfileData(runtimeData, frameworkData, pmData),
+      );
+      renderedFiles["docker-compose.dev.yml"] = buildComposeDevYaml(frameworkData, pmData);
+    }
+  }
+
+  return {
+    files: renderedFiles,
+    layers: resolvedLayers,
+  };
 };
 
 class LayerCompositionService implements LayerComposer {
-  private readonly layers: LayerRegistry;
+  private readonly provider: TemplateProvider;
 
-  constructor(layers: LayerRegistry = defaultLayerRegistry) {
-    this.layers = layers;
+  constructor(provider: TemplateProvider) {
+    this.provider = provider;
   }
 
-  resolveLayers(input: CreateSelections): ResolvedLayerSet {
-    const resolvedLayers = resolveOrderedLayers(input, this.layers);
-
-    const pmPreinstall =
-      input.packageManager === undefined
-        ? undefined
-        : this.layers["package-managers"][input.packageManager]?.preinstall;
-
-    const composedFiles = composeLayerFiles(resolvedLayers, pmPreinstall);
-
-    const renderer = new LayerTemplateRenderer();
-    const frameworkData = this.layers.frameworks?.[input.framework];
-
-    const context: TemplateContext = {
-      framework: getLabel("framework", input.framework),
-      name: input.name,
-      port: frameworkData?.port ?? 0,
-      runtime: getLabel("runtime", input.runtime),
-    };
-
-    const renderedFiles: Record<string, string> = Object.fromEntries(
-      Object.entries(composedFiles).map(([filePath, content]) => [
-        filePath,
-        renderer.render(content, context),
-      ]),
-    );
-
-    const runtimeData = this.layers.runtime?.[input.runtime];
-
-    if (
-      runtimeData !== undefined &&
-      frameworkData !== undefined &&
-      input.packageManager !== undefined
-    ) {
-      const pmData = this.layers["package-managers"][input.packageManager];
-
-      if (pmData !== undefined) {
-        renderedFiles["Dockerfile"] = renderDockerfile(
-          buildDockerfileData(runtimeData, frameworkData, pmData),
-        );
-        renderedFiles["docker-compose.dev.yml"] = buildComposeDevYaml(frameworkData, pmData);
-      }
-    }
-
-    return {
-      files: renderedFiles,
-      layers: resolvedLayers,
-    };
+  async resolveLayers(
+    input: CreateSelections,
+    options?: { forceFetch?: boolean },
+  ): Promise<ResolvedLayerSet> {
+    const { labels, registry } = await this.provider.loadLayers(options);
+    return resolveWithLayers(input, registry, labels);
   }
 }
 
-export { defaultLayerRegistry, LayerCompositionService };
+export { LayerCompositionService };
 export type {
   LayerComposer,
   LayerData,

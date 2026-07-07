@@ -1,7 +1,5 @@
-import { generateLayerFiles } from "./generate-layer-files.mjs";
-
 const setup = async () => {
-  await generateLayerFiles();
+  // No-op: template layer files are now fetched at runtime via TemplateProvider.
 };
 
 export { setup };

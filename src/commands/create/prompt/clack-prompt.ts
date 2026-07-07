@@ -15,6 +15,8 @@ import {
   runtimeOptions,
   serviceOptions,
 } from "../layer-composition/allowed-configuration.js";
+import type { Labels } from "../layer-composition/schemas/labels.js";
+import type { Runtime } from "../layer-composition/schemas/layers.js";
 import { getLabel } from "../layer-composition/labels.js";
 import type { LabelCategory } from "../layer-composition/labels.js";
 
@@ -47,23 +49,29 @@ const defaultClackApi: ClackPromptApi = {
   text,
 };
 
-const toPromptOptions = <T extends string>(
-  values: T[],
-  category: LabelCategory,
-): { label: string; value: T }[] =>
-  values.map((value) => ({
-    label: getLabel(category, value),
-    value,
-  }));
-
-const toLabelList = <T extends string>(values: T[], category: LabelCategory): string =>
-  values.map((value) => getLabel(category, value)).join(", ");
-
 class ClackPrompt implements Prompt {
   private readonly api: ClackPromptApi;
+  private readonly labels: Labels;
+  private readonly runtimeData: Runtime;
 
-  constructor(api: ClackPromptApi = defaultClackApi) {
+  constructor(runtimeData: Runtime, labels: Labels, api: ClackPromptApi = defaultClackApi) {
+    this.runtimeData = runtimeData;
+    this.labels = labels;
     this.api = api;
+  }
+
+  private toPromptOptions<T extends string>(
+    values: T[],
+    category: LabelCategory,
+  ): { label: string; value: T }[] {
+    return values.map((value) => ({
+      label: getLabel(this.labels, category, value),
+      value,
+    }));
+  }
+
+  private toLabelList<T extends string>(values: T[], category: LabelCategory): string {
+    return values.map((value) => getLabel(this.labels, category, value)).join(", ");
   }
 
   async promptForCreateInputs(): Promise<CreateSelections | null> {
@@ -85,7 +93,7 @@ class ClackPrompt implements Prompt {
 
     const runtime = await this.api.select({
       message: "Select runtime",
-      options: toPromptOptions(runtimeOptions(), "runtime"),
+      options: this.toPromptOptions(runtimeOptions(this.runtimeData), "runtime"),
     });
 
     if (this.api.isCancel(runtime)) {
@@ -94,7 +102,7 @@ class ClackPrompt implements Prompt {
 
     const framework = await this.api.select({
       message: "Select framework",
-      options: toPromptOptions(frameworkOptions(runtime as RuntimeOption), "framework"),
+      options: this.toPromptOptions(frameworkOptions(this.runtimeData, runtime as RuntimeOption), "framework"),
     });
 
     if (this.api.isCancel(framework)) {
@@ -102,7 +110,7 @@ class ClackPrompt implements Prompt {
     }
 
     let packageManager: string | symbol | undefined;
-    const packageManagers = packageManagerOptions(runtime as RuntimeOption);
+    const packageManagers = packageManagerOptions(this.runtimeData, runtime as RuntimeOption);
     if (packageManagers.length === 1) {
       const [autoSelected] = packageManagers;
       if (autoSelected !== undefined) {
@@ -111,7 +119,7 @@ class ClackPrompt implements Prompt {
     } else if (packageManagers.length > 1) {
       packageManager = await this.api.select({
         message: "Select package manager",
-        options: toPromptOptions(packageManagers as PackageManagerOption[], "packageManager"),
+        options: this.toPromptOptions(packageManagers as PackageManagerOption[], "packageManager"),
       });
 
       if (this.api.isCancel(packageManager)) {
@@ -119,13 +127,13 @@ class ClackPrompt implements Prompt {
       }
     }
 
-    const availableDatabases = databaseOptions(runtime as RuntimeOption);
+    const availableDatabases = databaseOptions(this.runtimeData, runtime as RuntimeOption);
 
     let databases: string[] | symbol = [];
     if (availableDatabases.length > 0) {
       databases = await this.api.multiselect({
         message: "Select databases",
-        options: toPromptOptions(availableDatabases, "database"),
+        options: this.toPromptOptions(availableDatabases, "database"),
         required: false,
       });
     }
@@ -136,7 +144,7 @@ class ClackPrompt implements Prompt {
 
     const platformServices = await this.api.multiselect({
       message: "Select platform services",
-      options: toPromptOptions(serviceOptions(runtime as RuntimeOption), "service"),
+      options: this.toPromptOptions(serviceOptions(this.runtimeData, runtime as RuntimeOption), "service"),
       required: false,
     });
 
@@ -147,19 +155,19 @@ class ClackPrompt implements Prompt {
     const confirmLines = [
       "Confirm create configuration:",
       `- Name: ${name}`,
-      `- Runtime: ${getLabel("runtime", runtime as RuntimeOption)}`,
-      `- Framework: ${getLabel("framework", framework as FrameworkOption)}`,
+      `- Runtime: ${getLabel(this.labels, "runtime", runtime as RuntimeOption)}`,
+      `- Framework: ${getLabel(this.labels, "framework", framework as FrameworkOption)}`,
     ];
 
     if (packageManager !== undefined) {
       confirmLines.push(
-        `- Package manager: ${getLabel("packageManager", packageManager as PackageManagerOption)}`,
+        `- Package manager: ${getLabel(this.labels, "packageManager", packageManager as PackageManagerOption)}`,
       );
     }
 
     confirmLines.push(
-      `- Databases: ${toLabelList(databases as DatabaseOption[], "database")}`,
-      `- Platform services: ${toLabelList(platformServices as ServiceOption[], "service")}`,
+      `- Databases: ${this.toLabelList(databases as DatabaseOption[], "database")}`,
+      `- Platform services: ${this.toLabelList(platformServices as ServiceOption[], "service")}`,
     );
 
     const isConfirmed = await this.api.confirm({

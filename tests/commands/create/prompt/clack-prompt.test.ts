@@ -4,7 +4,13 @@ import { ClackPrompt } from "../../../../src/commands/create/prompt/clack-prompt
 import type { ClackPromptApi } from "../../../../src/commands/create/prompt/clack-prompt.js";
 // oxlint-disable-next-line import/no-namespace
 import * as allowedConfig from "../../../../src/commands/create/layer-composition/allowed-configuration.js";
+import { RuntimeSchema } from "../../../../src/commands/create/layer-composition/schemas/layers.js";
+import { LabelsSchema } from "../../../../src/commands/create/layer-composition/schemas/labels.js";
+import runtimeFixture from "../../../fixtures/templates/layers/runtime.json";
+import labelsFixture from "../../../fixtures/templates/labels.json";
 
+const runtimeData = RuntimeSchema.parse(runtimeFixture);
+const labelsData = LabelsSchema.parse(labelsFixture);
 const CANCELLED = Symbol("cancelled");
 
 const createMockApi = (
@@ -58,7 +64,7 @@ describe(ClackPrompt, () => {
       },
     };
 
-    const adapter = new ClackPrompt(mockApi);
+    const adapter = new ClackPrompt(runtimeData, labelsData, mockApi);
 
     await adapter.promptForCreateInputs();
 
@@ -97,7 +103,7 @@ describe(ClackPrompt, () => {
       },
     };
 
-    const adapter = new ClackPrompt(mockApi);
+    const adapter = new ClackPrompt(runtimeData, labelsData, mockApi);
 
     await adapter.promptForCreateInputs();
 
@@ -119,7 +125,7 @@ describe(ClackPrompt, () => {
       },
     };
 
-    const adapter = new ClackPrompt(mockApi);
+    const adapter = new ClackPrompt(runtimeData, labelsData, mockApi);
 
     const result = await adapter.promptForCreateInputs();
 
@@ -139,7 +145,7 @@ describe(ClackPrompt, () => {
       },
     };
 
-    const adapter = new ClackPrompt(mockApi);
+    const adapter = new ClackPrompt(runtimeData, labelsData, mockApi);
 
     await adapter.promptForCreateInputs();
 
@@ -167,7 +173,7 @@ describe(ClackPrompt, () => {
       ],
     );
 
-    const adapter: Prompt = new ClackPrompt(mockApi);
+    const adapter: Prompt = new ClackPrompt(runtimeData, labelsData, mockApi);
 
     const result = await adapter.promptForCreateInputs();
 
@@ -187,7 +193,7 @@ describe(ClackPrompt, () => {
 
     const mockApi = createMockApi(["static_web", "html-css-js", "pnpm"], [[], []]);
 
-    const adapter: Prompt = new ClackPrompt(mockApi);
+    const adapter: Prompt = new ClackPrompt(runtimeData, labelsData, mockApi);
 
     const result = await adapter.promptForCreateInputs();
 
@@ -207,7 +213,7 @@ describe(ClackPrompt, () => {
       },
     };
 
-    const adapter = new ClackPrompt(mockApi);
+    const adapter = new ClackPrompt(runtimeData, labelsData, mockApi);
     const result = await adapter.promptForCreateInputs();
 
     expect(result?.packageManager).toBe("pnpm");
@@ -224,7 +230,7 @@ describe(ClackPrompt, () => {
       },
     };
 
-    const adapter = new ClackPrompt(mockApi);
+    const adapter = new ClackPrompt(runtimeData, labelsData, mockApi);
 
     await adapter.promptForCreateInputs();
 

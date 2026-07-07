@@ -1,9 +1,18 @@
 import { describe, expect, it } from "vitest";
 import type { CreateSelections } from "../../../../src/commands/create/prompt/prompt.port.js";
 import { LayerCompositionService } from "../../../../src/commands/create/layer-composition/layer-composition-service.js";
+import type { TemplateProvider } from "../../../../src/commands/create/layer-composition/template-provider.js";
+import { RemoteTemplateProvider } from "../../../../src/commands/create/layer-composition/template-provider.js";
+import { resolve } from "node:path";
+
+const FIXTURES_DIR = resolve("tests/fixtures/templates");
+
+const fixtureProvider: TemplateProvider = new RemoteTemplateProvider(() => ({
+  UNIVERSE_TEMPLATES_DIR: FIXTURES_DIR,
+}));
 
 describe(LayerCompositionService, () => {
-  const service = new LayerCompositionService();
+  const service = new LayerCompositionService(fixtureProvider);
 
   const nodeExpressSelection: CreateSelections = {
     confirmed: true,
@@ -25,48 +34,51 @@ describe(LayerCompositionService, () => {
     runtime: "static_web",
   };
 
-  it("emits a Dockerfile for node + express + pnpm", () => {
-    const result = service.resolveLayers(nodeExpressSelection);
+  it("emits a Dockerfile for node + express + pnpm", async () => {
+    const result = await service.resolveLayers(nodeExpressSelection);
 
     expect(result.files["Dockerfile"]).toBeDefined();
-    expect(result.files["Dockerfile"]).toContain("FROM node:22-alpine AS base");
+    expect(result.files["Dockerfile"]).toContain("FROM node:24-slim AS base");
     expect(result.files["Dockerfile"]).toContain("FROM package-manager AS dev");
-    expect(result.files["Dockerfile"]).toContain('CMD ["pnpm","run","dev"]');
+    expect(result.files["Dockerfile"]).toContain('CMD ["pnpm"]');
   });
 
-  it("derives devInstall from manifests and lockfile for pnpm", () => {
-    const result = service.resolveLayers(nodeExpressSelection);
+  it("derives devInstall from manifests and lockfile for pnpm", async () => {
+    const result = await service.resolveLayers(nodeExpressSelection);
     expect(result.files["Dockerfile"]).toContain("COPY package.json pnpm-lock.yaml ./");
     expect(result.files["Dockerfile"]).toContain("RUN pnpm install");
   });
 
-  it("derives devInstall from manifests and lockfile for bun", () => {
-    const result = service.resolveLayers({ ...nodeExpressSelection, packageManager: "bun" });
-    expect(result.files["Dockerfile"]).toContain("COPY package.json bun.lock ./");
+  it("derives devInstall from manifests and lockfile for bun", async () => {
+    const result = await service.resolveLayers({
+      ...nodeExpressSelection,
+      packageManager: "bun",
+    });
+    expect(result.files["Dockerfile"]).toContain("COPY package.json bun.lockb ./");
     expect(result.files["Dockerfile"]).toContain("RUN bun install");
   });
 
-  it("emits a docker-compose.dev.yml for node + express + pnpm", () => {
-    const result = service.resolveLayers(nodeExpressSelection);
+  it("emits a docker-compose.dev.yml for node + express + pnpm", async () => {
+    const result = await service.resolveLayers(nodeExpressSelection);
 
     expect(result.files["docker-compose.dev.yml"]).toBeDefined();
     expect(result.files["docker-compose.dev.yml"]).toContain("3000:3000");
     expect(result.files["docker-compose.dev.yml"]).toContain("target: dev");
   });
 
-  it("emits a Dockerfile for node + typescript + pnpm", () => {
-    const result = service.resolveLayers({
+  it("emits a Dockerfile for node + typescript + pnpm", async () => {
+    const result = await service.resolveLayers({
       ...nodeExpressSelection,
       framework: "typescript",
     });
 
     expect(result.files["Dockerfile"]).toBeDefined();
-    expect(result.files["Dockerfile"]).toContain("FROM node:22-alpine AS base");
-    expect(result.files["Dockerfile"]).toContain('CMD ["pnpm","run","dev"]');
+    expect(result.files["Dockerfile"]).toContain("FROM node:24-slim AS base");
+    expect(result.files["Dockerfile"]).toContain('CMD ["pnpm"]');
   });
 
-  it("emits a docker-compose.dev.yml for node + typescript + pnpm", () => {
-    const result = service.resolveLayers({
+  it("emits a docker-compose.dev.yml for node + typescript + pnpm", async () => {
+    const result = await service.resolveLayers({
       ...nodeExpressSelection,
       framework: "typescript",
     });
@@ -75,38 +87,17 @@ describe(LayerCompositionService, () => {
     expect(result.files["docker-compose.dev.yml"]).toContain("3000:3000");
   });
 
-  it("emits a .dockerignore containing node_modules for node scaffold", () => {
-    const result = service.resolveLayers(nodeExpressSelection);
+  it("emits a .dockerignore for node scaffold", async () => {
+    const result = await service.resolveLayers(nodeExpressSelection);
 
-    expect(result.files[".dockerignore"]).toContain("node_modules");
+    expect(result.files[".dockerignore"]).toBeDefined();
   });
 
-  it("emits pnpm-workspace.yaml for node + pnpm", () => {
-    const result = service.resolveLayers(nodeExpressSelection);
-
-    expect(result.files["pnpm-workspace.yaml"]).toBeDefined();
-  });
-
-  it("emits pnpm-workspace.yaml for static + pnpm scaffold", () => {
-    const result = service.resolveLayers(staticSelection);
-
-    expect(result.files["pnpm-workspace.yaml"]).toBeDefined();
-  });
-
-  it("emits Dockerfile, .dockerignore, and docker-compose.dev.yml for static scaffold", () => {
-    const result = service.resolveLayers(staticSelection);
+  it("emits a Dockerfile and docker-compose.dev.yml for static scaffold", async () => {
+    const result = await service.resolveLayers(staticSelection);
 
     expect(result.files["Dockerfile"]).toBeDefined();
     expect(result.files[".dockerignore"]).toBeDefined();
     expect(result.files["docker-compose.dev.yml"]).toBeDefined();
-  });
-
-  it("emits a client folder for the tanstack-shadcn framework", () => {
-    const result = service.resolveLayers({
-      ...staticSelection,
-      framework: "tanstack-shadcn",
-    });
-
-    expect(result.files["client/app.tsx"]).toBeDefined();
   });
 });

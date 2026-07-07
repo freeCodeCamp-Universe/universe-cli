@@ -6,7 +6,7 @@ import {
   rmSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, relative } from "node:path";
+import { join, relative, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { create } from "../../../src/commands/create/index.js";
 import type {
@@ -21,6 +21,15 @@ import type {
 import type { RepoInitialiser } from "../../../src/commands/create/io/repo-initialiser.port.js";
 import { ResolvedLayerSet } from "../../../src/commands/create/layer-composition/layer-composition-service.js";
 import { UsageError } from "../../../src/errors.js";
+import { RemoteTemplateProvider } from "../../../src/commands/create/layer-composition/template-provider.js";
+import { RuntimeSchema } from "../../../src/commands/create/layer-composition/schemas/layers.js";
+import runtimeFixture from "../../fixtures/templates/layers/runtime.json";
+
+const FIXTURES_DIR = resolve("tests/fixtures/templates");
+const runtimeData = RuntimeSchema.parse(runtimeFixture);
+const fixtureProvider = new RemoteTemplateProvider(() => ({
+  UNIVERSE_TEMPLATES_DIR: FIXTURES_DIR,
+}));
 
 interface MakeDepsOptions {
   packageManager?: PackageManager;
@@ -134,8 +143,10 @@ const makeDeps = (
     packageManager,
     prompt,
     repoInitialiser,
-    validator: new CreateInputValidationService((path) =>
-      existsSync(join(cwd, path)),
+    templateProvider: fixtureProvider,
+    validator: new CreateInputValidationService(
+      (path) => existsSync(join(cwd, path)),
+      runtimeData,
     ),
   };
 };
@@ -299,8 +310,8 @@ describe("create", () => {
         },
       },
       layerResolver: {
-        resolveLayers(_input: CreateSelections): ResolvedLayerSet {
-          return { files: resolvedLayerFiles, layers: [] };
+        resolveLayers(_input: CreateSelections): Promise<ResolvedLayerSet> {
+          return Promise.resolve({ files: resolvedLayerFiles, layers: [] });
         },
       },
       platformManifestGenerator: {
@@ -362,8 +373,8 @@ describe("create", () => {
         },
       },
       layerResolver: {
-        resolveLayers(_input: CreateSelections): ResolvedLayerSet {
-          return { files: resolvedLayerFiles, layers: [] };
+        resolveLayers(_input: CreateSelections): Promise<ResolvedLayerSet> {
+          return Promise.resolve({ files: resolvedLayerFiles, layers: [] });
         },
       },
       platformManifestGenerator: {

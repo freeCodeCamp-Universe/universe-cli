@@ -1,13 +1,15 @@
-import labelData from "./labels.json" with { type: "json" };
+import type { Labels } from "./schemas/labels.js";
 
-type LabelsData = typeof labelData;
-export type LabelCategory = keyof LabelsData;
+type LabelCategory = keyof Labels;
 
-export const getLabel = <C extends LabelCategory>(category: C, key: string): string => {
-  const categoryData = labelData[category];
-  if (key in categoryData) {
+const getLabel = <C extends LabelCategory>(labels: Labels, category: C, key: string): string => {
+  const categoryData = labels[category];
+  if (categoryData !== undefined && key in categoryData) {
     return categoryData[key as keyof typeof categoryData] as string;
   }
 
   return key;
 };
+
+export { getLabel };
+export type { LabelCategory };

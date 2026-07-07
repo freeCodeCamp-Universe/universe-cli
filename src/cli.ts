@@ -377,12 +377,15 @@ export async function run(argv = process.argv): Promise<void> {
   cli
     .command("create")
     .description("Scaffold a new project locally")
+    .option("--force-fetch", "Re-download templates even if cached")
     .action(async (_opts, cmd: Command) => {
       const opts = cmd.optsWithGlobals<{
+        forceFetch?: boolean;
         json?: boolean;
       }>();
       try {
         await create({
+          forceFetch: opts.forceFetch ?? false,
           json: opts.json ?? false,
         });
       } catch (err: unknown) {

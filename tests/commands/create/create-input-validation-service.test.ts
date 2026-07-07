@@ -5,6 +5,10 @@ import type {
   PackageManagerOption,
 } from "../../../src/commands/create/prompt/prompt.port.js";
 import { CreateInputValidationService } from "../../../src/commands/create/create-input-validation-service.js";
+import { RuntimeSchema } from "../../../src/commands/create/layer-composition/schemas/layers.js";
+import runtimeFixture from "../../fixtures/templates/layers/runtime.json";
+
+const runtimeData = RuntimeSchema.parse(runtimeFixture);
 
 const validNodeSelection: CreateSelections = {
   confirmed: true,
@@ -18,7 +22,7 @@ const validNodeSelection: CreateSelections = {
 
 describe(CreateInputValidationService, () => {
   it("accepts supported Node.js combinations", () => {
-    const service = new CreateInputValidationService(() => false);
+    const service = new CreateInputValidationService(() => false, runtimeData);
 
     const result = service.validateCreateInput(validNodeSelection);
 
@@ -26,7 +30,7 @@ describe(CreateInputValidationService, () => {
   });
 
   it("accepts bun as package manager for Node runtime", () => {
-    const service = new CreateInputValidationService(() => false);
+    const service = new CreateInputValidationService(() => false, runtimeData);
 
     const result = service.validateCreateInput({
       ...validNodeSelection,
@@ -37,7 +41,7 @@ describe(CreateInputValidationService, () => {
   });
 
   it("accepts supported Static combination", () => {
-    const service = new CreateInputValidationService(() => false);
+    const service = new CreateInputValidationService(() => false, runtimeData);
 
     const result = service.validateCreateInput({
       confirmed: true,
@@ -53,7 +57,7 @@ describe(CreateInputValidationService, () => {
   });
 
   it("rejects invalid project names", () => {
-    const service = new CreateInputValidationService(() => false);
+    const service = new CreateInputValidationService(() => false, runtimeData);
 
     const act = () =>
       service.validateCreateInput({
@@ -65,7 +69,7 @@ describe(CreateInputValidationService, () => {
   });
 
   it("rejects existing target directory", () => {
-    const service = new CreateInputValidationService(() => true);
+    const service = new CreateInputValidationService(() => true, runtimeData);
 
     const act = () => service.validateCreateInput(validNodeSelection);
 
@@ -73,7 +77,7 @@ describe(CreateInputValidationService, () => {
   });
 
   it("rejects unsupported runtimes", () => {
-    const service = new CreateInputValidationService(() => false);
+    const service = new CreateInputValidationService(() => false, runtimeData);
 
     const act = () =>
       service.validateCreateInput({
@@ -85,7 +89,7 @@ describe(CreateInputValidationService, () => {
   });
 
   it("rejects unsupported frameworks for Node runtime", () => {
-    const service = new CreateInputValidationService(() => false);
+    const service = new CreateInputValidationService(() => false, runtimeData);
 
     const act = () =>
       service.validateCreateInput({
@@ -97,7 +101,7 @@ describe(CreateInputValidationService, () => {
   });
 
   it("rejects missing package manager for Node runtime", () => {
-    const service = new CreateInputValidationService(() => false);
+    const service = new CreateInputValidationService(() => false, runtimeData);
     const { packageManager: _pm, ...selectionWithoutPm } = validNodeSelection;
 
     const act = () => service.validateCreateInput(selectionWithoutPm);
@@ -106,7 +110,7 @@ describe(CreateInputValidationService, () => {
   });
 
   it("rejects unsupported package manager for Node runtime", () => {
-    const service = new CreateInputValidationService(() => false);
+    const service = new CreateInputValidationService(() => false, runtimeData);
 
     const act = () =>
       service.validateCreateInput({
@@ -118,7 +122,7 @@ describe(CreateInputValidationService, () => {
   });
 
   it("rejects missing package manager for static_web runtime", () => {
-    const service = new CreateInputValidationService(() => false);
+    const service = new CreateInputValidationService(() => false, runtimeData);
 
     const act = () =>
       service.validateCreateInput({
@@ -134,7 +138,7 @@ describe(CreateInputValidationService, () => {
   });
 
   it("rejects unsupported Static database combinations", () => {
-    const service = new CreateInputValidationService(() => false);
+    const service = new CreateInputValidationService(() => false, runtimeData);
 
     const act = () =>
       service.validateCreateInput({
@@ -151,7 +155,7 @@ describe(CreateInputValidationService, () => {
   });
 
   it("rejects unsupported Static platform service combinations", () => {
-    const service = new CreateInputValidationService(() => false);
+    const service = new CreateInputValidationService(() => false, runtimeData);
 
     const act = () =>
       service.validateCreateInput({

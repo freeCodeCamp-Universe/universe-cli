@@ -11,6 +11,5 @@
     "resolveJsonModule": true,
     "skipLibCheck": true
   },
-  "include": ["src"],
-  "exclude": ["src/commands/create/layer-composition/files/**/*"]
+  "include": ["src"]
 }

@@ -1,13 +1,14 @@
-import runtimeData from "./layers/runtime.json" with { type: "json" };
+import type { Runtime, RuntimeOption } from "./schemas/layers.js";
 
-type RuntimeData = typeof runtimeData;
-type Runtime = keyof RuntimeData;
-
-const runtimeOptions = () => Object.keys(runtimeData) as Runtime[];
-const frameworkOptions = (runtime: Runtime) => runtimeData[runtime].frameworks;
-const packageManagerOptions = (runtime: Runtime) => runtimeData[runtime].packageManagers;
-const databaseOptions = (runtime: Runtime) => runtimeData[runtime].databases;
-const serviceOptions = (runtime: Runtime) => runtimeData[runtime].services;
+const runtimeOptions = (runtimeData: Runtime) => Object.keys(runtimeData) as RuntimeOption[];
+const frameworkOptions = (runtimeData: Runtime, runtime: RuntimeOption) =>
+  runtimeData[runtime].frameworks;
+const packageManagerOptions = (runtimeData: Runtime, runtime: RuntimeOption) =>
+  runtimeData[runtime].packageManagers;
+const databaseOptions = (runtimeData: Runtime, runtime: RuntimeOption) =>
+  runtimeData[runtime].databases;
+const serviceOptions = (runtimeData: Runtime, runtime: RuntimeOption) =>
+  runtimeData[runtime].services;
 
 interface RuntimeCombinations {
   databases: string[];
@@ -16,5 +17,11 @@ interface RuntimeCombinations {
   platformServices: string[];
 }
 
-export { databaseOptions, frameworkOptions, runtimeOptions, packageManagerOptions, serviceOptions };
+export {
+  databaseOptions,
+  frameworkOptions,
+  runtimeOptions,
+  packageManagerOptions,
+  serviceOptions,
+};
 export type { RuntimeCombinations };

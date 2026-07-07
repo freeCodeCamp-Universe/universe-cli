@@ -27,6 +27,10 @@ import { EXIT_USAGE, exitWithCode } from "../../output/exit-codes.js";
 import { CliError, ConfirmError } from "../../errors.js";
 import { outputError } from "../../output/format.js";
 import { LocalProjectWriter } from "./io/local-project-writer.js";
+import {
+  RemoteTemplateProvider,
+  type TemplateProvider,
+} from "./layer-composition/template-provider.js";
 
 export interface HandlerResult {
   exitCode: number;
@@ -45,17 +49,17 @@ export interface CreateDeps {
   platformManifestGenerator?: PlatformManifestGenerator;
   prompt?: Prompt;
   repoInitialiser?: RepoInitialiser;
+  templateProvider?: TemplateProvider;
   validator?: CreateInputValidator;
 }
 
 export const create = async (
-  options: { json: boolean },
+  options: { forceFetch?: boolean; json: boolean },
   deps: CreateDeps = {},
 ): Promise<void> => {
   const cwd = deps.cwd ?? process.cwd();
   const exit = deps.exit ?? exitWithCode;
   const filesystemWriter = deps.filesystemWriter ?? defaultFilesystemWriter;
-  const layerResolver = deps.layerResolver ?? new LayerCompositionService();
   const logger = deps.logger ?? clackLogger;
   const packageManager =
     deps.packageManager ??
@@ -65,12 +69,25 @@ export const create = async (
     });
   const platformManifestGenerator =
     deps.platformManifestGenerator ?? new PlatformManifestService();
-  const prompt = deps.prompt ?? new ClackPrompt();
   const repoInitialiser = deps.repoInitialiser ?? new GitRepoInitialiser();
-  const validator =
-    deps.validator ?? new CreateInputValidationService(existsSync);
 
   try {
+    const templateProvider = deps.templateProvider ?? new RemoteTemplateProvider();
+    const { labels, registry } = await templateProvider.loadLayers({
+      forceFetch: options.forceFetch,
+    });
+
+    const prompt =
+      deps.prompt ?? new ClackPrompt(registry.runtime, labels);
+    const layerResolver =
+      deps.layerResolver ?? new LayerCompositionService(templateProvider);
+    const validator =
+      deps.validator ??
+      new CreateInputValidationService(
+        (path) => existsSync(path),
+        registry.runtime,
+      );
+
     const promptResult = await prompt.promptForCreateInputs();
 
     if (promptResult === null || !promptResult.confirmed) {
@@ -79,7 +96,7 @@ export const create = async (
     }
 
     const validatedInput = validator.validateCreateInput(promptResult);
-    const resolvedLayers = layerResolver.resolveLayers(validatedInput);
+    const resolvedLayers = await layerResolver.resolveLayers(validatedInput);
     const targetDirectory = `${cwd}/${validatedInput.name}`;
     const projectFiles = {
       ...resolvedLayers.files,
