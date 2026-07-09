@@ -8,7 +8,7 @@ import { runCmdForFiles, runCmdForStdout } from "./docker-runner.js";
  */
 
 const LOCKFILE = "pnpm-lock.yaml";
-const MANIFESTS = ["package.json"];
+const MANIFESTS = ["package.json", "pnpm-workspace.yaml"];
 
 interface PnpmRunner {
   installLockfileOnly(cwd: string): Promise<void>;

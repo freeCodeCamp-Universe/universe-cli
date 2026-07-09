@@ -7,7 +7,7 @@ import { runCmdForFiles, runCmdForStdout } from "./docker-runner.js";
  * layer-composition/layers/package-manager.json (manifests/lockfile fields).
  */
 const LOCKFILE = "bun.lock";
-const MANIFESTS = ["package.json"];
+const MANIFESTS = ["package.json", "bunfig.toml"];
 
 interface BunRunner {
   installLockfileOnly(cwd: string): Promise<void>;
