@@ -105,7 +105,7 @@ const createPackageSpecifier = (config: Config): PackageSpecifier => ({
     const versions = config.extractVersions(listOutput);
     const pinned = pinVersions(pkg, versions);
 
-    await filesystemApi.writeFile(packageJsonPath, JSON.stringify(pinned));
+    await filesystemApi.writeFile(packageJsonPath, JSON.stringify(pinned, null, 2));
     await filesystemApi.deleteFile(lockfilePath);
 
     try {
