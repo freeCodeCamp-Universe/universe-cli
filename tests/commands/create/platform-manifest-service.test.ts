@@ -73,46 +73,4 @@ describe(PlatformManifestService, () => {
     expect(result).not.toHaveProperty("error");
   });
 
-  //     it("returns a typed manifest for a valid app manifest", () => {
-  //       const service = new PlatformManifestService();
-  //       const yaml = service.generatePlatformManifest(nodeSelection);
-
-  //       const result = service.validateManifest(yaml, "");
-
-  //       expect(result.stack).toBe("app");
-  //     });
-
-  //     it("returns a typed manifest for a valid static manifest", () => {
-  //       const service = new PlatformManifestService();
-  //       const yaml = service.generatePlatformManifest(staticSelection);
-
-  //       const result = service.validateManifest(yaml, "");
-
-  //       expect(result.stack).toBe("static");
-  //     });
-
-  //     it("throws when a required field is missing", () => {
-  //       const service = new PlatformManifestService();
-
-  //       expect(() => service.validateManifest("stack: app\n", "")).toThrow(ManifestInvalidError);
-  //     });
-
-  //     it("throws when schemaVersion is not recognised", () => {
-  //       const service = new PlatformManifestService();
-  //       const yaml = `stack: static
-  // schemaVersion: "999"
-  // name: hello
-  // domain:
-  //   preview: hello.preview.example.com
-  //   production: hello.example.com
-  // environments:
-  //   preview:
-  //     branch: preview
-  //   production:
-  //     branch: main
-  // `;
-
-  //       expect(() => service.validateManifest(yaml, "")).toThrow(ManifestInvalidError);
-  //     });
-  //   });
 });
