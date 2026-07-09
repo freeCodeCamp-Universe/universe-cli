@@ -14,5 +14,12 @@ const clackLogger: Logger = {
   warn: (msg) => log.warn(msg),
 };
 
-export { clackLogger };
+const silentLogger: Logger = {
+  error: () => {},
+  info: () => {},
+  success: () => {},
+  warn: () => {},
+};
+
+export { clackLogger, silentLogger };
 export type { Logger };

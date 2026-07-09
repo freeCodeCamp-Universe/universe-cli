@@ -139,6 +139,7 @@ const makeDeps = (
   return {
     cwd,
     exit: vi.fn(),
+    isTTY: true,
     logger: { error: vi.fn(), info: vi.fn(), success: vi.fn(), warn: vi.fn() },
     packageManager,
     prompt,
@@ -324,7 +325,7 @@ describe("create", () => {
       },
     };
 
-    await create({ json: true }, deps);
+    await create({ json: false }, deps);
 
     expect(writerCalls).toStrictEqual([
       {
@@ -343,7 +344,7 @@ describe("create", () => {
   it("returns non-zero when prompt flow is cancelled", async () => {
     const deps = makeDeps("/workspace", createPromptPort(null));
 
-    await create({ json: true }, deps);
+    await create({ json: false }, deps);
     expect(deps.exit).toHaveBeenCalledWith(18);
   });
 
@@ -392,5 +393,89 @@ describe("create", () => {
     expect(deps.logger.error).toHaveBeenCalledWith(
       message("/workspace/hello-universe"),
     );
+  });
+
+  describe("non-interactive mode", () => {
+    it("scaffolds with explicit flags and skips prompts", async () => {
+      const prompt = createPromptPort(null);
+      const promptSpy = vi.spyOn(prompt, "promptForCreateInputs");
+
+      const deps = {
+        ...makeDeps(rootDirectory, prompt),
+        isTTY: false,
+      };
+
+      await create(
+        {
+          json: false,
+          yes: true,
+          name: "non-interactive-app",
+          runtime: "node",
+          framework: "express",
+          databases: ["postgresql"],
+          services: ["auth"],
+          packageManager: "pnpm",
+        },
+        deps,
+      );
+
+      expect(promptSpy).not.toHaveBeenCalled();
+      expect(deps.exit).not.toHaveBeenCalled();
+      expect(existsSync(join(rootDirectory, "non-interactive-app"))).toBe(true);
+      expect(deps.logger.info).toHaveBeenCalledWith(
+        expect.stringContaining("non-interactive-app"),
+      );
+      expect(deps.logger.success).not.toHaveBeenCalled();
+    });
+
+    it("emits a JSON success envelope when --json is set", async () => {
+      const written: string[] = [];
+      const writeSpy = vi
+        .spyOn(process.stdout, "write")
+        .mockImplementation((chunk: string | Uint8Array) => {
+          written.push(String(chunk));
+          return true;
+        });
+
+      const deps = {
+        ...makeDeps(rootDirectory, createPromptPort(null)),
+        isTTY: false,
+      };
+
+      await create(
+        {
+          json: true,
+          yes: true,
+          name: "json-app",
+          runtime: "node",
+          framework: "express",
+          databases: [],
+          services: [],
+          packageManager: "pnpm",
+        },
+        deps,
+      );
+
+      writeSpy.mockRestore();
+
+      expect(deps.exit).not.toHaveBeenCalled();
+      expect(deps.logger.success).not.toHaveBeenCalled();
+
+      expect(written).toHaveLength(1);
+      const envelope = JSON.parse(written[0]);
+      expect(envelope).toMatchObject({
+        schemaVersion: "1",
+        command: "create",
+        success: true,
+        name: "json-app",
+        runtime: "node",
+        framework: "express",
+        databases: [],
+        platformServices: [],
+        packageManager: "pnpm",
+      });
+      expect(envelope.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+      expect(envelope.path).toMatch(/json-app$/);
+    });
   });
 });

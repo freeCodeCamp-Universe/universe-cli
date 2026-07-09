@@ -13,12 +13,15 @@ Every `universe` command, flag, exit code, and environment variable. Task walkth
 
 ### Top-level
 
-| Command           | Flags                                                         | Purpose                                                                    |
-| ----------------- | ------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| `universe init`   | `--site <slug>`, `--dir <path>`, `--force`, `--yes`, `--json` | Scaffold a `platform.yaml` in the current directory.                       |
-| `universe login`  | `--force`, `--json`                                           | GitHub OAuth device flow → token at `~/.config/universe-cli/token` (0600). |
-| `universe logout` | `--json`                                                      | Delete the stored device-flow token.                                       |
-| `universe whoami` | `--json`                                                      | Resolved login, identity source, proxy URL, authorized-site count.         |
+| Command           | Flags                                                                                                                                                       | Purpose                                                                    |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `universe create` | `--name <name>`, `--runtime <rt>`, `--framework <fw>`, `--database <db...>`, `--service <svc...>`, `--pkg-manager <pm>`, `--force-fetch`, `--yes`, `--json` | Scaffold a new project from layered templates into a subdirectory.         |
+| `universe init`   | `--site <slug>`, `--dir <path>`, `--force`, `--yes`, `--json`                                                                                               | Scaffold a `platform.yaml` in the current directory.                       |
+| `universe login`  | `--force`, `--json`                                                                                                                                         | GitHub OAuth device flow → token at `~/.config/universe-cli/token` (0600). |
+| `universe logout` | `--json`                                                                                                                                                    | Delete the stored device-flow token.                                       |
+| `universe whoami` | `--json`                                                                                                                                                    | Resolved login, identity source, proxy URL, authorized-site count.         |
+
+`create` fetches templates from an external repository (cached locally; `--force-fetch` re-downloads), prompts for runtime, framework, databases, services, and package manager, then writes the composed project files — including a generated `platform.yaml` — into `./<name>`, installs dependencies, and initialises a git repo. In a TTY it runs interactively; `--yes`, `--json`, or a non-TTY require `--name` and use defaults or flag values for the remaining selections. No network identity is needed. Source: `src/commands/create/`.
 
 `init` needs no network or identity. It derives `site` from the git `origin` remote (falling back to the directory name), sanitized to `SITE_NAME_PATTERN`, and infers `build.command` from `package.json`'s `build` script plus the lockfile's package manager. In a TTY it prompts for each field; `--yes`, `--json`, or a non-TTY write the derived defaults. It refuses to clobber an existing `platform.yaml` unless `--force` is passed (exit 11). Source: `src/commands/init.ts`.
 
