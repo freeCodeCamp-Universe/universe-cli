@@ -132,7 +132,7 @@ class ClackPrompt implements Prompt {
     let databases: string[] | symbol = [];
     if (availableDatabases.length > 0) {
       databases = await this.api.multiselect({
-        message: "Select databases",
+        message: "Select databases (space to select, enter to continue)",
         options: this.toPromptOptions(availableDatabases, "database"),
         required: false,
       });
@@ -143,7 +143,7 @@ class ClackPrompt implements Prompt {
     }
 
     const platformServices = await this.api.multiselect({
-      message: "Select platform services",
+      message: "Select platform services (space to select, enter to continue",
       options: this.toPromptOptions(serviceOptions(this.runtimeData, runtime as RuntimeOption), "service"),
       required: false,
     });
