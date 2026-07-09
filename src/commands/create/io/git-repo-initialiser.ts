@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type { RepoInitialiser } from "./repo-initialiser.port.js";
-import { UsageError } from "../../../errors.js";
+import { GitError } from "../../../errors.js";
 
 type RunCommand = (command: string, args: string[], cwd: string) => Promise<void>;
 
@@ -24,7 +24,7 @@ class GitRepoInitialiser implements RepoInitialiser {
       await this.run("git", ["add", "."], projectDirectory);
       await this.run("git", ["commit", "-m", "chore: initial commit"], projectDirectory);
     } catch (error) {
-      throw new UsageError((error as Error).message);
+      throw new GitError((error as Error).message);
     }
   }
 }

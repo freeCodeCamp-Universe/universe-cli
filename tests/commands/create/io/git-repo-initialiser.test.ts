@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { UsageError } from "../../../../src/errors.js";
+import { GitError } from "../../../../src/errors.js";
 import { GitRepoInitialiser } from "../../../../src/commands/create/io/git-repo-initialiser.js";
 
 describe(GitRepoInitialiser, () => {
@@ -25,7 +25,7 @@ describe(GitRepoInitialiser, () => {
     const adapter = new GitRepoInitialiser(run);
 
     await expect(adapter.initialise("/some/project")).rejects.toBeInstanceOf(
-      UsageError,
+      GitError,
     );
   });
 });
