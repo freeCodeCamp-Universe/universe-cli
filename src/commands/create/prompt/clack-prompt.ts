@@ -143,7 +143,7 @@ class ClackPrompt implements Prompt {
     }
 
     const platformServices = await this.api.multiselect({
-      message: "Select platform services (space to select, enter to continue",
+      message: "Select platform services (space to select, enter to continue)",
       options: this.toPromptOptions(serviceOptions(this.runtimeData, runtime as RuntimeOption), "service"),
       required: false,
     });

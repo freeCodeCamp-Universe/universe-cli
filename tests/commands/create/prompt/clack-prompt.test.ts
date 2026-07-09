@@ -73,8 +73,8 @@ describe(ClackPrompt, () => {
       "Select runtime",
       "Select framework",
       "Select package manager",
-      "Select databases",
-      "Select platform services",
+      "Select databases (space to select, enter to continue)",
+      "Select platform services (space to select, enter to continue)",
       "confirmation",
     ]);
   });
@@ -112,7 +112,7 @@ describe(ClackPrompt, () => {
       "Select runtime",
       "Select framework",
       "Select package manager",
-      "Select platform services",
+      "Select platform services (space to select, enter to continue)",
       "confirmation",
     ]);
   });
