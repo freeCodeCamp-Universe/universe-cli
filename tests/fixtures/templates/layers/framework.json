@@ -1,0 +1,42 @@
+{
+  "express": {
+    "devCopySource": "COPY src/ ./src/",
+    "files": {
+      "src/index.ts": "console.log('hello');\n"
+    },
+    "port": 3000,
+    "watchSync": [{ "path": "./src", "target": "/app/src" }]
+  },
+  "html-css-js": {
+    "devCopySource": "COPY public public",
+    "files": {
+      "public/index.html": "<h1>hello</h1>\n"
+    },
+    "port": 3000,
+    "watchSync": [{ "path": "./public", "target": "/app/public" }]
+  },
+  "react-vite": {
+    "devCopySource": "COPY src src",
+    "files": {
+      "src/main.tsx": "console.log('hello');\n"
+    },
+    "port": 5173,
+    "watchSync": [{ "path": "./src", "target": "/app/src" }]
+  },
+  "tanstack-shadcn": {
+    "devCopySource": "COPY client ./client/",
+    "files": {
+      "client/main.tsx": "console.log('hello');\n"
+    },
+    "port": 5173,
+    "watchSync": [{ "path": "client", "target": "/app/client" }]
+  },
+  "typescript": {
+    "devCopySource": "COPY src/ ./src/",
+    "files": {
+      "src/index.ts": "console.log('hello');\n"
+    },
+    "port": 3000,
+    "watchSync": [{ "path": "./src", "target": "/app/src" }]
+  }
+}

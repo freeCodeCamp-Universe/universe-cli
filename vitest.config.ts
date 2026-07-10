@@ -8,6 +8,7 @@ export default defineConfig({
     __VERSION__: JSON.stringify(pkg.version),
   },
   test: {
+    globalSetup: ["./scripts/vitest-setup.mjs"],
     include: ["tests/**/*.test.ts"],
   },
 });

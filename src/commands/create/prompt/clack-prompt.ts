@@ -1,0 +1,194 @@
+import { confirm, isCancel, multiselect, select, text } from "@clack/prompts";
+import type {
+  CreateSelections,
+  DatabaseOption,
+  PackageManagerOption,
+  ServiceOption,
+  Prompt,
+} from "./prompt.port.js";
+import {
+  databaseOptions,
+  frameworkOptions,
+  packageManagerOptions,
+  runtimeOptions,
+  serviceOptions,
+} from "../layer-composition/allowed-configuration.js";
+import type { Labels } from "../layer-composition/schemas/labels.js";
+import type { Runtime } from "../layer-composition/schemas/layers.js";
+import { getLabel } from "../layer-composition/labels.js";
+import type { LabelCategory } from "../layer-composition/labels.js";
+
+interface ClackPromptApi {
+  confirm(options: { message: string }): Promise<boolean | symbol>;
+  isCancel(value: unknown): value is symbol;
+  multiselect(options: {
+    message: string;
+    options: { label: string; value: string }[];
+    required?: boolean;
+  }): Promise<string[] | symbol>;
+  select(options: {
+    message: string;
+    options: { label: string; value: string }[];
+  }): Promise<string | symbol>;
+  text(options: {
+    message: string;
+    placeholder?: string;
+    validate?: (value: string | undefined) => string | Error | undefined;
+  }): Promise<string | symbol>;
+}
+
+const PROJECT_NAME_PATTERN = /^[a-z][a-z0-9-]{2,49}$/;
+
+const defaultClackApi: ClackPromptApi = {
+  confirm,
+  isCancel,
+  multiselect,
+  select,
+  text,
+};
+
+class ClackPrompt implements Prompt {
+  private readonly api: ClackPromptApi;
+  private readonly labels: Labels;
+  private readonly runtimeData: Runtime;
+
+  constructor(runtimeData: Runtime, labels: Labels, api: ClackPromptApi = defaultClackApi) {
+    this.runtimeData = runtimeData;
+    this.labels = labels;
+    this.api = api;
+  }
+
+  private toPromptOptions<T extends string>(
+    values: T[],
+    category: LabelCategory,
+  ): { label: string; value: T }[] {
+    return values.map((value) => ({
+      label: getLabel(this.labels, category, value),
+      value,
+    }));
+  }
+
+  private toLabelList<T extends string>(values: T[], category: LabelCategory): string {
+    return values.map((value) => getLabel(this.labels, category, value)).join(", ");
+  }
+
+  async promptForCreateInputs(): Promise<CreateSelections | null> {
+    const name = await this.api.text({
+      message: "Enter project name",
+      placeholder: "my-project",
+      validate: (value) => {
+        if (value !== undefined && PROJECT_NAME_PATTERN.test(value)) {
+          return undefined;
+        }
+
+        return "Name must be lowercase kebab-case, start with a letter, and be 3–50 characters long.";
+      },
+    });
+
+    if (this.api.isCancel(name)) {
+      return null;
+    }
+
+    const runtime = await this.api.select({
+      message: "Select runtime",
+      options: this.toPromptOptions(runtimeOptions(this.runtimeData), "runtime"),
+    });
+
+    if (this.api.isCancel(runtime)) {
+      return null;
+    }
+
+    const framework = await this.api.select({
+      message: "Select framework",
+      options: this.toPromptOptions(frameworkOptions(this.runtimeData, runtime), "framework"),
+    });
+
+    if (this.api.isCancel(framework)) {
+      return null;
+    }
+
+    let packageManager: string | symbol | undefined;
+    const packageManagers = packageManagerOptions(this.runtimeData, runtime);
+    if (packageManagers.length === 1) {
+      const [autoSelected] = packageManagers;
+      if (autoSelected !== undefined) {
+        packageManager = autoSelected;
+      }
+    } else if (packageManagers.length > 1) {
+      packageManager = await this.api.select({
+        message: "Select package manager",
+        options: this.toPromptOptions(packageManagers as PackageManagerOption[], "packageManager"),
+      });
+
+      if (this.api.isCancel(packageManager)) {
+        return null;
+      }
+    }
+
+    const availableDatabases = databaseOptions(this.runtimeData, runtime);
+
+    let databases: string[] | symbol = [];
+    if (availableDatabases.length > 0) {
+      databases = await this.api.multiselect({
+        message: "Select databases (space to select, enter to continue)",
+        options: this.toPromptOptions(availableDatabases, "database"),
+        required: false,
+      });
+    }
+
+    if (this.api.isCancel(databases)) {
+      return null;
+    }
+
+    const platformServices = await this.api.multiselect({
+      message: "Select platform services (space to select, enter to continue)",
+      options: this.toPromptOptions(serviceOptions(this.runtimeData, runtime), "service"),
+      required: false,
+    });
+
+    if (this.api.isCancel(platformServices)) {
+      return null;
+    }
+
+    const confirmLines = [
+      "Confirm create configuration:",
+      `- Name: ${name}`,
+      `- Runtime: ${getLabel(this.labels, "runtime", runtime)}`,
+      `- Framework: ${getLabel(this.labels, "framework", framework)}`,
+    ];
+
+    if (packageManager !== undefined) {
+      confirmLines.push(
+        `- Package manager: ${getLabel(this.labels, "packageManager", packageManager as PackageManagerOption)}`,
+      );
+    }
+
+    confirmLines.push(
+      `- Databases: ${this.toLabelList(databases as DatabaseOption[], "database")}`,
+      `- Platform services: ${this.toLabelList(platformServices as ServiceOption[], "service")}`,
+    );
+
+    const isConfirmed = await this.api.confirm({
+      message: confirmLines.join("\n"),
+    });
+
+    if (this.api.isCancel(isConfirmed)) {
+      return null;
+    }
+
+    return {
+      confirmed: isConfirmed,
+      databases: databases as DatabaseOption[],
+      framework,
+      name,
+      platformServices: platformServices as ServiceOption[],
+      runtime,
+      ...(packageManager !== undefined && {
+        packageManager: packageManager as PackageManagerOption,
+      }),
+    };
+  }
+}
+
+export { ClackPrompt };
+export type { ClackPromptApi };

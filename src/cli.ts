@@ -1,4 +1,5 @@
 import { Command } from "commander";
+import { create } from "./commands/create/index.js";
 import { deploy } from "./commands/deploy.js";
 import { init } from "./commands/init.js";
 import { login } from "./commands/login.js";
@@ -370,6 +371,46 @@ export async function run(argv = process.argv): Promise<void> {
         });
       } catch (err: unknown) {
         handleActionError("ls", opts.json ?? false, err);
+      }
+    });
+
+  cli
+    .command("create")
+    .description("Scaffold a new project locally")
+    .option("--force-fetch", "Re-download templates even if cached")
+    .option("--yes", "Skip prompts; use flag values (required for non-TTY/CI)")
+    .option("--name <name>", "Project name (required in non-interactive mode)")
+    .option("--runtime <runtime>", "Runtime: e.g. node | static_web")
+    .option("--framework <framework>", "Framework (must be valid for chosen runtime)")
+    .option("--database <db...>", "Databases")
+    .option("--service <svc...>", "Platform services")
+    .option("--pkg-manager <pm>", "Package manager: e.g pnpm | bun")
+    .action(async (_opts, cmd: Command) => {
+      const opts = cmd.optsWithGlobals<{
+        forceFetch?: boolean;
+        json?: boolean;
+        yes?: boolean;
+        name?: string;
+        runtime?: string;
+        framework?: string;
+        database?: string[];
+        service?: string[];
+        pkgManager?: string;
+      }>();
+      try {
+        await create({
+          forceFetch: opts.forceFetch ?? false,
+          json: opts.json ?? false,
+          yes: opts.yes ?? false,
+          name: opts.name,
+          runtime: opts.runtime,
+          framework: opts.framework,
+          databases: opts.database,
+          services: opts.service,
+          packageManager: opts.pkgManager,
+        });
+      } catch (err: unknown) {
+        handleActionError("create", opts.json ?? false, err);
       }
     });
 
