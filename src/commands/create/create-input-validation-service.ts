@@ -7,7 +7,6 @@ import {
 } from "./layer-composition/allowed-configuration.js";
 import type { RuntimeCombinations } from "./layer-composition/allowed-configuration.js";
 import type { Runtime } from "./layer-composition/schemas/layers.js";
-import { RUNTIME_OPTIONS } from "./layer-composition/schemas/layers.js";
 import type { CreateSelections } from "./prompt/prompt.port.js";
 import { SITE_NAME_PATTERN } from "../../lib/platform-yaml.schema.js";
 
@@ -51,7 +50,7 @@ class CreateInputValidationService implements CreateInputValidator {
   }
 
   private validateRuntimeAndCombinations(input: CreateSelections): void {
-    const isValidRuntime = Object.values(RUNTIME_OPTIONS).includes(input.runtime);
+    const isValidRuntime = input.runtime in this.runtimeData;
 
     if (!isValidRuntime) {
       throw new UsageError(`unsupported runtime "${input.runtime}"`);

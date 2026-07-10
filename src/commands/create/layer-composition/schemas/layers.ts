@@ -15,11 +15,8 @@ const DatabaseSchema = z.record(
 );
 type Database = z.infer<typeof DatabaseSchema>;
 
-const RUNTIME_OPTIONS = { NODE: "node", STATIC_WEB: "static_web" } as const;
-const RuntimeOptionSchema = z.literal(Object.values(RUNTIME_OPTIONS));
-type RuntimeOption = z.infer<typeof RuntimeOptionSchema>;
 const RuntimeSchema = z.record(
-  RuntimeOptionSchema,
+  z.string(),
   z.strictObject({
     baseImage: z.string(),
     databases: z.array(z.string()),
@@ -54,16 +51,8 @@ const ServiceSchema = z.record(
 );
 type Service = z.infer<typeof ServiceSchema>;
 
-const FrameworkOptionSchema = z.literal([
-  "express",
-  "html-css-js",
-  "react-vite",
-  "tanstack-shadcn",
-  "typescript",
-]);
-type FrameworkOption = z.infer<typeof FrameworkOptionSchema>;
 const FrameworkSchema = z.record(
-  FrameworkOptionSchema,
+  z.string(),
   z.strictObject({
     devCopySource: z.string(),
     files: z.record(z.string(), z.string()),
@@ -73,9 +62,9 @@ const FrameworkSchema = z.record(
 );
 type Framework = z.infer<typeof FrameworkSchema>;
 
-type FrameworkLayerData = Framework[FrameworkOption];
+type FrameworkLayerData = Framework[string];
 type PackageManagerLayerData = PackageManager[PackageManagerOption];
-type RuntimeLayerData = Pick<Runtime[RuntimeOption], "baseImage" | "files">;
+type RuntimeLayerData = Pick<Runtime[string], "baseImage" | "files">;
 
 export {
   AlwaysSchema,
@@ -84,7 +73,6 @@ export {
   RuntimeSchema,
   PackageManagerSchema,
   ServiceSchema,
-  RUNTIME_OPTIONS,
 };
 export type {
   Always,
@@ -92,13 +80,11 @@ export type {
   DatabaseOption,
   Framework,
   FrameworkLayerData,
-  FrameworkOption,
   PackageManager,
   PackageManagerLayerData,
   PackageManagerOption,
   Runtime,
   RuntimeLayerData,
-  RuntimeOption,
   Service,
   ServiceOption,
 };

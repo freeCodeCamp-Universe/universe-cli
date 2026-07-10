@@ -2,11 +2,9 @@ import { confirm, isCancel, multiselect, select, text } from "@clack/prompts";
 import type {
   CreateSelections,
   DatabaseOption,
-  FrameworkOption,
   PackageManagerOption,
   ServiceOption,
   Prompt,
-  RuntimeOption,
 } from "./prompt.port.js";
 import {
   databaseOptions,
@@ -102,7 +100,7 @@ class ClackPrompt implements Prompt {
 
     const framework = await this.api.select({
       message: "Select framework",
-      options: this.toPromptOptions(frameworkOptions(this.runtimeData, runtime as RuntimeOption), "framework"),
+      options: this.toPromptOptions(frameworkOptions(this.runtimeData, runtime), "framework"),
     });
 
     if (this.api.isCancel(framework)) {
@@ -110,7 +108,7 @@ class ClackPrompt implements Prompt {
     }
 
     let packageManager: string | symbol | undefined;
-    const packageManagers = packageManagerOptions(this.runtimeData, runtime as RuntimeOption);
+    const packageManagers = packageManagerOptions(this.runtimeData, runtime);
     if (packageManagers.length === 1) {
       const [autoSelected] = packageManagers;
       if (autoSelected !== undefined) {
@@ -127,7 +125,7 @@ class ClackPrompt implements Prompt {
       }
     }
 
-    const availableDatabases = databaseOptions(this.runtimeData, runtime as RuntimeOption);
+    const availableDatabases = databaseOptions(this.runtimeData, runtime);
 
     let databases: string[] | symbol = [];
     if (availableDatabases.length > 0) {
@@ -144,7 +142,7 @@ class ClackPrompt implements Prompt {
 
     const platformServices = await this.api.multiselect({
       message: "Select platform services (space to select, enter to continue)",
-      options: this.toPromptOptions(serviceOptions(this.runtimeData, runtime as RuntimeOption), "service"),
+      options: this.toPromptOptions(serviceOptions(this.runtimeData, runtime), "service"),
       required: false,
     });
 
@@ -155,8 +153,8 @@ class ClackPrompt implements Prompt {
     const confirmLines = [
       "Confirm create configuration:",
       `- Name: ${name}`,
-      `- Runtime: ${getLabel(this.labels, "runtime", runtime as RuntimeOption)}`,
-      `- Framework: ${getLabel(this.labels, "framework", framework as FrameworkOption)}`,
+      `- Runtime: ${getLabel(this.labels, "runtime", runtime)}`,
+      `- Framework: ${getLabel(this.labels, "framework", framework)}`,
     ];
 
     if (packageManager !== undefined) {
@@ -181,10 +179,10 @@ class ClackPrompt implements Prompt {
     return {
       confirmed: isConfirmed,
       databases: databases as DatabaseOption[],
-      framework: framework as FrameworkOption,
+      framework,
       name,
       platformServices: platformServices as ServiceOption[],
-      runtime: runtime as RuntimeOption,
+      runtime,
       ...(packageManager !== undefined && {
         packageManager: packageManager as PackageManagerOption,
       }),

@@ -1,13 +1,13 @@
-import type { Runtime, RuntimeOption } from "./schemas/layers.js";
+import type { Runtime } from "./schemas/layers.js";
 
-const runtimeOptions = (runtimeData: Runtime) => Object.keys(runtimeData) as RuntimeOption[];
-const frameworkOptions = (runtimeData: Runtime, runtime: RuntimeOption) =>
+const runtimeOptions = (runtimeData: Runtime) => Object.keys(runtimeData);
+const frameworkOptions = (runtimeData: Runtime, runtime: string) =>
   runtimeData[runtime].frameworks;
-const packageManagerOptions = (runtimeData: Runtime, runtime: RuntimeOption) =>
+const packageManagerOptions = (runtimeData: Runtime, runtime: string) =>
   runtimeData[runtime].packageManagers;
-const databaseOptions = (runtimeData: Runtime, runtime: RuntimeOption) =>
+const databaseOptions = (runtimeData: Runtime, runtime: string) =>
   runtimeData[runtime].databases;
-const serviceOptions = (runtimeData: Runtime, runtime: RuntimeOption) =>
+const serviceOptions = (runtimeData: Runtime, runtime: string) =>
   runtimeData[runtime].services;
 
 interface RuntimeCombinations {

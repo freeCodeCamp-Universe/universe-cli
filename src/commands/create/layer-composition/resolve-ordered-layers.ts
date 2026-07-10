@@ -4,10 +4,9 @@ import type {
   FrameworkLayerData,
   PackageManagerLayerData,
   Runtime,
-  RuntimeOption,
 } from "./schemas/layers.js";
 
-type RuntimeEntryData = Runtime[RuntimeOption];
+type RuntimeEntryData = Runtime[string];
 
 type LayerType = "always" | "frameworks" | "package-managers" | "runtime" | "services";
 

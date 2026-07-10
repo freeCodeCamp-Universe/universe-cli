@@ -1,15 +1,13 @@
 import type {
   DatabaseOption,
-  FrameworkOption,
   PackageManagerOption,
-  RuntimeOption,
   ServiceOption,
 } from "../layer-composition/schemas/layers.js";
 
 interface CreateSelections {
   name: string;
-  runtime: RuntimeOption;
-  framework: FrameworkOption;
+  runtime: string;
+  framework: string;
   databases: DatabaseOption[];
   platformServices: ServiceOption[];
   confirmed: boolean;
@@ -23,9 +21,7 @@ interface Prompt {
 export type {
   CreateSelections,
   DatabaseOption,
-  FrameworkOption,
   PackageManagerOption,
   ServiceOption,
   Prompt,
-  RuntimeOption,
 };

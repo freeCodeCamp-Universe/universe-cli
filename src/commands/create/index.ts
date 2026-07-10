@@ -29,9 +29,7 @@ import {
 } from "./layer-composition/allowed-configuration.js";
 import type {
   DatabaseOption,
-  FrameworkOption,
   PackageManagerOption,
-  RuntimeOption,
   ServiceOption,
 } from "./layer-composition/schemas/layers.js";
 import { clackLogger, silentLogger, type Logger } from "../../output/logger.js";
@@ -138,9 +136,9 @@ export const create = async (
       }
 
       const runtimes = runtimeOptions(registry.runtime);
-      const runtime = (options.runtime ?? runtimes[0]) as RuntimeOption;
+      const runtime = options.runtime ?? runtimes[0];
       const frameworks = frameworkOptions(registry.runtime, runtime);
-      const framework = (options.framework ?? frameworks[0]) as FrameworkOption;
+      const framework = options.framework ?? frameworks[0];
       const pkgManagers = packageManagerOptions(registry.runtime, runtime);
       const pm =
         options.packageManager !== undefined

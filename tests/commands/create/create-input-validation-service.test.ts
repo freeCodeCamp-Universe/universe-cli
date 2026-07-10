@@ -82,7 +82,7 @@ describe(CreateInputValidationService, () => {
     const act = () =>
       service.validateCreateInput({
         ...validNodeSelection,
-        runtime: "Python" as CreateSelections["runtime"],
+        runtime: "Python",
       });
 
     expect(act).toThrow(UsageError);
@@ -94,7 +94,7 @@ describe(CreateInputValidationService, () => {
     const act = () =>
       service.validateCreateInput({
         ...validNodeSelection,
-        framework: "Flask" as CreateSelections["framework"],
+        framework: "Flask",
       });
 
     expect(act).toThrow(UsageError);
