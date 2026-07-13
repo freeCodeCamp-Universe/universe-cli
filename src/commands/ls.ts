@@ -17,7 +17,7 @@ import {
 } from "../lib/proxy-client.js";
 import { buildEnvelope } from "../output/envelope.js";
 import { exitWithCode } from "../output/exit-codes.js";
-import { outputError } from "../output/format.js";
+import { emitJson, outputError } from "../output/format.js";
 
 export interface LsOptions {
   json: boolean;
@@ -40,10 +40,6 @@ export interface LsDeps {
 const defaultReadPlatformYaml = async (cwd: string): Promise<string> => {
   return readFile(resolve(cwd, "platform.yaml"), "utf-8");
 };
-
-function emitJson(envelope: object): void {
-  process.stdout.write(JSON.stringify(envelope) + "\n");
-}
 
 type DeployState = "preview" | "production" | "preview+production" | null;
 

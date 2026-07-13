@@ -36,7 +36,7 @@ import { clackLogger, silentLogger, type Logger } from "../../output/logger.js";
 import { EXIT_USAGE, exitWithCode } from "../../output/exit-codes.js";
 import { CliError, ConfirmError, UsageError } from "../../errors.js";
 import { buildEnvelope } from "../../output/envelope.js";
-import { outputError } from "../../output/format.js";
+import { emitJson, outputError } from "../../output/format.js";
 import { LocalProjectWriter } from "./io/local-project-writer.js";
 import {
   RemoteTemplateProvider,
@@ -49,10 +49,6 @@ export interface HandlerResult {
 }
 
 const defaultFilesystemWriter: ProjectWriter = new LocalProjectWriter();
-
-function emitJson(envelope: object): void {
-  process.stdout.write(JSON.stringify(envelope) + "\n");
-}
 
 export interface CreateOptions {
   json: boolean;

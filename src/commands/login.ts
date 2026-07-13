@@ -17,7 +17,7 @@ import {
   EXIT_CREDENTIALS,
   exitWithCode,
 } from "../output/exit-codes.js";
-import { outputError } from "../output/format.js";
+import { emitJson, outputError } from "../output/format.js";
 
 export interface LoginOptions {
   json: boolean;
@@ -51,10 +51,6 @@ const NO_SITES_WARNING = [
   "  3. Confirm your team membership at",
   "     https://github.com/orgs/freeCodeCamp-Universe/teams.",
 ].join("\n");
-
-function emitJson(envelope: Record<string, unknown>): void {
-  process.stdout.write(JSON.stringify(envelope) + "\n");
-}
 
 export async function login(
   options: LoginOptions,

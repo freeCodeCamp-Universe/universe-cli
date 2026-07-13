@@ -8,7 +8,7 @@ import { parsePlatformYaml } from "../lib/platform-yaml.js";
 import { SITE_NAME_PATTERN } from "../lib/platform-yaml.schema.js";
 import { buildEnvelope } from "../output/envelope.js";
 import { EXIT_USAGE, exitWithCode } from "../output/exit-codes.js";
-import { outputError } from "../output/format.js";
+import { emitJson, outputError } from "../output/format.js";
 
 export interface InitOptions {
   json: boolean;
@@ -95,10 +95,6 @@ const defaultPromptConfirm = async (
   if (isCancel(r)) throw new ConfirmError("init cancelled");
   return r === true;
 };
-
-function emitJson(envelope: object): void {
-  process.stdout.write(JSON.stringify(envelope) + "\n");
-}
 
 export function sanitizeSite(raw: string): string {
   const slug = raw

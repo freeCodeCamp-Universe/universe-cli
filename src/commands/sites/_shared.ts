@@ -17,10 +17,6 @@ export interface SitesCommandDeps {
   exit?: (code: number) => never;
 }
 
-export function emitJson(envelope: object): void {
-  process.stdout.write(JSON.stringify(envelope) + "\n");
-}
-
 /**
  * Parse the `--team` / `--teams` flag into a clean string array.
  * Accepts a single value (`--team=staff`) or comma-separated

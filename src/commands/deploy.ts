@@ -33,7 +33,7 @@ import {
 import { uploadFiles as defaultUploadFiles } from "../lib/upload.js";
 import { buildEnvelope } from "../output/envelope.js";
 import { EXIT_USAGE, exitWithCode } from "../output/exit-codes.js";
-import { outputError } from "../output/format.js";
+import { emitJson, outputError } from "../output/format.js";
 
 export interface DeployOptions {
   json: boolean;
@@ -75,10 +75,6 @@ export interface DeployDeps {
 const defaultReadPlatformYaml = async (cwd: string): Promise<string> => {
   return readFile(resolve(cwd, "platform.yaml"), "utf-8");
 };
-
-function emitJson(envelope: object): void {
-  process.stdout.write(JSON.stringify(envelope) + "\n");
-}
 
 async function readAndParseConfig(
   cwd: string,

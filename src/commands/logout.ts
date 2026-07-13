@@ -4,6 +4,7 @@ import {
   loadToken as defaultLoadToken,
 } from "../lib/token-store.js";
 import { buildEnvelope } from "../output/envelope.js";
+import { emitJson } from "../output/format.js";
 
 export interface LogoutOptions {
   json: boolean;
@@ -14,10 +15,6 @@ export interface LogoutDeps {
   deleteToken?: typeof defaultDeleteToken;
   logSuccess?: (msg: string) => void;
   logInfo?: (msg: string) => void;
-}
-
-function emitJson(envelope: Record<string, unknown>): void {
-  process.stdout.write(JSON.stringify(envelope) + "\n");
 }
 
 export async function logout(

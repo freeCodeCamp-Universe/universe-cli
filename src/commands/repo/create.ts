@@ -3,10 +3,9 @@ import { ConfirmError } from "../../errors.js";
 import { type ProxyClient, wrapProxyError } from "../../lib/proxy-client.js";
 import { buildEnvelope } from "../../output/envelope.js";
 import { exitWithCode } from "../../output/exit-codes.js";
-import { outputError } from "../../output/format.js";
+import { emitJson, outputError } from "../../output/format.js";
 import {
   defaultRepoPrompts,
-  emitJson,
   type RepoCommandDeps,
   type RepoPrompts,
   setupClient,

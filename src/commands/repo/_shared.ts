@@ -48,10 +48,6 @@ export interface RepoCommandDeps {
   isTTY?: boolean;
 }
 
-export function emitJson(envelope: object): void {
-  process.stdout.write(JSON.stringify(envelope) + "\n");
-}
-
 /**
  * Resolve identity + construct a proxy client. Throws CredentialError
  * when no identity is available — the caller wraps via wrapProxyError.

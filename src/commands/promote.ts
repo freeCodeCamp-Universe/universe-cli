@@ -18,7 +18,7 @@ import {
 } from "../lib/proxy-client.js";
 import { buildEnvelope } from "../output/envelope.js";
 import { exitWithCode } from "../output/exit-codes.js";
-import { outputError } from "../output/format.js";
+import { emitJson, outputError } from "../output/format.js";
 
 export interface PromoteOptions {
   json: boolean;
@@ -47,10 +47,6 @@ const defaultPromptConfirm = async (msg: string): Promise<boolean> => {
 const defaultReadPlatformYaml = async (cwd: string): Promise<string> => {
   return readFile(resolve(cwd, "platform.yaml"), "utf-8");
 };
-
-function emitJson(envelope: object): void {
-  process.stdout.write(JSON.stringify(envelope) + "\n");
-}
 
 async function readAndParseConfig(
   cwd: string,
