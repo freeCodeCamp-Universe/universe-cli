@@ -206,12 +206,12 @@ const fetchAndCache = async (
 
 class RemoteTemplateProvider implements TemplateProvider {
   private readonly env: () => TemplateProviderEnv;
-  private readonly cacheBaseOverride?: () => string;
+  private readonly cacheBaseOverride?: string;
   private readonly fetchImpl: FetchFn;
 
   constructor(
     env: () => TemplateProviderEnv = readEnv,
-    cacheBaseOverride?: () => string,
+    cacheBaseOverride?: string,
     fetchImpl: FetchFn = globalThis.fetch,
   ) {
     this.env = env;
@@ -221,7 +221,7 @@ class RemoteTemplateProvider implements TemplateProvider {
 
   private resolveCacheDir(version: string): string {
     if (this.cacheBaseOverride !== undefined) {
-      return join(this.cacheBaseOverride(), version);
+      return join(this.cacheBaseOverride, version);
     }
     return templateCacheDir(version);
   }
