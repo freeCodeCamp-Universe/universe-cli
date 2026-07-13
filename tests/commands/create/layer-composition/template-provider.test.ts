@@ -10,7 +10,7 @@ import type { FetchFn } from "../../../../src/commands/create/layer-composition/
 
 const execFileAsync = promisify(execFile);
 const FIXTURES_DIR = resolve("tests/fixtures/templates");
-const TEMPLATE_URL = "https://example.com/releases/download/v1.0.0/templates-1.0.0.tar.gz";
+const TEMPLATE_VERSION = "1.0.0";
 
 const createTarball = async (sourceDir: string, destPath: string): Promise<void> => {
   const files = await readdir(sourceDir);
@@ -41,19 +41,40 @@ describe("RemoteTemplateProvider", () => {
   });
 
   // -----------------------------------------------------------------------
-  // UNIVERSE_TEMPLATES_URL env var check
+  // Version resolution
   // -----------------------------------------------------------------------
 
-  describe("env var validation", () => {
-    it("throws when neither UNIVERSE_TEMPLATES_URL nor UNIVERSE_TEMPLATES_DIR is set", async () => {
-      const provider = new RemoteTemplateProvider(() => ({}));
+  describe("version resolution", () => {
+    it("uses default version from assets.json when no env vars are set", async () => {
+      const cacheBase = join(tmpDir, "cache");
+      const cacheVersionDir = join(cacheBase, TEMPLATE_VERSION);
+      await cp(FIXTURES_DIR, cacheVersionDir, { recursive: true });
 
-      await expect(provider.loadLayers()).rejects.toThrow(
-        "UNIVERSE_TEMPLATES_URL is not set. Set it to the URL of a universe-templates release asset.",
+      const provider = new RemoteTemplateProvider(
+        () => ({}),
+        () => cacheBase,
       );
+
+      const { registry } = await provider.loadLayers();
+      expect(registry.always).toBeDefined();
     });
 
-    it("does not require UNIVERSE_TEMPLATES_URL when UNIVERSE_TEMPLATES_DIR is set", async () => {
+    it("uses UNIVERSE_TEMPLATES_VERSION when set", async () => {
+      const customVersion = "2.0.0";
+      const cacheBase = join(tmpDir, "cache");
+      const cacheVersionDir = join(cacheBase, customVersion);
+      await cp(FIXTURES_DIR, cacheVersionDir, { recursive: true });
+
+      const provider = new RemoteTemplateProvider(
+        () => ({ UNIVERSE_TEMPLATES_VERSION: customVersion }),
+        () => cacheBase,
+      );
+
+      const { registry } = await provider.loadLayers();
+      expect(registry.always).toBeDefined();
+    });
+
+    it("does not require UNIVERSE_TEMPLATES_VERSION when UNIVERSE_TEMPLATES_DIR is set", async () => {
       const provider = new RemoteTemplateProvider(() => ({
         UNIVERSE_TEMPLATES_DIR: FIXTURES_DIR,
       }));
@@ -142,7 +163,7 @@ describe("RemoteTemplateProvider", () => {
       await cp(FIXTURES_DIR, cacheVersionDir, { recursive: true });
 
       const provider = new RemoteTemplateProvider(
-        () => ({ UNIVERSE_TEMPLATES_URL: TEMPLATE_URL }),
+        () => ({ UNIVERSE_TEMPLATES_VERSION: TEMPLATE_VERSION }),
         () => cacheBase,
       );
 
@@ -169,7 +190,7 @@ describe("RemoteTemplateProvider", () => {
       const cacheBase = join(tmpDir, "cache");
 
       const provider = new RemoteTemplateProvider(
-        () => ({ UNIVERSE_TEMPLATES_URL: TEMPLATE_URL }),
+        () => ({ UNIVERSE_TEMPLATES_VERSION: TEMPLATE_VERSION }),
         () => cacheBase,
         fakeFetchOk(tarballPath),
       );
@@ -195,7 +216,7 @@ describe("RemoteTemplateProvider", () => {
       };
 
       const provider = new RemoteTemplateProvider(
-        () => ({ UNIVERSE_TEMPLATES_URL: TEMPLATE_URL }),
+        () => ({ UNIVERSE_TEMPLATES_VERSION: TEMPLATE_VERSION }),
         () => cacheBase,
         countingFetch,
       );
@@ -210,13 +231,13 @@ describe("RemoteTemplateProvider", () => {
       const cacheBase = join(tmpDir, "cache");
 
       const provider = new RemoteTemplateProvider(
-        () => ({ UNIVERSE_TEMPLATES_URL: TEMPLATE_URL }),
+        () => ({ UNIVERSE_TEMPLATES_VERSION: TEMPLATE_VERSION }),
         () => cacheBase,
         fakeFetch404,
       );
 
       await expect(provider.loadLayers()).rejects.toThrow(
-        "Template not found at https://example.com/releases/download/v1.0.0/templates-1.0.0.tar.gz. Check UNIVERSE_TEMPLATES_URL.",
+        "Check UNIVERSE_TEMPLATES_VERSION.",
       );
     });
 
@@ -224,7 +245,7 @@ describe("RemoteTemplateProvider", () => {
       const cacheBase = join(tmpDir, "cache");
 
       const provider = new RemoteTemplateProvider(
-        () => ({ UNIVERSE_TEMPLATES_URL: TEMPLATE_URL }),
+        () => ({ UNIVERSE_TEMPLATES_VERSION: TEMPLATE_VERSION }),
         () => cacheBase,
         fakeFetchNetworkError,
       );
@@ -246,7 +267,7 @@ describe("RemoteTemplateProvider", () => {
       const cacheBase = join(tmpDir, "cache");
 
       const provider = new RemoteTemplateProvider(
-        () => ({ UNIVERSE_TEMPLATES_URL: TEMPLATE_URL }),
+        () => ({ UNIVERSE_TEMPLATES_VERSION: TEMPLATE_VERSION }),
         () => cacheBase,
         fakeFetchOk(badTarball),
       );
@@ -269,7 +290,7 @@ describe("RemoteTemplateProvider", () => {
       const cacheBase = join(tmpDir, "cache");
 
       const provider = new RemoteTemplateProvider(
-        () => ({ UNIVERSE_TEMPLATES_URL: TEMPLATE_URL }),
+        () => ({ UNIVERSE_TEMPLATES_VERSION: TEMPLATE_VERSION }),
         () => cacheBase,
         fakeFetchOk(extraTarball),
       );
@@ -296,7 +317,7 @@ describe("RemoteTemplateProvider", () => {
       const cacheBase = join(tmpDir, "cache");
 
       const provider = new RemoteTemplateProvider(
-        () => ({ UNIVERSE_TEMPLATES_URL: TEMPLATE_URL }),
+        () => ({ UNIVERSE_TEMPLATES_VERSION: TEMPLATE_VERSION }),
         () => cacheBase,
         fakeFetchOk(badSchemaTarball),
       );
@@ -314,7 +335,7 @@ describe("RemoteTemplateProvider", () => {
       const cacheBase = join(tmpDir, "cache");
 
       const provider = new RemoteTemplateProvider(
-        () => ({ UNIVERSE_TEMPLATES_URL: TEMPLATE_URL }),
+        () => ({ UNIVERSE_TEMPLATES_VERSION: TEMPLATE_VERSION }),
         () => cacheBase,
         fakeFetchOk(corruptedTarball),
       );
@@ -356,7 +377,7 @@ describe("RemoteTemplateProvider", () => {
       };
 
       const provider = new RemoteTemplateProvider(
-        () => ({ UNIVERSE_TEMPLATES_URL: TEMPLATE_URL }),
+        () => ({ UNIVERSE_TEMPLATES_VERSION: TEMPLATE_VERSION }),
         () => cacheBase,
         countingFetch,
       );
@@ -371,7 +392,7 @@ describe("RemoteTemplateProvider", () => {
       const cacheBase = join(tmpDir, "cache");
 
       const provider = new RemoteTemplateProvider(
-        () => ({ UNIVERSE_TEMPLATES_URL: TEMPLATE_URL }),
+        () => ({ UNIVERSE_TEMPLATES_VERSION: TEMPLATE_VERSION }),
         () => cacheBase,
         fakeFetchOk(tarballPath),
       );
@@ -394,7 +415,7 @@ describe("RemoteTemplateProvider", () => {
       const provider = new RemoteTemplateProvider(
         () => ({
           UNIVERSE_TEMPLATES_DIR: FIXTURES_DIR,
-          UNIVERSE_TEMPLATES_URL: TEMPLATE_URL,
+          UNIVERSE_TEMPLATES_VERSION: TEMPLATE_VERSION,
         }),
         undefined,
         countingFetch,

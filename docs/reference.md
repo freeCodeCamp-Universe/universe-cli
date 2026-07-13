@@ -107,6 +107,7 @@ artemis validates every bearer with `GET /user` and authorizes via `GET /user/te
 | `UNIVERSE_UPDATE_TTL_MS`    | `3600000`                       | all          | Update-check cache TTL, ms. Lower = fresher; `0` checks every run. |
 | `UNIVERSE_DEBUG`            | —                               | all          | `1`/`true` logs raw proxy request/response. Verbose; debugging.    |
 | `NO_COLOR`                  | —                               | all          | Standard; suppresses color in the update notice.                   |
+| `UNIVERSE_TEMPLATES_VERSION` | (baked-in)                      | `create`     | Override the template version used by `universe create`.           |
 | `UNIVERSE_GH_CLIENT_ID`     | baked-in App client id          | `login` only | Override the device-flow GitHub App (fork / self-host tenants).    |
 | `XDG_CONFIG_HOME`           | `~/.config`                     | login/logout | Base dir for the token store (`<base>/universe-cli/token`).        |
 

@@ -14,7 +14,8 @@ import {
   ServiceSchema,
 } from "./schemas/layers.js";
 import { LabelsSchema, type Labels } from "./schemas/labels.js";
-import { templateCacheDir, versionFromUrl } from "./template-cache.js";
+import { defaultTemplateVersion, resolveTemplateUrl } from "./assets.js";
+import { templateCacheDir } from "./template-cache.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -40,14 +41,14 @@ interface TemplateProvider {
 
 interface TemplateProviderEnv {
   UNIVERSE_TEMPLATES_DIR?: string;
-  UNIVERSE_TEMPLATES_URL?: string;
+  UNIVERSE_TEMPLATES_VERSION?: string;
 }
 
 type FetchFn = (url: string) => Promise<Response>;
 
 const readEnv = (): TemplateProviderEnv => ({
   UNIVERSE_TEMPLATES_DIR: process.env["UNIVERSE_TEMPLATES_DIR"],
-  UNIVERSE_TEMPLATES_URL: process.env["UNIVERSE_TEMPLATES_URL"],
+  UNIVERSE_TEMPLATES_VERSION: process.env["UNIVERSE_TEMPLATES_VERSION"],
 });
 
 const validateEntries = (
@@ -151,7 +152,7 @@ const fetchTarball = async (url: string, fetchImpl: FetchFn): Promise<Buffer> =>
   }
 
   if (response.status === 404) {
-    throw new ConfigError(`Template not found at ${url}. Check UNIVERSE_TEMPLATES_URL.`);
+    throw new ConfigError(`Template not found at ${url}. Check UNIVERSE_TEMPLATES_VERSION.`);
   }
 
   if (!response.ok) {
@@ -218,27 +219,26 @@ class RemoteTemplateProvider implements TemplateProvider {
     this.fetchImpl = fetchImpl;
   }
 
-  private resolveCacheDir(url: string): string {
+  private resolveCacheDir(version: string): string {
     if (this.cacheBaseOverride !== undefined) {
-      return join(this.cacheBaseOverride(), versionFromUrl(url));
+      return join(this.cacheBaseOverride(), version);
     }
-    return templateCacheDir(url);
+    return templateCacheDir(version);
   }
 
   async loadLayers(options?: { forceFetch?: boolean }): Promise<TemplateData> {
-    const { UNIVERSE_TEMPLATES_DIR, UNIVERSE_TEMPLATES_URL } = this.env();
+    const { UNIVERSE_TEMPLATES_DIR, UNIVERSE_TEMPLATES_VERSION } = this.env();
 
     if (UNIVERSE_TEMPLATES_DIR !== undefined && UNIVERSE_TEMPLATES_DIR.length > 0) {
       return loadFromDir(UNIVERSE_TEMPLATES_DIR);
     }
 
-    if (UNIVERSE_TEMPLATES_URL === undefined || UNIVERSE_TEMPLATES_URL.length === 0) {
-      throw new ConfigError(
-        "UNIVERSE_TEMPLATES_URL is not set. Set it to the URL of a universe-templates release asset.",
-      );
-    }
-
-    const cacheDir = this.resolveCacheDir(UNIVERSE_TEMPLATES_URL);
+    const version =
+      UNIVERSE_TEMPLATES_VERSION && UNIVERSE_TEMPLATES_VERSION.length > 0
+        ? UNIVERSE_TEMPLATES_VERSION
+        : defaultTemplateVersion;
+    const url = resolveTemplateUrl(version);
+    const cacheDir = this.resolveCacheDir(version);
 
     if (options?.forceFetch) {
       await rm(cacheDir, { force: true, recursive: true });
@@ -248,7 +248,7 @@ class RemoteTemplateProvider implements TemplateProvider {
       return loadFromDir(cacheDir);
     }
 
-    return fetchAndCache(UNIVERSE_TEMPLATES_URL, cacheDir, this.fetchImpl);
+    return fetchAndCache(url, cacheDir, this.fetchImpl);
   }
 }
 
