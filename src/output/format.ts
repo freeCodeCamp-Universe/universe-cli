@@ -31,6 +31,10 @@ export interface OutputErrorOptions {
   requestId?: string;
 }
 
+export function emitJson(envelope: object): void {
+  process.stdout.write(JSON.stringify(envelope) + "\n");
+}
+
 export function outputSuccess(
   ctx: OutputContext,
   humanMessage: string,

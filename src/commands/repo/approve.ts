@@ -3,10 +3,9 @@ import { ConfirmError, StorageError } from "../../errors.js";
 import { wrapProxyError } from "../../lib/proxy-client.js";
 import { buildEnvelope } from "../../output/envelope.js";
 import { EXIT_STORAGE, exitWithCode } from "../../output/exit-codes.js";
-import { outputError } from "../../output/format.js";
+import { emitJson, outputError } from "../../output/format.js";
 import {
   defaultRepoPrompts,
-  emitJson,
   type RepoCommandDeps,
   setupClient,
   UsageError,

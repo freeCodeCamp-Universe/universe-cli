@@ -8,7 +8,7 @@ import {
   type ProxyClientConfig,
 } from "../lib/proxy-client.js";
 import { buildEnvelope } from "../output/envelope.js";
-import { outputError } from "../output/format.js";
+import { emitJson, outputError } from "../output/format.js";
 import { EXIT_CREDENTIALS, exitWithCode } from "../output/exit-codes.js";
 import { CliError } from "../errors.js";
 
@@ -26,10 +26,6 @@ export interface WhoAmIDeps {
 }
 
 const DEFAULT_PROXY_URL = "https://uploads.freecode.camp";
-
-function emitJson(envelope: object): void {
-  process.stdout.write(JSON.stringify(envelope) + "\n");
-}
 
 export async function whoami(
   options: WhoAmIOptions,

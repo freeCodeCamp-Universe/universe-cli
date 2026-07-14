@@ -3,9 +3,8 @@ import { UsageError } from "../../errors.js";
 import { wrapProxyError } from "../../lib/proxy-client.js";
 import { buildEnvelope } from "../../output/envelope.js";
 import { exitWithCode } from "../../output/exit-codes.js";
-import { outputError } from "../../output/format.js";
+import { emitJson, outputError } from "../../output/format.js";
 import {
-  emitJson,
   formatRepoTable,
   type RepoCommandDeps,
   setupClient,
