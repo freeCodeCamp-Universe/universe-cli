@@ -4,6 +4,7 @@ import {
   EXIT_STORAGE,
   EXIT_USAGE,
 } from "../output/exit-codes.js";
+import { auditRowArraySchema } from "../commands/audit/schema.js";
 import {
   repoApproveResultSchema,
   repoRowArraySchema,
@@ -212,6 +213,27 @@ export interface RepoApproveResult {
   request: RepoRow;
 }
 
+export interface AuditRow {
+  id: number;
+  occurredAt: string;
+  actor: string;
+  action: string;
+  site?: string;
+  deployId?: string;
+  outcome: string;
+  requestId?: string;
+  detail?: Record<string, unknown>;
+}
+
+export interface ListAuditQuery {
+  site?: string;
+  actor?: string;
+  action?: string;
+  since?: string;
+  limit?: number;
+  offset?: number;
+}
+
 export interface ProxyClient {
   whoami(): Promise<WhoAmIResponse>;
   deployInit(req: DeployInitRequest): Promise<DeployInitResponse>;
@@ -238,6 +260,7 @@ export interface ProxyClient {
   deleteSite(req: DeleteSiteRequest): Promise<void>;
   createRepoRequest(req: CreateRepoRequestBody): Promise<RepoRow>;
   listRepoRequests(req?: ListRepoRequestsQuery): Promise<RepoRow[]>;
+  listAudit(req?: ListAuditQuery): Promise<AuditRow[]>;
   getRepoRequest(id: string): Promise<RepoRow>;
   approveRepoRequest(req: { id: string }): Promise<RepoApproveResult>;
   rejectRepoRequest(req: { id: string; reason?: string }): Promise<RepoRow>;
@@ -720,6 +743,29 @@ export function createProxyClient(cfg: ProxyClientConfig): ProxyClient {
           },
         },
         (raw) => repoRowArraySchema.parse(raw),
+      );
+    },
+
+    async listAudit(req) {
+      const params = new URLSearchParams();
+      if (req?.site) params.set("site", req.site);
+      if (req?.actor) params.set("actor", req.actor);
+      if (req?.action) params.set("action", req.action);
+      if (req?.since) params.set("since", req.since);
+      if (req?.limit !== undefined) params.set("limit", String(req.limit));
+      if (req?.offset !== undefined) params.set("offset", String(req.offset));
+      const qs = params.toString();
+      const url = `${base}/api/audit${qs ? `?${qs}` : ""}`;
+      return call<AuditRow[]>(
+        url,
+        {
+          method: "GET",
+          headers: {
+            Authorization: await userBearer(),
+            Accept: "application/json",
+          },
+        },
+        (raw) => auditRowArraySchema.parse(raw),
       );
     },
 

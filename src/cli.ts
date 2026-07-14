@@ -18,6 +18,7 @@ import { ls as repoLs } from "./commands/repo/ls.js";
 import { reject as repoReject } from "./commands/repo/reject.js";
 import { rm as repoRm } from "./commands/repo/rm.js";
 import { status as repoStatus } from "./commands/repo/status.js";
+import { ls as auditLs } from "./commands/audit/ls.js";
 import { type OutputContext, outputError } from "./output/format.js";
 import { EXIT_USAGE, exitWithCode } from "./output/exit-codes.js";
 import { CliError } from "./errors.js";
@@ -95,6 +96,7 @@ export async function run(argv = process.argv): Promise<void> {
     "repo",
     "Repository creation + approval queue commands",
   );
+  const auditCli = namespaceGroup("audit", "Audit trail query commands");
 
   sitesCli
     .command("register <slug>")
@@ -381,7 +383,10 @@ export async function run(argv = process.argv): Promise<void> {
     .option("--yes", "Skip prompts; use flag values (required for non-TTY/CI)")
     .option("--name <name>", "Project name (required in non-interactive mode)")
     .option("--runtime <runtime>", "Runtime: e.g. node | static_web")
-    .option("--framework <framework>", "Framework (must be valid for chosen runtime)")
+    .option(
+      "--framework <framework>",
+      "Framework (must be valid for chosen runtime)",
+    )
     .option("--database <db...>", "Databases")
     .option("--service <svc...>", "Platform services")
     .option("--pkg-manager <pm>", "Package manager: e.g pnpm | bun")
@@ -482,9 +487,43 @@ export async function run(argv = process.argv): Promise<void> {
       }
     });
 
+  auditCli
+    .command("ls")
+    .description("List durable audit events (who did what)")
+    .option("--actor <login>", "Filter by GitHub actor")
+    .option("--action <action>", "Filter by action (e.g. repo.approve)")
+    .option("--site <slug>", "Filter by site")
+    .option("--since <rfc3339>", "Only events at or after this timestamp")
+    .option("--limit <n>", "Max rows (default 100, max 500)", (v: string) =>
+      Number.parseInt(v, 10),
+    )
+    .action(async (_opts, cmd: Command) => {
+      const opts = cmd.optsWithGlobals<{
+        json?: boolean;
+        actor?: string;
+        action?: string;
+        site?: string;
+        since?: string;
+        limit?: number;
+      }>();
+      try {
+        await auditLs({
+          json: opts.json ?? false,
+          actor: opts.actor,
+          action: opts.action,
+          site: opts.site,
+          since: opts.since,
+          limit: opts.limit,
+        });
+      } catch (err: unknown) {
+        handleActionError("audit ls", opts.json ?? false, err);
+      }
+    });
+
   cli.addCommand(staticCli);
   cli.addCommand(sitesCli);
   cli.addCommand(repoCli);
+  cli.addCommand(auditCli);
 
   if (args.length === 0) {
     cli.outputHelp();
