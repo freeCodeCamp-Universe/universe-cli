@@ -81,6 +81,26 @@ export async function setupClient(deps: RepoCommandDeps): Promise<{
  * Render repo-request rows as an aligned text table. Returns `emptyMsg`
  * when there are no rows (the caller passes a status-specific phrase).
  */
+function humanizeDuration(ms: number): string {
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h${m % 60}m`;
+  const d = Math.floor(h / 24);
+  return `${d}d${h % 24}h`;
+}
+
+const RESOLVED_STATUSES = new Set(["active", "rejected", "failed"]);
+
+function resolveLatency(r: RepoRow): string {
+  if (!RESOLVED_STATUSES.has(r.status)) return "";
+  const ms = Date.parse(r.updatedAt) - Date.parse(r.createdAt);
+  if (!Number.isFinite(ms) || ms < 0) return "";
+  return humanizeDuration(ms);
+}
+
 export function formatRepoTable(
   rows: RepoRow[],
   emptyMsg = "No repo requests.",
@@ -93,6 +113,8 @@ export function formatRepoTable(
     "STATUS",
     "REQUESTED BY",
     "REQUESTED AT",
+    "APPROVER",
+    "LATENCY",
   ];
   const cells: string[][] = rows.map((r) => [
     r.id,
@@ -101,6 +123,8 @@ export function formatRepoTable(
     r.status,
     r.requestedBy,
     r.createdAt,
+    r.approver ?? "",
+    resolveLatency(r),
   ]);
   const widths = headers.map((h, i) =>
     Math.max(h.length, ...cells.map((row) => row[i]?.length ?? 0)),

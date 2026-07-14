@@ -44,6 +44,24 @@ describe("formatRepoTable", () => {
     expect(lines[2]).toContain("active");
   });
 
+  it("shows approver and resolve latency for resolved rows", () => {
+    const out = formatRepoTable([
+      row({
+        id: "req_010",
+        name: "shipped",
+        status: "active",
+        approver: "boss",
+        createdAt: "2026-05-29T12:00:00Z",
+        updatedAt: "2026-05-29T12:05:30Z",
+      }),
+    ]);
+    const lines = out.split("\n");
+    expect(lines[0]).toContain("APPROVER");
+    expect(lines[0]).toContain("LATENCY");
+    expect(lines[1]).toContain("boss");
+    expect(lines[1]).toContain("5m");
+  });
+
   it("pads columns to align cells", () => {
     const out = formatRepoTable([row({ id: "req_long_id_here", name: "x" })]);
     const [header, dataRow] = out.split("\n");

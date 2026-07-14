@@ -51,6 +51,7 @@ interface ParsedDeploy {
 
 interface DeployRow extends ParsedDeploy {
   state: DeployState;
+  actor?: string;
 }
 
 function deployState(
@@ -112,12 +113,13 @@ async function readSiteFromYaml(
 }
 
 function formatTable(deploys: DeployRow[]): string {
-  const header = ["DEPLOY ID", "TIMESTAMP", "SHA", "STATE"];
+  const header = ["DEPLOY ID", "TIMESTAMP", "SHA", "STATE", "ACTOR"];
   const rows = deploys.map((d) => [
     d.deployId,
     d.timestamp ? d.timestamp.replace("T", " ").replace("Z", "") : "—",
     d.sha ?? "—",
     d.state ?? "—",
+    d.actor ?? "—",
   ]);
   const widths = header.map((h, i) =>
     Math.max(h.length, ...rows.map((r) => (r[i] ?? "").length)),
@@ -184,9 +186,10 @@ export async function ls(options: LsOptions, deps: LsDeps = {}): Promise<void> {
       productionId = production?.deployId ?? null;
     }
 
-    const deploys: DeployRow[] = parsed.map((d) => ({
+    const deploys: DeployRow[] = parsed.map((d, i) => ({
       ...d,
       state: deployState(d.deployId, previewId, productionId),
+      actor: sorted[i]?.actor,
     }));
 
     if (options.json) {

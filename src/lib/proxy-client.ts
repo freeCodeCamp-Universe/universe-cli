@@ -126,6 +126,7 @@ export interface DeployFinalizeResponse {
 
 export interface DeploySummary {
   deployId: string;
+  actor?: string;
 }
 
 export interface AliasResponse {
