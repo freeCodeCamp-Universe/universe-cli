@@ -56,7 +56,7 @@ describe(BunPackageManager, () => {
       };
       const adapter = new BunPackageManager(runner);
 
-      await expect(adapter.specifyDeps(tmpDir)).rejects.toBeInstanceOf(UsageError);
+      await expect(adapter.specifyDeps(tmpDir, "1.0.0")).rejects.toBeInstanceOf(UsageError);
     });
   });
 });

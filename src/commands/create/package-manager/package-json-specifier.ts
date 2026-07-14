@@ -70,7 +70,7 @@ Please check that the output format of list() has not changed, and that extractV
 };
 
 const createPackageSpecifier = (config: Config): PackageSpecifier => ({
-  async specifyDeps(projectDirectory: string): Promise<void> {
+  async specifyDeps(projectDirectory: string, _pmVersion: string): Promise<void> {
     const { lockfileName, runner, deleteBeforeFirstInstall } = config;
     const lockfilePath = join(projectDirectory, lockfileName);
 

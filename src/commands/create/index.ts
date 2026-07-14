@@ -190,6 +190,7 @@ export const create = async (
     if (manager !== undefined) {
       await packageManager.specifyDeps({
         manager,
+        pmVersion: registry["package-managers"][manager]?.pmVersion ?? "",
         projectDirectory: targetDirectory,
       });
     }

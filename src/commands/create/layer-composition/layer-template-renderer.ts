@@ -1,6 +1,7 @@
 interface TemplateContext {
   framework: string;
   name: string;
+  pmVersion: string;
   port: number;
   runtime: string;
 }
@@ -11,7 +12,8 @@ class LayerTemplateRenderer {
       .replaceAll("{{name}}", context.name)
       .replaceAll("{{port}}", String(context.port))
       .replaceAll("{{runtime}}", context.runtime)
-      .replaceAll("{{framework}}", context.framework);
+      .replaceAll("{{framework}}", context.framework)
+      .replaceAll("{{pmVersion}}", context.pmVersion);
   }
 }
 

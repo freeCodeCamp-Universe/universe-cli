@@ -55,8 +55,8 @@ class BunPackageManager implements PackageSpecifier {
     });
   }
 
-  specifyDeps(projectDirectory: string): Promise<void> {
-    return this.impl.specifyDeps(projectDirectory);
+  specifyDeps(projectDirectory: string, _pmVersion: string): Promise<void> {
+    return this.impl.specifyDeps(projectDirectory, _pmVersion);
   }
 }
 

@@ -75,12 +75,12 @@ const resolveWithLayers = (
 ): ResolvedLayerSet => {
   const resolvedLayers = resolveOrderedLayers(input, layers);
 
-  const pmPreinstall =
-    input.packageManager === undefined
-      ? undefined
-      : layers["package-managers"][input.packageManager]?.preinstall;
+  const pmData =
+    input.packageManager !== undefined
+      ? layers["package-managers"][input.packageManager]
+      : undefined;
 
-  const composedFiles = composeLayerFiles(resolvedLayers, pmPreinstall);
+  const composedFiles = composeLayerFiles(resolvedLayers, pmData?.preinstall);
 
   const renderer = new LayerTemplateRenderer();
   const frameworkData = layers.frameworks?.[input.framework];
@@ -88,6 +88,7 @@ const resolveWithLayers = (
   const context: TemplateContext = {
     framework: getLabel(labels, "framework", input.framework),
     name: input.name,
+    pmVersion: pmData?.pmVersion ?? "",
     port: frameworkData?.port ?? 0,
     runtime: getLabel(labels, "runtime", input.runtime),
   };
@@ -104,16 +105,16 @@ const resolveWithLayers = (
   if (
     runtimeData !== undefined &&
     frameworkData !== undefined &&
-    input.packageManager !== undefined
+    pmData !== undefined
   ) {
-    const pmData = layers["package-managers"][input.packageManager];
-
-    if (pmData !== undefined) {
-      renderedFiles["Dockerfile"] = renderDockerfile(
-        buildDockerfileData(runtimeData, frameworkData, pmData),
-      );
-      renderedFiles["docker-compose.dev.yml"] = buildComposeDevYaml(frameworkData, pmData);
-    }
+    renderedFiles["Dockerfile"] = renderer.render(
+      renderDockerfile(buildDockerfileData(runtimeData, frameworkData, pmData)),
+      context,
+    );
+    renderedFiles["docker-compose.dev.yml"] = renderer.render(
+      buildComposeDevYaml(frameworkData, pmData),
+      context,
+    );
   }
 
   return {

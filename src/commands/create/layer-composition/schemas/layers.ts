@@ -38,6 +38,7 @@ const PackageManagerSchema = z.record(
     lockfile: z.string(),
     manifests: z.array(z.string()),
     pmInstall: z.string(),
+    pmVersion: z.string(),
     preinstall: z.string().optional(),
   }),
 );
