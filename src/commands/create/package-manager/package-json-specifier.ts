@@ -1,7 +1,6 @@
 import { access, readFile, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { UsageError } from "../../../errors.js";
-import type { PackageSpecifier } from "./package-specifier.port.js";
 
 interface FilesystemApi {
   deleteFile(path: string): Promise<void>;
@@ -69,8 +68,8 @@ Please check that the output format of list() has not changed, and that extractV
   return pinned;
 };
 
-const createPackageSpecifier = (config: Config): PackageSpecifier => ({
-  async specifyDeps(projectDirectory: string, _pmVersion: string): Promise<void> {
+const createPackageSpecifier = (config: Config) => ({
+  async run(projectDirectory: string): Promise<void> {
     const { lockfileName, runner, deleteBeforeFirstInstall } = config;
     const lockfilePath = join(projectDirectory, lockfileName);
 
