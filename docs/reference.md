@@ -103,7 +103,7 @@ artemis validates every bearer with `GET /user` and authorizes via `GET /user/te
 | `GITHUB_TOKEN` / `GH_TOKEN` | —                               | all          | Identity sources 1–2. Must be user-scoped.                         |
 | `UNIVERSE_PROXY_URL`        | `https://uploads.freecode.camp` | all          | Point at a different artemis host (staging, mirror).               |
 | `UNIVERSE_FETCH_TIMEOUT_MS` | `30000`                         | all          | Per-request timeout to artemis, ms. `0` disables.                  |
-| `UNIVERSE_NO_UPDATE_CHECK`  | —                               | all          | `1`/`true` disables the background update check.                   |
+| `UNIVERSE_NO_UPDATE_CHECK`  | —                               | all          | `1`/`true` disables the background update check and the template version check. |
 | `UNIVERSE_UPDATE_TTL_MS`    | `3600000`                       | all          | Update-check cache TTL, ms. Lower = fresher; `0` checks every run. |
 | `UNIVERSE_DEBUG`            | —                               | all          | `1`/`true` logs raw proxy request/response. Verbose; debugging.    |
 | `NO_COLOR`                  | —                               | all          | Standard; suppresses color in the update notice.                   |
