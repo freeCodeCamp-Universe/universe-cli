@@ -1,6 +1,6 @@
 {
   "name": "@freecodecamp/universe-cli",
-  "version": "0.10.1",
+  "version": "0.11.0",
   "main": "dist/index.cjs",
   "scripts": {
     "test": "vitest run",
