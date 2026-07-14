@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0](https://github.com/freeCodeCamp-Universe/universe-cli/compare/universe-cli-v0.10.1...universe-cli-v0.11.0) (2026-07-14)
+
+
+### Features
+
+* add 'create' command ([#21](https://github.com/freeCodeCamp-Universe/universe-cli/issues/21)) ([e0392b8](https://github.com/freeCodeCamp-Universe/universe-cli/commit/e0392b82b4505d1ab503de87ac8d6cfb14c292a7))
+
+
+### Bug Fixes
+
+* **proxy:** map 429 rate-limit to EXIT_STORAGE ([f920e71](https://github.com/freeCodeCamp-Universe/universe-cli/commit/f920e715a8240e393187fad02362eb9f0f60b62d))
+
 ## [0.10.1](https://github.com/freeCodeCamp-Universe/universe-cli/compare/universe-cli-v0.10.0...universe-cli-v0.10.1) (2026-06-03)
 
 
