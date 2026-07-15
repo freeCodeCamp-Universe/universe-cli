@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.0](https://github.com/freeCodeCamp-Universe/universe-cli/compare/universe-cli-v0.11.0...universe-cli-v0.12.0) (2026-07-15)
+
+
+### Features
+
+* **cli:** add audit ls command ([#29](https://github.com/freeCodeCamp-Universe/universe-cli/issues/29)) ([f7c9882](https://github.com/freeCodeCamp-Universe/universe-cli/commit/f7c98825f382fa385d1fd437459b0b54a758491d))
+
 ## [0.11.0](https://github.com/freeCodeCamp-Universe/universe-cli/compare/universe-cli-v0.10.1...universe-cli-v0.11.0) (2026-07-14)
 
 
