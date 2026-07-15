@@ -10,13 +10,7 @@ const cacheBase = (): string => {
   return join(homedir(), ".cache");
 };
 
-const versionFromUrl = (url: string): string => {
-  const filename = url.split("/").at(-1) ?? url;
-  const match = filename.match(/^templates-(.+)\.tar\.gz$/);
-  return match?.[1] ?? filename;
-};
+const templateCacheDir = (version: string): string =>
+  join(cacheBase(), APP_DIR, TEMPLATES_DIR, version);
 
-const templateCacheDir = (url: string): string =>
-  join(cacheBase(), APP_DIR, TEMPLATES_DIR, versionFromUrl(url));
-
-export { cacheBase, templateCacheDir, versionFromUrl };
+export { cacheBase, templateCacheDir };

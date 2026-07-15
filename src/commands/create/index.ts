@@ -42,6 +42,11 @@ import {
   RemoteTemplateProvider,
   type TemplateProvider,
 } from "./layer-composition/template-provider.js";
+import { defaultTemplateVersion } from "./layer-composition/assets.js";
+import {
+  checkTemplateVersion,
+  formatTemplateNotice,
+} from "../../lib/template-version-check.js";
 
 export interface HandlerResult {
   exitCode: number;
@@ -96,6 +101,21 @@ export const create = async (
   const repoInitialiser = deps.repoInitialiser ?? new GitRepoInitialiser();
 
   try {
+    const templatesDir = process.env["UNIVERSE_TEMPLATES_DIR"];
+    if (!(templatesDir && templatesDir.length > 0)) {
+      const envVersion = process.env["UNIVERSE_TEMPLATES_VERSION"];
+      const effectiveVersion =
+        envVersion && envVersion.length > 0 ? envVersion : defaultTemplateVersion;
+      try {
+        const notice = await checkTemplateVersion(effectiveVersion);
+        if (notice) {
+          process.stderr.write(formatTemplateNotice(notice));
+        }
+      } catch {
+        // Non-fatal: never block scaffolding.
+      }
+    }
+
     const templateProvider = deps.templateProvider ?? new RemoteTemplateProvider();
     const { labels, registry } = await templateProvider.loadLayers({
       forceFetch: options.forceFetch,
