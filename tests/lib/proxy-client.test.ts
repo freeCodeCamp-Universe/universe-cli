@@ -1400,3 +1400,106 @@ describe("debug trace (L2)", () => {
     expect(called).toBe(0);
   });
 });
+
+describe("listAudit query + response (R6)", () => {
+  it("builds /api/audit with every filter as a query param", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, []));
+    const client = createProxyClient({
+      baseUrl,
+      getAuthToken,
+      fetch: fetchMock,
+    });
+
+    await client.listAudit({
+      site: "www",
+      actor: "alice",
+      action: "repo.approve",
+      since: "2026-07-01T00:00:00Z",
+      limit: 25,
+      offset: 50,
+    });
+
+    const url = new URL(getUrl(fetchMock.mock.calls[0]));
+    expect(url.pathname).toBe("/api/audit");
+    expect(url.searchParams.get("site")).toBe("www");
+    expect(url.searchParams.get("actor")).toBe("alice");
+    expect(url.searchParams.get("action")).toBe("repo.approve");
+    expect(url.searchParams.get("since")).toBe("2026-07-01T00:00:00Z");
+    expect(url.searchParams.get("limit")).toBe("25");
+    expect(url.searchParams.get("offset")).toBe("50");
+    const init = getInit(fetchMock.mock.calls[0]);
+    expect(init.method).toBe("GET");
+    expect(init.headers["Authorization"]).toBe("Bearer ghp_test");
+  });
+
+  it("omits the query string entirely when no filters are given", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, []));
+    const client = createProxyClient({
+      baseUrl,
+      getAuthToken,
+      fetch: fetchMock,
+    });
+
+    await client.listAudit({});
+
+    expect(getUrl(fetchMock.mock.calls[0])).toBe(
+      "https://uploads.freecode.camp/api/audit",
+    );
+  });
+
+  it("parses a well-formed AuditRow array with optional fields omitted", async () => {
+    const rows = [
+      {
+        id: 7,
+        occurredAt: "2026-07-15T08:00:00Z",
+        actor: "alice",
+        action: "repo.approve",
+        outcome: "success",
+      },
+      {
+        id: 6,
+        occurredAt: "2026-07-15T07:00:00Z",
+        actor: "system:gc",
+        action: "gc.tombstone",
+        site: "www",
+        deployId: "20260715-070000-abc1234",
+        outcome: "success",
+        requestId: "req_abc",
+        detail: { name: "app" },
+      },
+    ];
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, rows));
+    const client = createProxyClient({
+      baseUrl,
+      getAuthToken,
+      fetch: fetchMock,
+    });
+
+    const got = await client.listAudit({ actor: "alice" });
+    expect(got).toEqual(rows);
+  });
+
+  it("rejects an AuditRow whose id is not a number with malformed_response", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse(200, [
+        {
+          id: "not-a-number",
+          occurredAt: "2026-07-15T08:00:00Z",
+          actor: "alice",
+          action: "repo.approve",
+          outcome: "success",
+        },
+      ]),
+    );
+    const client = createProxyClient({
+      baseUrl,
+      getAuthToken,
+      fetch: fetchMock,
+    });
+
+    await expect(client.listAudit({})).rejects.toMatchObject({
+      code: "malformed_response",
+      exitCode: EXIT_STORAGE,
+    });
+  });
+});

@@ -214,6 +214,18 @@ describe("ls command", () => {
     expect(msg).toContain("preview");
   });
 
+  it("shows the finalizing actor in the ACTOR column", async () => {
+    const proxy = mkProxy();
+    proxy.siteDeploys.mockResolvedValue([
+      { deployId: "20260427-141522-abc1234", actor: "alice" },
+    ]);
+    const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
+    await ls({ json: false }, deps);
+    const msg = deps.logSuccess.mock.calls[0]?.[0] ?? "";
+    expect(msg).toContain("ACTOR");
+    expect(msg).toContain("alice");
+  });
+
   it("reports empty list cleanly in text mode", async () => {
     const proxy = mkProxy();
     proxy.siteDeploys.mockResolvedValue([]);
