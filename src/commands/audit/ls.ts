@@ -22,7 +22,7 @@ function formatTable(rows: AuditRow[]): string {
     r.occurredAt,
     r.actor,
     r.action,
-    r.site || r.deployId || targetFromDetail(r),
+    targetOf(r),
     r.outcome,
   ]);
   const widths = headers.map((h, i) =>
@@ -36,6 +36,11 @@ function formatTable(rows: AuditRow[]): string {
 function targetFromDetail(r: AuditRow): string {
   const name = r.detail?.["name"];
   return typeof name === "string" ? name : "";
+}
+
+function targetOf(r: AuditRow): string {
+  if (r.site && r.deployId) return `${r.site}/${r.deployId}`;
+  return r.site || r.deployId || targetFromDetail(r);
 }
 
 export async function ls(

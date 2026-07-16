@@ -5,6 +5,7 @@ import {
   EXIT_USAGE,
 } from "../output/exit-codes.js";
 import { auditRowArraySchema } from "../commands/audit/schema.js";
+import { deploySummaryArraySchema } from "../commands/sites/schema.js";
 import {
   repoApproveResultSchema,
   repoRowArraySchema,
@@ -584,13 +585,17 @@ export function createProxyClient(cfg: ProxyClientConfig): ProxyClient {
 
     async siteDeploys(req) {
       const url = `${base}/api/site/${encodeURIComponent(req.site)}/deploys`;
-      return call<DeploySummary[]>(url, {
-        method: "GET",
-        headers: {
-          Authorization: await userBearer(),
-          Accept: "application/json",
+      return call<DeploySummary[]>(
+        url,
+        {
+          method: "GET",
+          headers: {
+            Authorization: await userBearer(),
+            Accept: "application/json",
+          },
         },
-      });
+        (raw) => deploySummaryArraySchema.parse(raw),
+      );
     },
 
     async getAlias(req) {

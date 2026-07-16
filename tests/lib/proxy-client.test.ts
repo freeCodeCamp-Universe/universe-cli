@@ -301,6 +301,22 @@ describe("createProxyClient", () => {
         "https://uploads.freecode.camp/api/site/a%20b/deploys",
       );
     });
+
+    it("rejects a response whose shape is not DeploySummary[]", async () => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValue(jsonResponse(200, [{ notADeployId: 1 }]));
+      const client = createProxyClient({
+        baseUrl,
+        getAuthToken,
+        fetch: fetchMock,
+      });
+      const err = await client
+        .siteDeploys({ site: "my-site" })
+        .catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(ProxyError);
+      expect((err as ProxyError).code).toBe("malformed_response");
+    });
   });
 
   describe("getAlias", () => {

@@ -85,4 +85,25 @@ describe("audit ls", () => {
     expect(listAudit).not.toHaveBeenCalled();
     expect(deps.exit).toHaveBeenCalled();
   });
+
+  it("keeps the deployId in TARGET for deploy-scoped rows", async () => {
+    const listAudit = vi.fn().mockResolvedValue([
+      {
+        id: 3,
+        occurredAt: "2026-07-14T11:00:00Z",
+        actor: "carol",
+        action: "deploy.finalize",
+        site: "www",
+        deployId: "20260714-110000-abc1234",
+        outcome: "success",
+      },
+    ] satisfies AuditRow[]);
+    const deps = mkDeps(listAudit);
+
+    await ls({ json: false }, deps);
+
+    const out = deps.logMessage.mock.calls[0]?.[0] as string;
+    expect(out).toContain("www");
+    expect(out).toContain("20260714-110000-abc1234");
+  });
 });
