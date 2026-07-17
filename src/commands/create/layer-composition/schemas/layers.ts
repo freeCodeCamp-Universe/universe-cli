@@ -38,7 +38,9 @@ const PackageManagerSchema = z.record(
     lockfile: z.string(),
     manifests: z.array(z.string()),
     pmInstall: z.string(),
-    pmVersion: z.string(),
+    pmVersion: z
+      .string()
+      .regex(/^\d+\.\d+\.\d+$/, "pmVersion must be a semver version (major.minor.patch), e.g. 1.2.3"),
     preinstall: z.string().optional(),
   }),
 );
