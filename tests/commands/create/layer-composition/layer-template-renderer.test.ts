@@ -4,6 +4,7 @@ import { LayerTemplateRenderer } from "../../../../src/commands/create/layer-com
 const rendererContext = {
   framework: "Express",
   name: "my-app",
+  pmVersion: "10.12.1",
   port: 3000,
   runtime: "Node.js (TypeScript)",
 };
@@ -44,12 +45,21 @@ describe(LayerTemplateRenderer, () => {
     expect(result).toBe("port=3000");
   });
 
+  it("substitutes {{pmVersion}} with the package manager version", () => {
+    const renderer = new LayerTemplateRenderer();
+
+    const result = renderer.render("RUN npm i -g bun@{{pmVersion}}", rendererContext);
+
+    expect(result).toBe("RUN npm i -g bun@10.12.1");
+  });
+
   it("returns the template unchanged when given an empty context", () => {
     const renderer = new LayerTemplateRenderer();
 
     const result = renderer.render("hello={{name}}", {
       framework: "",
       name: "",
+      pmVersion: "",
       port: 0,
       runtime: "",
     });

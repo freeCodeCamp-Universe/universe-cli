@@ -217,6 +217,7 @@ describe("create", () => {
     expect(deps.exit).not.toHaveBeenCalled();
     expect(specifyDeps).toHaveBeenCalledWith({
       manager: "pnpm",
+      pmVersion: "9.0.0",
       projectDirectory: join(rootDirectory, name),
     });
   });
@@ -235,6 +236,7 @@ describe("create", () => {
     expect(deps.exit).not.toHaveBeenCalled();
     expect(specifyDeps).toHaveBeenCalledWith({
       manager: "pnpm",
+      pmVersion: "9.0.0",
       projectDirectory: join(rootDirectory, name),
     });
   });

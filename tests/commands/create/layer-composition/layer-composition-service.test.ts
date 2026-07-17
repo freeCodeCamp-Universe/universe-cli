@@ -87,6 +87,36 @@ describe(LayerCompositionService, () => {
     expect(result.files["docker-compose.dev.yml"]).toContain("3000:3000");
   });
 
+  it("does not add packageManager field to package.json for pnpm (set later by specifyDeps)", async () => {
+    const result = await service.resolveLayers(nodeExpressSelection);
+    const pkg = JSON.parse(result.files["package.json"]!) as Record<string, unknown>;
+    expect(pkg["packageManager"]).toBeUndefined();
+  });
+
+  it("pins pnpm version in Dockerfile via corepack install -g", async () => {
+    const result = await service.resolveLayers(nodeExpressSelection);
+    expect(result.files["Dockerfile"]).toContain(
+      "RUN corepack enable pnpm && corepack install -g pnpm@9.0.0",
+    );
+  });
+
+  it("pins bun version in Dockerfile pmInstall", async () => {
+    const result = await service.resolveLayers({
+      ...nodeExpressSelection,
+      packageManager: "bun",
+    });
+    expect(result.files["Dockerfile"]).toContain("RUN npm i -g bun@1.0.0");
+  });
+
+  it("does not add packageManager field to package.json for bun", async () => {
+    const result = await service.resolveLayers({
+      ...nodeExpressSelection,
+      packageManager: "bun",
+    });
+    const pkg = JSON.parse(result.files["package.json"]!) as Record<string, unknown>;
+    expect(pkg["packageManager"]).toBeUndefined();
+  });
+
   it("emits a .dockerignore for node scaffold", async () => {
     const result = await service.resolveLayers(nodeExpressSelection);
 

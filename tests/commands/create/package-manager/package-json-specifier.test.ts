@@ -53,11 +53,11 @@ describe(createPackageSpecifier, () => {
     },
   });
 
-  describe("specifyDeps", () => {
+  describe("run", () => {
     it("creates a lockfile", async () => {
       const adapter = createAdapter(makeHappyRunner());
 
-      await adapter.specifyDeps(tmpDir);
+      await adapter.run(tmpDir);
 
       await expect(access(join(tmpDir, LOCKFILE_NAME))).resolves.toBeUndefined();
     });
@@ -65,7 +65,7 @@ describe(createPackageSpecifier, () => {
     it("pins versions in package.json", async () => {
       const adapter = createAdapter(makeHappyRunner());
 
-      await adapter.specifyDeps(tmpDir);
+      await adapter.run(tmpDir);
 
       const content = JSON.parse(await readFile(join(tmpDir, "package.json"), "utf8")) as {
         dependencies: Record<string, string>;
@@ -88,7 +88,7 @@ describe(createPackageSpecifier, () => {
       };
       const adapter = createAdapter(runner);
 
-      await adapter.specifyDeps(tmpDir);
+      await adapter.run(tmpDir);
 
       expect(installCount).toBe(2);
     });
@@ -104,7 +104,7 @@ describe(createPackageSpecifier, () => {
       };
       const adapter = createAdapter(runner);
 
-      await expect(adapter.specifyDeps(tmpDir)).rejects.toBeInstanceOf(UsageError);
+      await expect(adapter.run(tmpDir)).rejects.toBeInstanceOf(UsageError);
     });
 
     it("throws UsageError if lockfile was not created after the first install", async () => {
@@ -120,7 +120,7 @@ describe(createPackageSpecifier, () => {
       };
       const adapter = createAdapter(runner);
 
-      await expect(adapter.specifyDeps(tmpDir)).rejects.toBeInstanceOf(UsageError);
+      await expect(adapter.run(tmpDir)).rejects.toBeInstanceOf(UsageError);
       expect(listCalled).toBe(false);
     });
 
@@ -141,7 +141,7 @@ describe(createPackageSpecifier, () => {
       };
       const adapter = createAdapter(runner);
 
-      await expect(adapter.specifyDeps(tmpDir)).rejects.toBeInstanceOf(UsageError);
+      await expect(adapter.run(tmpDir)).rejects.toBeInstanceOf(UsageError);
     });
 
     it("throws UsageError if lockfile was not created after the pinning install", async () => {
@@ -160,7 +160,7 @@ describe(createPackageSpecifier, () => {
       };
       const adapter = createAdapter(runner);
 
-      await expect(adapter.specifyDeps(tmpDir)).rejects.toBeInstanceOf(UsageError);
+      await expect(adapter.run(tmpDir)).rejects.toBeInstanceOf(UsageError);
     });
   });
 });

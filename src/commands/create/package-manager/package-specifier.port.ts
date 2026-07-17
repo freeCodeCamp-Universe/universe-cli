@@ -1,5 +1,5 @@
 interface PackageSpecifier {
-  specifyDeps(projectDirectory: string): Promise<void>;
+  specifyDeps(projectDirectory: string, pmVersion: string): Promise<void>;
 }
 
 export type { PackageSpecifier };

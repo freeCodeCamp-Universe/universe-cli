@@ -16,6 +16,7 @@ const packageManager: PackageManagerLayerData = {
   lockfile: "pnpm-lock.yaml",
   manifests: ["package.json"],
   pmInstall: "RUN corepack enable pnpm",
+  pmVersion: "9.0.0",
 };
 
 const parseResult = (f: FrameworkLayerData, pm: PackageManagerLayerData) => {

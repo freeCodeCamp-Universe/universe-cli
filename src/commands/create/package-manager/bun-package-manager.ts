@@ -44,19 +44,20 @@ const extractVersions = (listOutput: string): Record<string, string> => {
 };
 
 class BunPackageManager implements PackageSpecifier {
-  private readonly impl: PackageSpecifier;
+  private readonly runner: BunRunner;
 
   constructor(runner: BunRunner = bunRunner) {
-    this.impl = createPackageSpecifier({
+    this.runner = runner;
+  }
+
+  specifyDeps(projectDirectory: string, _pmVersion: string): Promise<void> {
+    const specifier = createPackageSpecifier({
       deleteBeforeFirstInstall: true,
       extractVersions,
       lockfileName: LOCKFILE,
-      runner,
+      runner: this.runner,
     });
-  }
-
-  specifyDeps(projectDirectory: string): Promise<void> {
-    return this.impl.specifyDeps(projectDirectory);
+    return specifier.run(projectDirectory);
   }
 }
 

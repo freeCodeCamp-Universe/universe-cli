@@ -24,9 +24,20 @@ interface ListedPackage {
   devDependencies?: Record<string, ListedDependency>;
 }
 
-const defaultPnpmRunner: PnpmRunner = {
+type PnpmRunnerFactory = (pmVersion: string) => PnpmRunner;
+
+const defaultRunnerFactory: PnpmRunnerFactory = (pmVersion) => ({
   async installLockfileOnly(cwd) {
-    await runCmdForFiles(cwd, ["pnpm", "install", "--lockfile-only"], MANIFESTS, [LOCKFILE]);
+    await runCmdForFiles(
+      cwd,
+      [
+        "sh",
+        "-c",
+        `corepack use pnpm@${pmVersion} && pnpm install --lockfile-only`,
+      ],
+      MANIFESTS,
+      [LOCKFILE, "package.json"],
+    );
   },
   list(cwd) {
     return runCmdForStdout(
@@ -35,7 +46,7 @@ const defaultPnpmRunner: PnpmRunner = {
       [...MANIFESTS, LOCKFILE],
     );
   },
-};
+});
 
 const extractVersions = (listOutput: string): Record<string, string> => {
   const packages = JSON.parse(listOutput) as ListedPackage[];
@@ -54,20 +65,26 @@ const extractVersions = (listOutput: string): Record<string, string> => {
 };
 
 class PnpmPackageManager implements PackageSpecifier {
-  private readonly impl: PackageSpecifier;
+  private readonly createRunner: PnpmRunnerFactory;
 
-  constructor(runner: PnpmRunner = defaultPnpmRunner) {
-    this.impl = createPackageSpecifier({
+  constructor(createRunner: PnpmRunnerFactory = defaultRunnerFactory) {
+    this.createRunner = createRunner;
+  }
+
+  async specifyDeps(
+    projectDirectory: string,
+    pmVersion: string,
+  ): Promise<void> {
+    const runner = this.createRunner(pmVersion);
+    const specifier = createPackageSpecifier({
       deleteBeforeFirstInstall: false,
       extractVersions,
       lockfileName: LOCKFILE,
       runner,
     });
-  }
-
-  specifyDeps(projectDirectory: string): Promise<void> {
-    return this.impl.specifyDeps(projectDirectory);
+    await specifier.run(projectDirectory);
   }
 }
 
 export { PnpmPackageManager };
+export type { PnpmRunnerFactory };

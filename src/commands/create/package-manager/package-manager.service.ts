@@ -2,6 +2,7 @@ import type { PackageSpecifier } from "./package-specifier.port.js";
 
 interface RunOptions {
   manager: "pnpm" | "bun";
+  pmVersion: string;
   projectDirectory: string;
 }
 
@@ -17,12 +18,12 @@ class PackageManagerService implements PackageManager {
   }
 
   async specifyDeps(options: RunOptions): Promise<void> {
-    const { manager, projectDirectory } = options;
+    const { manager, pmVersion, projectDirectory } = options;
     const adapter = this.adapters[manager];
     if (!adapter) {
       throw new Error(`Unknown package manager: ${manager}`);
     }
-    await adapter.specifyDeps(projectDirectory);
+    await adapter.specifyDeps(projectDirectory, pmVersion);
   }
 }
 
