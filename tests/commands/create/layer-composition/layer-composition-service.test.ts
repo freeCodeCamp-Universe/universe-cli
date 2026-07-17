@@ -58,12 +58,12 @@ describe(LayerCompositionService, () => {
     expect(result.files["Dockerfile"]).toContain("RUN bun install");
   });
 
-  it("emits a docker-compose.dev.yml for node + express + pnpm", async () => {
+  it("emits a compose.yaml for node + express + pnpm", async () => {
     const result = await service.resolveLayers(nodeExpressSelection);
 
-    expect(result.files["docker-compose.dev.yml"]).toBeDefined();
-    expect(result.files["docker-compose.dev.yml"]).toContain("3000:3000");
-    expect(result.files["docker-compose.dev.yml"]).toContain("target: dev");
+    expect(result.files["compose.yaml"]).toBeDefined();
+    expect(result.files["compose.yaml"]).toContain("3000:3000");
+    expect(result.files["compose.yaml"]).toContain("target: dev");
   });
 
   it("emits a Dockerfile for node + typescript + pnpm", async () => {
@@ -77,14 +77,14 @@ describe(LayerCompositionService, () => {
     expect(result.files["Dockerfile"]).toContain('CMD ["pnpm"]');
   });
 
-  it("emits a docker-compose.dev.yml for node + typescript + pnpm", async () => {
+  it("emits a compose.yaml for node + typescript + pnpm", async () => {
     const result = await service.resolveLayers({
       ...nodeExpressSelection,
       framework: "typescript",
     });
 
-    expect(result.files["docker-compose.dev.yml"]).toBeDefined();
-    expect(result.files["docker-compose.dev.yml"]).toContain("3000:3000");
+    expect(result.files["compose.yaml"]).toBeDefined();
+    expect(result.files["compose.yaml"]).toContain("3000:3000");
   });
 
   it("does not add packageManager field to package.json for pnpm (set later by specifyDeps)", async () => {
@@ -123,11 +123,11 @@ describe(LayerCompositionService, () => {
     expect(result.files[".dockerignore"]).toBeDefined();
   });
 
-  it("emits a Dockerfile and docker-compose.dev.yml for static scaffold", async () => {
+  it("emits a Dockerfile and compose.yaml for static scaffold", async () => {
     const result = await service.resolveLayers(staticSelection);
 
     expect(result.files["Dockerfile"]).toBeDefined();
     expect(result.files[".dockerignore"]).toBeDefined();
-    expect(result.files["docker-compose.dev.yml"]).toBeDefined();
+    expect(result.files["compose.yaml"]).toBeDefined();
   });
 });

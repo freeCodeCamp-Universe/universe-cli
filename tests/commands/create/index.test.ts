@@ -52,7 +52,7 @@ const resolvedLayerFiles = {
   ".gitignore": "node_modules\n",
   Procfile: "web: node dist/index.js\n",
   "README.md": "# hello-universe\n",
-  "docker-compose.dev.yml": "services:{}\n",
+  "compose.yaml": "services:{}\n",
   "package.json": '{"name":"hello-universe"}',
   "src/index.ts": "console.log('hello universe');\n",
   "tsconfig.json": '{"compilerOptions":{}}',
@@ -339,7 +339,8 @@ describe("create", () => {
       },
     ]);
     expect(deps.logger.success).toHaveBeenCalledWith(
-      "Scaffolded project at /workspace/hello-universe",
+      "Project scaffolded. cd into /hello-universe and run " +
+        "`docker compose up --watch` to start the project",
     );
   });
 

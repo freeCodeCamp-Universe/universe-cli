@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parse as parseYaml } from "yaml";
-import { buildComposeDevYaml } from "../../../../src/commands/create/layer-composition/build-compose-dev-yaml.js";
+import { buildComposeYaml } from "../../../../src/commands/create/layer-composition/build-compose-yaml.js";
 import type { FrameworkLayerData, PackageManagerLayerData } from "../../../../src/commands/create/layer-composition/schemas/layers.js";
 
 const framework: FrameworkLayerData = {
@@ -20,12 +20,12 @@ const packageManager: PackageManagerLayerData = {
 };
 
 const parseResult = (f: FrameworkLayerData, pm: PackageManagerLayerData) => {
-  const yaml = parseYaml(buildComposeDevYaml(f, pm)) as Record<string, unknown>;
+  const yaml = parseYaml(buildComposeYaml(f, pm)) as Record<string, unknown>;
   const app = (yaml["services"] as Record<string, unknown>)["app"] as Record<string, unknown>;
   return app;
 };
 
-describe(buildComposeDevYaml, () => {
+describe(buildComposeYaml, () => {
   it("sets build context to ./", () => {
     const app = parseResult(framework, packageManager);
     expect((app["build"] as Record<string, unknown>)["context"]).toBe("./");
