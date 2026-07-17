@@ -60,6 +60,9 @@ const FrameworkSchema = z.record(
     devCopySource: z.string(),
     files: z.record(z.string(), z.string()),
     port: z.number(),
+    skills: z
+      .array(z.strictObject({ repo: z.string(), skill: z.string() }))
+      .optional(),
     watchSync: z.array(z.strictObject({ path: z.string(), target: z.string() })),
   }),
 );
