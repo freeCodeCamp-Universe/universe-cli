@@ -21,8 +21,16 @@ describe(NpxSkillInstaller, () => {
     );
 
     expect(calls).toStrictEqual([
-      ["npx", ["skills", "add", "org/a", "--skill", "a1", "--skill", "a2"], "/some/project"],
-      ["npx", ["skills", "add", "org/b", "--skill", "b1"], "/some/project"],
+      [
+        "npx",
+        ["--yes", "skills", "add", "--yes", "org/a", "--skill", "a1", "--skill", "a2"],
+        "/some/project",
+      ],
+      [
+        "npx",
+        ["--yes", "skills", "add", "--yes", "org/b", "--skill", "b1"],
+        "/some/project",
+      ],
     ]);
   });
 

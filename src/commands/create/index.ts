@@ -201,7 +201,14 @@ export const create = async (
 
     const skills = registry.frameworks[validatedInput.framework]?.skills;
     if (skills && skills.length > 0) {
-      await skillInstaller.installSkills(skills, targetDirectory);
+      try {
+        await skillInstaller.installSkills(skills, targetDirectory);
+      } catch (err) {
+        // Non-fatal: the project is already scaffolded. Route the failure to
+        // the logger (stderr / silent in --json mode) so it never lands on
+        // stdout and corrupts emitJson's envelope.
+        logger.error(err instanceof Error ? err.message : String(err));
+      }
     }
 
     await repoInitialiser.initialise(targetDirectory);

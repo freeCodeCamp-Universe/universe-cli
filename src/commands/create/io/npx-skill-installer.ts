@@ -36,8 +36,10 @@ class NpxSkillInstaller implements SkillInstaller {
     try {
       for (const [repo, repoSkills] of skillsByRepo) {
         const args = [
+          "--yes",
           "skills",
           "add",
+          "--yes",
           repo,
           ...repoSkills.flatMap((skill) => ["--skill", skill]),
         ];
