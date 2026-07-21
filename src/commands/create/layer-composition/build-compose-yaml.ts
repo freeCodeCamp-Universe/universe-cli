@@ -38,4 +38,28 @@ const buildComposeYaml = (
   return stringifyYaml(compose);
 };
 
-export { buildComposeYaml };
+const buildDevcontainerComposeYaml = () => `services:
+  devcontainer:
+    build:
+      context: ..
+      target: dev
+    command: ["sleep", "infinity"]
+    volumes:
+    # First mount the source
+      - type: bind
+        source: ..
+        target: /app
+        consistency: cached
+    # Then mount an anonymous volume to hold node_modules. Otherwise the bind mount causes the host node_modules to be used.
+      - type: volume
+        target: /app/node_modules
+`;
+
+const buildDevcontainerJson = () => `{
+  "$schema": "https://raw.githubusercontent.com/devcontainers/spec/main/schemas/devContainer.schema.json",
+  "dockerComposeFile": ["./docker-compose.yml"],
+  "service": "devcontainer",
+  "workspaceFolder": "/app"
+}`;
+
+export { buildComposeYaml, buildDevcontainerComposeYaml, buildDevcontainerJson };
