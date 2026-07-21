@@ -40,7 +40,10 @@ const PackageManagerSchema = z.record(
     pmInstall: z.string(),
     pmVersion: z
       .string()
-      .regex(/^\d+\.\d+\.\d+$/, "pmVersion must be a semver version (major.minor.patch), e.g. 1.2.3"),
+      .regex(
+        /^\d+\.\d+\.\d+$/,
+        "pmVersion must be a semver version (major.minor.patch), e.g. 1.2.3",
+      ),
     preinstall: z.string().optional(),
   }),
 );
@@ -60,9 +63,7 @@ const FrameworkSchema = z.record(
     devCopySource: z.string(),
     files: z.record(z.string(), z.string()),
     port: z.number(),
-    skills: z
-      .array(z.strictObject({ repo: z.string(), skill: z.string() }))
-      .optional(),
+    skills: z.array(z.strictObject({ repo: z.string(), skill: z.string() })).optional(),
     watchSync: z.array(z.strictObject({ path: z.string(), target: z.string() })),
   }),
 );

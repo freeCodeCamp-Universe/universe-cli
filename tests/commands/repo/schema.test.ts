@@ -65,10 +65,9 @@ describe("createRepoRequestSchema", () => {
   });
 
   it("rejects an empty-string template (must be omitted when blank)", () => {
-    expect(
-      createRepoRequestSchema.safeParse({ name: "my-repo", template: "" })
-        .success,
-    ).toBe(false);
+    expect(createRepoRequestSchema.safeParse({ name: "my-repo", template: "" }).success).toBe(
+      false,
+    );
   });
 
   it("rejects an invalid repo name", () => {

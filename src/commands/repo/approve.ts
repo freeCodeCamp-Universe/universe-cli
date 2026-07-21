@@ -4,12 +4,7 @@ import { wrapProxyError } from "../../lib/proxy-client.js";
 import { buildEnvelope } from "../../output/envelope.js";
 import { EXIT_STORAGE, exitWithCode } from "../../output/exit-codes.js";
 import { emitJson, outputError } from "../../output/format.js";
-import {
-  defaultRepoPrompts,
-  type RepoCommandDeps,
-  setupClient,
-  UsageError,
-} from "./_shared.js";
+import { defaultRepoPrompts, type RepoCommandDeps, setupClient, UsageError } from "./_shared.js";
 
 export interface RepoApproveOptions {
   json: boolean;
@@ -44,9 +39,7 @@ export async function approve(
     // must pass --yes rather than silently approving.
     if (!options.json && !options.yes) {
       if (!isTTY) {
-        throw new UsageError(
-          "non-interactive session: pass --yes to approve without confirmation",
-        );
+        throw new UsageError("non-interactive session: pass --yes to approve without confirmation");
       }
       const cur = await client.getRepoRequest(options.id);
       const ok = await prompts.confirm({
@@ -111,12 +104,10 @@ export async function approve(
   }
 
   if (creationFailure) {
-    outputError(
-      { json: true, command },
-      EXIT_STORAGE,
-      "approved, but repository creation failed",
-      { logError: error, extras: creationFailure },
-    );
+    outputError({ json: true, command }, EXIT_STORAGE, "approved, but repository creation failed", {
+      logError: error,
+      extras: creationFailure,
+    });
     exit(EXIT_STORAGE);
   }
 }

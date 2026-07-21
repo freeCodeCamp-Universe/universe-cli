@@ -51,9 +51,7 @@ function mkPrompts(over: Record<string, unknown> = {}) {
 function mkDeps(overrides: Record<string, unknown> = {}) {
   return {
     env: {} as NodeJS.ProcessEnv,
-    resolveIdentity: vi
-      .fn()
-      .mockResolvedValue({ token: "ghp_x", source: "env_GITHUB_TOKEN" }),
+    resolveIdentity: vi.fn().mockResolvedValue({ token: "ghp_x", source: "env_GITHUB_TOKEN" }),
     createProxyClient: vi.fn().mockReturnValue(mkProxy()),
     logSuccess: vi.fn(),
     logError: vi.fn(),
@@ -67,12 +65,10 @@ function mkDeps(overrides: Record<string, unknown> = {}) {
 describe("repo create command", () => {
   it("submits in JSON mode without prompting", async () => {
     const stdout: string[] = [];
-    const writeSpy = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation((c: unknown) => {
-        stdout.push(String(c));
-        return true;
-      });
+    const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((c: unknown) => {
+      stdout.push(String(c));
+      return true;
+    });
     const deps = mkDeps();
     await create({ json: true, name: "my-repo", visibility: "private" }, deps);
     writeSpy.mockRestore();
@@ -102,10 +98,7 @@ describe("repo create command", () => {
 
   it("coerces a numeric option value to a string (CA-2)", async () => {
     const deps = mkDeps();
-    await create(
-      { json: true, name: "my-repo", description: 2026 as unknown as string },
-      deps,
-    );
+    await create({ json: true, name: "my-repo", description: 2026 as unknown as string }, deps);
     const proxy = deps.createProxyClient.mock.results[0]?.value;
     expect(proxy.createRepoRequest).toHaveBeenCalledWith(
       expect.objectContaining({ description: "2026" }),
@@ -116,24 +109,20 @@ describe("repo create command", () => {
     const deps = mkDeps();
     await expect(create({ json: false }, deps)).rejects.toThrow("__exit__");
     expect(deps.exit).toHaveBeenCalledWith(10);
-    expect(deps.logError).toHaveBeenCalledWith(
-      expect.stringMatching(/name is required/i),
-    );
+    expect(deps.logError).toHaveBeenCalledWith(expect.stringMatching(/name is required/i));
   });
 
   it("rejects an invalid repo name with EXIT_USAGE", async () => {
     const deps = mkDeps();
-    await expect(create({ json: true, name: "-bad" }, deps)).rejects.toThrow(
-      "__exit__",
-    );
+    await expect(create({ json: true, name: "-bad" }, deps)).rejects.toThrow("__exit__");
     expect(deps.exit).toHaveBeenCalledWith(10);
   });
 
   it("rejects an invalid visibility with EXIT_USAGE", async () => {
     const deps = mkDeps();
-    await expect(
-      create({ json: true, name: "ok", visibility: "secret" }, deps),
-    ).rejects.toThrow("__exit__");
+    await expect(create({ json: true, name: "ok", visibility: "secret" }, deps)).rejects.toThrow(
+      "__exit__",
+    );
     expect(deps.exit).toHaveBeenCalledWith(10);
   });
 
@@ -167,9 +156,7 @@ describe("repo create command", () => {
       template: "hello-universe",
     });
     expect(prompts.confirm).toHaveBeenCalledTimes(1);
-    expect(deps.logSuccess).toHaveBeenCalledWith(
-      expect.stringContaining("Request submitted"),
-    );
+    expect(deps.logSuccess).toHaveBeenCalledWith(expect.stringContaining("Request submitted"));
   });
 
   it("falls back to free-text template when the allowlist is empty", async () => {
@@ -223,24 +210,16 @@ describe("repo create command", () => {
     const proxy = mkProxy();
     proxy.createRepoRequest = vi
       .fn()
-      .mockRejectedValue(
-        new ProxyError(409, "already_exists", "already pending"),
-      );
+      .mockRejectedValue(new ProxyError(409, "already_exists", "already pending"));
     const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
-    await expect(
-      create({ json: false, name: "dup", yes: true }, deps),
-    ).rejects.toThrow("__exit__");
+    await expect(create({ json: false, name: "dup", yes: true }, deps)).rejects.toThrow("__exit__");
     expect(deps.exit).toHaveBeenCalledWith(10);
-    expect(deps.logError).toHaveBeenCalledWith(
-      expect.stringContaining("already_exists"),
-    );
+    expect(deps.logError).toHaveBeenCalledWith(expect.stringContaining("already_exists"));
   });
 
   it("requires --yes in a non-interactive (non-TTY) session", async () => {
     const deps = mkDeps();
-    await expect(
-      create({ json: false, name: "my-repo" }, deps),
-    ).rejects.toThrow("__exit__");
+    await expect(create({ json: false, name: "my-repo" }, deps)).rejects.toThrow("__exit__");
     // The --yes gate must fire before any client setup.
     expect(deps.createProxyClient).not.toHaveBeenCalled();
     expect(deps.exit).toHaveBeenCalledWith(10); // EXIT_USAGE
@@ -254,9 +233,7 @@ describe("repo create command", () => {
     // error must win over the credential lookup.
     await expect(create({ json: false }, deps)).rejects.toThrow("__exit__");
     expect(deps.exit).toHaveBeenCalledWith(10); // EXIT_USAGE, not EXIT_CREDENTIALS
-    expect(deps.logError).toHaveBeenCalledWith(
-      expect.stringMatching(/name is required/i),
-    );
+    expect(deps.logError).toHaveBeenCalledWith(expect.stringMatching(/name is required/i));
     expect(deps.resolveIdentity).not.toHaveBeenCalled();
   });
 
@@ -265,38 +242,26 @@ describe("repo create command", () => {
     const proxy = mkProxy();
     proxy.createRepoRequest = vi
       .fn()
-      .mockRejectedValue(
-        new ProxyError(409, "already_exists", "already pending or active"),
-      );
+      .mockRejectedValue(new ProxyError(409, "already_exists", "already pending or active"));
     const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
-    await expect(
-      create({ json: false, name: "dup", yes: true }, deps),
-    ).rejects.toThrow("__exit__");
+    await expect(create({ json: false, name: "dup", yes: true }, deps)).rejects.toThrow("__exit__");
     expect(deps.exit).toHaveBeenCalledWith(10);
-    expect(deps.logError).toHaveBeenCalledWith(
-      expect.stringContaining("repo ls --status all"),
-    );
+    expect(deps.logError).toHaveBeenCalledWith(expect.stringContaining("repo ls --status all"));
   });
 
   it("omits the hint in JSON mode (machine output stays clean)", async () => {
     const stdout: string[] = [];
-    const writeSpy = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation((c: unknown) => {
-        stdout.push(String(c));
-        return true;
-      });
+    const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((c: unknown) => {
+      stdout.push(String(c));
+      return true;
+    });
     const { ProxyError } = await import("../../../src/lib/proxy-client.js");
     const proxy = mkProxy();
     proxy.createRepoRequest = vi
       .fn()
-      .mockRejectedValue(
-        new ProxyError(409, "already_exists", "already pending or active"),
-      );
+      .mockRejectedValue(new ProxyError(409, "already_exists", "already pending or active"));
     const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
-    await expect(
-      create({ json: true, name: "dup", yes: true }, deps),
-    ).rejects.toThrow("__exit__");
+    await expect(create({ json: true, name: "dup", yes: true }, deps)).rejects.toThrow("__exit__");
     writeSpy.mockRestore();
     const env = JSON.parse(stdout.join("").trim());
     expect(env.error.message).not.toContain("repo ls --status all");
@@ -309,9 +274,7 @@ describe("repo create command", () => {
     proxy.listRepoTemplates = vi.fn().mockResolvedValue([]);
     proxy.createRepoRequest = vi
       .fn()
-      .mockRejectedValue(
-        new ProxyError(409, "already_exists", "already pending or active"),
-      );
+      .mockRejectedValue(new ProxyError(409, "already_exists", "already pending or active"));
     const prompts = mkPrompts({
       text: vi
         .fn()
@@ -329,16 +292,12 @@ describe("repo create command", () => {
     await expect(create({ json: false }, deps)).rejects.toThrow("__exit__");
     expect(proxy.createRepoRequest).toHaveBeenCalled();
     expect(deps.exit).toHaveBeenCalledWith(10);
-    expect(deps.logError).toHaveBeenCalledWith(
-      expect.stringContaining("repo ls --status all"),
-    );
+    expect(deps.logError).toHaveBeenCalledWith(expect.stringContaining("repo ls --status all"));
   });
 
   it("falls back to free-text template when listRepoTemplates throws", async () => {
     const proxy = mkProxy();
-    proxy.listRepoTemplates = vi
-      .fn()
-      .mockRejectedValue(new Error("network unreachable"));
+    proxy.listRepoTemplates = vi.fn().mockRejectedValue(new Error("network unreachable"));
     const prompts = mkPrompts({
       text: vi
         .fn()

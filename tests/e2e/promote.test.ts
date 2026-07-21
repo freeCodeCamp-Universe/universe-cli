@@ -34,12 +34,10 @@ async function runPromote(
   options: { json: true; from?: string },
 ): Promise<RunResult> {
   const chunks: string[] = [];
-  const spy = vi
-    .spyOn(process.stdout, "write")
-    .mockImplementation((chunk: unknown) => {
-      chunks.push(String(chunk));
-      return true;
-    });
+  const spy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+    chunks.push(String(chunk));
+    return true;
+  });
   const captured: CapturedExit = {};
   try {
     await promote(options, {
@@ -54,8 +52,7 @@ async function runPromote(
   }
   spy.mockRestore();
   const raw = chunks.join("").trim();
-  const envelope =
-    raw.length > 0 ? (JSON.parse(raw) as Record<string, unknown>) : undefined;
+  const envelope = raw.length > 0 ? (JSON.parse(raw) as Record<string, unknown>) : undefined;
   return { captured, envelope };
 }
 
@@ -90,9 +87,7 @@ async function runPromoteText(
   return { captured, successes, errors };
 }
 
-async function makeProject(
-  site: string,
-): Promise<{ dir: string; cleanup: () => Promise<void> }> {
+async function makeProject(site: string): Promise<{ dir: string; cleanup: () => Promise<void> }> {
   const dir = await mkdtemp(join(tmpdir(), "universe-cli-e2e-promote-"));
   await writeFile(join(dir, "platform.yaml"), `site: ${site}\n`, "utf-8");
   return { dir, cleanup: () => rm(dir, { recursive: true, force: true }) };

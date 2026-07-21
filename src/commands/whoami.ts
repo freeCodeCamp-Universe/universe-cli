@@ -27,10 +27,7 @@ export interface WhoAmIDeps {
 
 const DEFAULT_PROXY_URL = "https://uploads.freecode.camp";
 
-export async function whoami(
-  options: WhoAmIOptions,
-  deps: WhoAmIDeps = {},
-): Promise<void> {
+export async function whoami(options: WhoAmIOptions, deps: WhoAmIDeps = {}): Promise<void> {
   const env = deps.env ?? process.env;
   const resolve = deps.resolveIdentity ?? defaultResolveIdentity;
   const mkClient = deps.createProxyClient ?? defaultCreateProxyClient;
@@ -42,12 +39,9 @@ export async function whoami(
   if (!identity) {
     const msg =
       "No GitHub identity available. Run `universe login`, set $GITHUB_TOKEN, or install the gh CLI.";
-    outputError(
-      { json: options.json, command: "whoami" },
-      EXIT_CREDENTIALS,
-      msg,
-      { logError: error },
-    );
+    outputError({ json: options.json, command: "whoami" }, EXIT_CREDENTIALS, msg, {
+      logError: error,
+    });
     exit(EXIT_CREDENTIALS);
     return;
   }

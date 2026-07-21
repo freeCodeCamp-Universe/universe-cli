@@ -28,11 +28,7 @@ describe("init E2E (spawned binary, real filesystem)", () => {
 
   it("scaffolds a schema-valid platform.yaml with --yes", async () => {
     const dir = await project();
-    const r = await runBinary(
-      ["init", "--json", "--yes", "--site", "my-fresh-site"],
-      ENV,
-      dir,
-    );
+    const r = await runBinary(["init", "--json", "--yes", "--site", "my-fresh-site"], ENV, dir);
     expect(r.exitCode, `stderr=${r.stderr}\nstdout=${r.stdout}`).toBe(0);
     const env = JSON.parse(r.stdout.trim()) as Record<string, unknown>;
     expect(env["command"]).toBe("init");
@@ -51,11 +47,7 @@ describe("init E2E (spawned binary, real filesystem)", () => {
       JSON.stringify({ scripts: { build: "vite build" } }),
       "utf-8",
     );
-    await writeFile(
-      join(dir, "pnpm-lock.yaml"),
-      "lockfileVersion: 9\n",
-      "utf-8",
-    );
+    await writeFile(join(dir, "pnpm-lock.yaml"), "lockfileVersion: 9\n", "utf-8");
     const r = await runBinary(["init", "--yes", "--site", "built"], ENV, dir);
     expect(r.exitCode, `stderr=${r.stderr}\nstdout=${r.stdout}`).toBe(0);
     const written = await readFile(join(dir, "platform.yaml"), "utf-8");

@@ -3,11 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { type CliEnv, makeCliEnv } from "./_helpers/cli-env.js";
-import {
-  type FakeArtemis,
-  type SiteRow,
-  startFakeArtemis,
-} from "./_helpers/fake-artemis.js";
+import { type FakeArtemis, type SiteRow, startFakeArtemis } from "./_helpers/fake-artemis.js";
 import { runBinary } from "./_helpers/spawn-cli.js";
 
 /**
@@ -94,9 +90,7 @@ describe("binary smoke matrix (10 verbs × 1 happy-path)", () => {
     resetState(server);
     const r = await runBinary(["whoami", "--json"], env.env);
     expect(r.exitCode, `stderr=${r.stderr}\nstdout=${r.stdout}`).toBe(0);
-    expect((JSON.parse(r.stdout.trim()) as { command: string }).command).toBe(
-      "whoami",
-    );
+    expect((JSON.parse(r.stdout.trim()) as { command: string }).command).toBe("whoami");
   }, 60_000);
 
   it("init --json --yes", async () => {
@@ -109,22 +103,15 @@ describe("binary smoke matrix (10 verbs × 1 happy-path)", () => {
       project.dir,
     );
     expect(r.exitCode, `stderr=${r.stderr}\nstdout=${r.stdout}`).toBe(0);
-    expect((JSON.parse(r.stdout.trim()) as { command: string }).command).toBe(
-      "init",
-    );
+    expect((JSON.parse(r.stdout.trim()) as { command: string }).command).toBe("init");
   }, 60_000);
 
   it("static ls --json --site <site>", async () => {
     resetState(server);
     server.state.registry.set(SITE, row(SITE));
-    const r = await runBinary(
-      ["static", "ls", "--json", "--site", SITE],
-      env.env,
-    );
+    const r = await runBinary(["static", "ls", "--json", "--site", SITE], env.env);
     expect(r.exitCode, `stderr=${r.stderr}\nstdout=${r.stdout}`).toBe(0);
-    expect((JSON.parse(r.stdout.trim()) as { command: string }).command).toBe(
-      "ls",
-    );
+    expect((JSON.parse(r.stdout.trim()) as { command: string }).command).toBe("ls");
   }, 60_000);
 
   it("static deploy --json (preview)", async () => {
@@ -132,11 +119,7 @@ describe("binary smoke matrix (10 verbs × 1 happy-path)", () => {
     server.state.registry.set(SITE, row(SITE));
     const project = await makeProject(SITE, { "index.html": "<html></html>" });
     projects.push(project);
-    const r = await runBinary(
-      ["static", "deploy", "--json"],
-      env.env,
-      project.dir,
-    );
+    const r = await runBinary(["static", "deploy", "--json"], env.env, project.dir);
     expect(r.exitCode, `stderr=${r.stderr}\nstdout=${r.stdout}`).toBe(0);
     const env0 = JSON.parse(r.stdout.trim()) as Record<string, unknown>;
     expect(env0["command"]).toBe("deploy");
@@ -149,23 +132,15 @@ describe("binary smoke matrix (10 verbs × 1 happy-path)", () => {
     server.state.aliases.preview.set(SITE, "20260301-091500-aaa1111");
     const project = await makeProject(SITE);
     projects.push(project);
-    const r = await runBinary(
-      ["static", "promote", "--json"],
-      env.env,
-      project.dir,
-    );
+    const r = await runBinary(["static", "promote", "--json"], env.env, project.dir);
     expect(r.exitCode, `stderr=${r.stderr}\nstdout=${r.stdout}`).toBe(0);
-    expect((JSON.parse(r.stdout.trim()) as { command: string }).command).toBe(
-      "promote",
-    );
+    expect((JSON.parse(r.stdout.trim()) as { command: string }).command).toBe("promote");
   }, 60_000);
 
   it("static rollback --json --to <id>", async () => {
     resetState(server);
     server.state.registry.set(SITE, row(SITE));
-    server.state.deploysBySite.set(SITE, [
-      { deployId: "20260101-090000-old0000" },
-    ]);
+    server.state.deploysBySite.set(SITE, [{ deployId: "20260101-090000-old0000" }]);
     const project = await makeProject(SITE);
     projects.push(project);
     const r = await runBinary(
@@ -174,21 +149,14 @@ describe("binary smoke matrix (10 verbs × 1 happy-path)", () => {
       project.dir,
     );
     expect(r.exitCode, `stderr=${r.stderr}\nstdout=${r.stdout}`).toBe(0);
-    expect((JSON.parse(r.stdout.trim()) as { command: string }).command).toBe(
-      "rollback",
-    );
+    expect((JSON.parse(r.stdout.trim()) as { command: string }).command).toBe("rollback");
   }, 60_000);
 
   it("sites register --json <slug>", async () => {
     resetState(server);
-    const r = await runBinary(
-      ["sites", "register", "smoke-fresh", "--json"],
-      env.env,
-    );
+    const r = await runBinary(["sites", "register", "smoke-fresh", "--json"], env.env);
     expect(r.exitCode, `stderr=${r.stderr}\nstdout=${r.stdout}`).toBe(0);
-    expect((JSON.parse(r.stdout.trim()) as { command: string }).command).toBe(
-      "sites register",
-    );
+    expect((JSON.parse(r.stdout.trim()) as { command: string }).command).toBe("sites register");
   }, 60_000);
 
   it("sites ls --json", async () => {
@@ -196,9 +164,7 @@ describe("binary smoke matrix (10 verbs × 1 happy-path)", () => {
     server.state.registry.set(SITE, row(SITE));
     const r = await runBinary(["sites", "ls", "--json"], env.env);
     expect(r.exitCode, `stderr=${r.stderr}\nstdout=${r.stdout}`).toBe(0);
-    expect((JSON.parse(r.stdout.trim()) as { command: string }).command).toBe(
-      "sites ls",
-    );
+    expect((JSON.parse(r.stdout.trim()) as { command: string }).command).toBe("sites ls");
   }, 60_000);
 
   it("sites update --json <slug> --team <team>", async () => {
@@ -209,9 +175,7 @@ describe("binary smoke matrix (10 verbs × 1 happy-path)", () => {
       env.env,
     );
     expect(r.exitCode, `stderr=${r.stderr}\nstdout=${r.stdout}`).toBe(0);
-    expect((JSON.parse(r.stdout.trim()) as { command: string }).command).toBe(
-      "sites update",
-    );
+    expect((JSON.parse(r.stdout.trim()) as { command: string }).command).toBe("sites update");
   }, 60_000);
 
   it("sites rm --json <slug>", async () => {
@@ -219,9 +183,7 @@ describe("binary smoke matrix (10 verbs × 1 happy-path)", () => {
     server.state.registry.set(SITE, row(SITE));
     const r = await runBinary(["sites", "rm", SITE, "--json"], env.env);
     expect(r.exitCode, `stderr=${r.stderr}\nstdout=${r.stdout}`).toBe(0);
-    expect((JSON.parse(r.stdout.trim()) as { command: string }).command).toBe(
-      "sites rm",
-    );
+    expect((JSON.parse(r.stdout.trim()) as { command: string }).command).toBe("sites rm");
   }, 60_000);
 
   it("logout --json (idempotent — no token to remove)", async () => {
@@ -232,9 +194,7 @@ describe("binary smoke matrix (10 verbs × 1 happy-path)", () => {
     try {
       const r = await runBinary(["logout", "--json"], logoutEnv.env);
       expect(r.exitCode, `stderr=${r.stderr}\nstdout=${r.stdout}`).toBe(0);
-      expect((JSON.parse(r.stdout.trim()) as { command: string }).command).toBe(
-        "logout",
-      );
+      expect((JSON.parse(r.stdout.trim()) as { command: string }).command).toBe("logout");
     } finally {
       await logoutEnv.cleanup();
     }

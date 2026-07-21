@@ -34,9 +34,7 @@ function mkProxy() {
     createRepoRequest: vi.fn(),
     listRepoRequests: vi.fn(),
     getRepoRequest: vi.fn().mockResolvedValue(repoRow({ status: "pending" })),
-    approveRepoRequest: vi
-      .fn()
-      .mockResolvedValue({ outcome: "ok", request: repoRow() }),
+    approveRepoRequest: vi.fn().mockResolvedValue({ outcome: "ok", request: repoRow() }),
     rejectRepoRequest: vi.fn(),
     listRepoTemplates: vi.fn(),
   };
@@ -45,9 +43,7 @@ function mkProxy() {
 function mkDeps(overrides: Record<string, unknown> = {}) {
   return {
     env: {} as NodeJS.ProcessEnv,
-    resolveIdentity: vi
-      .fn()
-      .mockResolvedValue({ token: "ghp_x", source: "env_GITHUB_TOKEN" }),
+    resolveIdentity: vi.fn().mockResolvedValue({ token: "ghp_x", source: "env_GITHUB_TOKEN" }),
     createProxyClient: vi.fn().mockReturnValue(mkProxy()),
     logSuccess: vi.fn(),
     logError: vi.fn(),
@@ -61,12 +57,10 @@ function mkDeps(overrides: Record<string, unknown> = {}) {
 describe("repo approve command", () => {
   it("renders the ok outcome without prompting in JSON mode", async () => {
     const stdout: string[] = [];
-    const writeSpy = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation((c: unknown) => {
-        stdout.push(String(c));
-        return true;
-      });
+    const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((c: unknown) => {
+      stdout.push(String(c));
+      return true;
+    });
     const deps = mkDeps();
     await approve({ json: true, id: "req_001" }, deps);
     writeSpy.mockRestore();
@@ -86,13 +80,11 @@ describe("repo approve command", () => {
       request: repoRow({ status: "failed", error: "missing Contents:read" }),
     });
     const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
-    await expect(
-      approve({ json: false, id: "req_001", yes: true }, deps),
-    ).rejects.toThrow("__exit__");
-    expect(deps.exit).toHaveBeenCalledWith(13); // EXIT_STORAGE
-    expect(deps.logError).toHaveBeenCalledWith(
-      expect.stringContaining("creation failed"),
+    await expect(approve({ json: false, id: "req_001", yes: true }, deps)).rejects.toThrow(
+      "__exit__",
     );
+    expect(deps.exit).toHaveBeenCalledWith(13); // EXIT_STORAGE
+    expect(deps.logError).toHaveBeenCalledWith(expect.stringContaining("creation failed"));
   });
 
   it("aborts with EXIT_CONFIRM when the confirm is declined", async () => {
@@ -108,9 +100,7 @@ describe("repo approve command", () => {
       isTTY: true,
       prompts,
     });
-    await expect(approve({ json: false, id: "req_001" }, deps)).rejects.toThrow(
-      "__exit__",
-    );
+    await expect(approve({ json: false, id: "req_001" }, deps)).rejects.toThrow("__exit__");
     expect(proxy.getRepoRequest).toHaveBeenCalledWith("req_001"); // echo
     expect(proxy.approveRepoRequest).not.toHaveBeenCalled();
     expect(deps.exit).toHaveBeenCalledWith(18); // EXIT_CONFIRM
@@ -121,36 +111,28 @@ describe("repo approve command", () => {
     const proxy = mkProxy();
     proxy.approveRepoRequest = vi
       .fn()
-      .mockRejectedValue(
-        new ProxyError(409, "already_resolved", "resolved by another admin"),
-      );
+      .mockRejectedValue(new ProxyError(409, "already_resolved", "resolved by another admin"));
     const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
-    await expect(
-      approve({ json: false, id: "req_001", yes: true }, deps),
-    ).rejects.toThrow("__exit__");
-    expect(deps.exit).toHaveBeenCalledWith(10);
-    expect(deps.logError).toHaveBeenCalledWith(
-      expect.stringContaining("already_resolved"),
+    await expect(approve({ json: false, id: "req_001", yes: true }, deps)).rejects.toThrow(
+      "__exit__",
     );
+    expect(deps.exit).toHaveBeenCalledWith(10);
+    expect(deps.logError).toHaveBeenCalledWith(expect.stringContaining("already_resolved"));
   });
 
   it("emits a structured failure envelope for approved_failed in JSON mode", async () => {
     const stdout: string[] = [];
-    const writeSpy = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation((c: unknown) => {
-        stdout.push(String(c));
-        return true;
-      });
+    const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((c: unknown) => {
+      stdout.push(String(c));
+      return true;
+    });
     const proxy = mkProxy();
     proxy.approveRepoRequest = vi.fn().mockResolvedValue({
       outcome: "approved_failed",
       request: repoRow({ status: "failed", error: "missing Contents:read" }),
     });
     const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
-    await expect(approve({ json: true, id: "req_001" }, deps)).rejects.toThrow(
-      "__exit__",
-    );
+    await expect(approve({ json: true, id: "req_001" }, deps)).rejects.toThrow("__exit__");
     writeSpy.mockRestore();
     expect(deps.exit).toHaveBeenCalledWith(13);
     const env = JSON.parse(stdout.join("").trim());
@@ -167,9 +149,7 @@ describe("repo approve command", () => {
   it("requires --yes in a non-interactive (non-TTY) session", async () => {
     const proxy = mkProxy();
     const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
-    await expect(approve({ json: false, id: "req_001" }, deps)).rejects.toThrow(
-      "__exit__",
-    );
+    await expect(approve({ json: false, id: "req_001" }, deps)).rejects.toThrow("__exit__");
     expect(proxy.approveRepoRequest).not.toHaveBeenCalled();
     expect(deps.exit).toHaveBeenCalledWith(10); // EXIT_USAGE
   });
@@ -191,9 +171,7 @@ describe("repo approve command", () => {
       isTTY: true,
       prompts,
     });
-    await expect(approve({ json: false, id: "ghost" }, deps)).rejects.toThrow(
-      "__exit__",
-    );
+    await expect(approve({ json: false, id: "ghost" }, deps)).rejects.toThrow("__exit__");
     expect(deps.exit).toHaveBeenCalledWith(10); // EXIT_USAGE
     expect(prompts.confirm).not.toHaveBeenCalled();
     expect(proxy.approveRepoRequest).not.toHaveBeenCalled();

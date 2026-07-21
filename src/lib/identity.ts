@@ -32,11 +32,7 @@ const execFileP = promisify(execFile);
  * Source labels are stable strings used by `whoami` output and tests.
  */
 
-export type IdentitySource =
-  | "env_GITHUB_TOKEN"
-  | "env_GH_TOKEN"
-  | "gh_cli"
-  | "device_flow";
+export type IdentitySource = "env_GITHUB_TOKEN" | "env_GH_TOKEN" | "gh_cli" | "device_flow";
 
 export interface ResolvedIdentity {
   token: string;

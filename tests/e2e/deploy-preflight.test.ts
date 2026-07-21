@@ -29,21 +29,14 @@ interface RunResult {
   buildCalls: number;
 }
 
-async function runDeployWithBuildStub(
-  env: NodeJS.ProcessEnv,
-  cwd: string,
-): Promise<RunResult> {
+async function runDeployWithBuildStub(env: NodeJS.ProcessEnv, cwd: string): Promise<RunResult> {
   const chunks: string[] = [];
-  const spy = vi
-    .spyOn(process.stdout, "write")
-    .mockImplementation((chunk: unknown) => {
-      chunks.push(String(chunk));
-      return true;
-    });
+  const spy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+    chunks.push(String(chunk));
+    return true;
+  });
   const captured: CapturedExit = {};
-  const buildStub = vi
-    .fn()
-    .mockResolvedValue({ skipped: true, outputDir: join(cwd, "dist") });
+  const buildStub = vi.fn().mockResolvedValue({ skipped: true, outputDir: join(cwd, "dist") });
   try {
     await deploy(
       { json: true, promote: false },
@@ -64,8 +57,7 @@ async function runDeployWithBuildStub(
   }
   spy.mockRestore();
   const raw = chunks.join("").trim();
-  const envelope =
-    raw.length > 0 ? (JSON.parse(raw) as Record<string, unknown>) : undefined;
+  const envelope = raw.length > 0 ? (JSON.parse(raw) as Record<string, unknown>) : undefined;
   return { captured, envelope, buildCalls: buildStub.mock.calls.length };
 }
 
@@ -128,14 +120,10 @@ describe("static deploy preflight E2E (build never runs on auth failure)", () =>
 
     expect(r.buildCalls).toBe(0);
 
-    const deployCalls = server.callLog.filter((c) =>
-      c.path.startsWith("/api/deploy/"),
-    );
+    const deployCalls = server.callLog.filter((c) => c.path.startsWith("/api/deploy/"));
     expect(deployCalls).toHaveLength(0);
 
-    expect(server.callLog.filter((c) => c.path === "/api/whoami")).toHaveLength(
-      1,
-    );
+    expect(server.callLog.filter((c) => c.path === "/api/whoami")).toHaveLength(1);
   });
 
   it("whoami 200 but site_unauthorized → EXIT_CREDENTIALS with rich body, build skipped", async () => {
@@ -165,9 +153,7 @@ describe("static deploy preflight E2E (build never runs on auth failure)", () =>
 
     expect(r.buildCalls).toBe(0);
 
-    const deployCalls = server.callLog.filter((c) =>
-      c.path.startsWith("/api/deploy/"),
-    );
+    const deployCalls = server.callLog.filter((c) => c.path.startsWith("/api/deploy/"));
     expect(deployCalls).toHaveLength(0);
   });
 });

@@ -109,8 +109,7 @@ export async function create(
           message: "Repository name",
           placeholder: "learn-python-rpg",
         });
-        if (prompts.isCancel(v))
-          throw new ConfirmError("repo create cancelled");
+        if (prompts.isCancel(v)) throw new ConfirmError("repo create cancelled");
         name = String(v).trim();
       }
       if (visibility === undefined) {
@@ -122,8 +121,7 @@ export async function create(
           ],
           initialValue: "private",
         });
-        if (prompts.isCancel(v))
-          throw new ConfirmError("repo create cancelled");
+        if (prompts.isCancel(v)) throw new ConfirmError("repo create cancelled");
         visibility = String(v);
       }
       if (description === undefined) {
@@ -131,8 +129,7 @@ export async function create(
           message: "Description (optional)",
           placeholder: "What is this project about?",
         });
-        if (prompts.isCancel(v))
-          throw new ConfirmError("repo create cancelled");
+        if (prompts.isCancel(v)) throw new ConfirmError("repo create cancelled");
         description = String(v);
       }
       if (template === undefined) {
@@ -155,9 +152,7 @@ export async function create(
 
     const parsed = createRepoRequestSchema.safeParse(candidate);
     if (!parsed.success) {
-      const issues = parsed.error.issues.map(
-        (i) => `${i.path.join(".") || "input"}: ${i.message}`,
-      );
+      const issues = parsed.error.issues.map((i) => `${i.path.join(".") || "input"}: ${i.message}`);
       throw new UsageError(issues.join("; "));
     }
     const body = parsed.data;

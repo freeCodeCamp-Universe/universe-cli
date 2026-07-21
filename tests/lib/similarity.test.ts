@@ -29,9 +29,9 @@ describe("suggest", () => {
   });
 
   it("prefers substring match over edit distance", () => {
-    expect(
-      suggest("hello-universe-1", ["hello-universe", "gomoku", "test"]),
-    ).toBe("hello-universe");
+    expect(suggest("hello-universe-1", ["hello-universe", "gomoku", "test"])).toBe(
+      "hello-universe",
+    );
   });
 
   it("matches substring in either direction, case-insensitively", () => {

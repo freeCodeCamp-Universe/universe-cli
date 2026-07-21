@@ -34,12 +34,10 @@ async function runRollback(
   options: { json: true; to: string | undefined },
 ): Promise<RunResult> {
   const chunks: string[] = [];
-  const spy = vi
-    .spyOn(process.stdout, "write")
-    .mockImplementation((chunk: unknown) => {
-      chunks.push(String(chunk));
-      return true;
-    });
+  const spy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+    chunks.push(String(chunk));
+    return true;
+  });
   const captured: CapturedExit = {};
   try {
     await rollback(options, {
@@ -54,14 +52,11 @@ async function runRollback(
   }
   spy.mockRestore();
   const raw = chunks.join("").trim();
-  const envelope =
-    raw.length > 0 ? (JSON.parse(raw) as Record<string, unknown>) : undefined;
+  const envelope = raw.length > 0 ? (JSON.parse(raw) as Record<string, unknown>) : undefined;
   return { captured, envelope };
 }
 
-async function makeProject(
-  site: string,
-): Promise<{ dir: string; cleanup: () => Promise<void> }> {
+async function makeProject(site: string): Promise<{ dir: string; cleanup: () => Promise<void> }> {
   const dir = await mkdtemp(join(tmpdir(), "universe-cli-e2e-rollback-"));
   await writeFile(join(dir, "platform.yaml"), `site: ${site}\n`, "utf-8");
   return { dir, cleanup: () => rm(dir, { recursive: true, force: true }) };
@@ -101,10 +96,7 @@ describe("static rollback E2E", () => {
   it("rollback --to <id> rewinds production alias to a prior deploy", async () => {
     const oldId = "20251010-090000-old0000";
     const currentId = "20260301-091500-new1111";
-    server.state.deploysBySite.set(site, [
-      { deployId: currentId },
-      { deployId: oldId },
-    ]);
+    server.state.deploysBySite.set(site, [{ deployId: currentId }, { deployId: oldId }]);
     server.state.aliases.production.set(site, currentId);
     env = await makeCliEnv({ proxyUrl: server.url, githubToken: token });
     const project = await makeProject(site);

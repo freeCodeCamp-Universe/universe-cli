@@ -4,12 +4,7 @@ import { wrapProxyError } from "../../lib/proxy-client.js";
 import { buildEnvelope } from "../../output/envelope.js";
 import { exitWithCode } from "../../output/exit-codes.js";
 import { emitJson, outputError } from "../../output/format.js";
-import {
-  defaultRepoPrompts,
-  type RepoCommandDeps,
-  setupClient,
-  UsageError,
-} from "./_shared.js";
+import { defaultRepoPrompts, type RepoCommandDeps, setupClient, UsageError } from "./_shared.js";
 
 export interface RepoRejectOptions {
   json: boolean;
@@ -43,9 +38,7 @@ export async function reject(
     // session must pass --yes rather than silently rejecting.
     if (!options.json && !options.yes) {
       if (!isTTY) {
-        throw new UsageError(
-          "non-interactive session: pass --yes to reject without confirmation",
-        );
+        throw new UsageError("non-interactive session: pass --yes to reject without confirmation");
       }
       const cur = await client.getRepoRequest(options.id);
       const ok = await prompts.confirm({
@@ -57,9 +50,7 @@ export async function reject(
     }
 
     const reason =
-      options.reason === undefined
-        ? undefined
-        : String(options.reason).trim() || undefined;
+      options.reason === undefined ? undefined : String(options.reason).trim() || undefined;
     const row = await client.rejectRepoRequest({
       id: options.id,
       reason,

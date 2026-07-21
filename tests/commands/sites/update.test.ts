@@ -43,10 +43,7 @@ function mkDeps(overrides: Record<string, unknown> = {}) {
 describe("sites update command", () => {
   it("calls updateSite with slug + parsed teams", async () => {
     const deps = mkDeps();
-    await update(
-      { json: false, slug: "blog", team: "news-editors,platform" },
-      deps,
-    );
+    await update({ json: false, slug: "blog", team: "news-editors,platform" }, deps);
     const proxy = deps.createProxyClient.mock.results[0]?.value;
     expect(proxy.updateSite).toHaveBeenCalledWith({
       slug: "blog",
@@ -56,51 +53,36 @@ describe("sites update command", () => {
 
   it("rejects empty slug with EXIT_USAGE", async () => {
     const deps = mkDeps();
-    await expect(
-      update({ json: false, slug: "", team: "staff" }, deps),
-    ).rejects.toThrow("__exit__");
-    expect(deps.exit).toHaveBeenCalledWith(10);
-    expect(deps.logError).toHaveBeenCalledWith(
-      expect.stringMatching(/slug is required/i),
+    await expect(update({ json: false, slug: "", team: "staff" }, deps)).rejects.toThrow(
+      "__exit__",
     );
+    expect(deps.exit).toHaveBeenCalledWith(10);
+    expect(deps.logError).toHaveBeenCalledWith(expect.stringMatching(/slug is required/i));
   });
 
   it("rejects missing --team with EXIT_USAGE (server enforces too)", async () => {
     const deps = mkDeps();
-    await expect(update({ json: false, slug: "blog" }, deps)).rejects.toThrow(
-      "__exit__",
-    );
+    await expect(update({ json: false, slug: "blog" }, deps)).rejects.toThrow("__exit__");
     expect(deps.exit).toHaveBeenCalledWith(10);
-    expect(deps.logError).toHaveBeenCalledWith(
-      expect.stringMatching(/--team is required/i),
-    );
+    expect(deps.logError).toHaveBeenCalledWith(expect.stringMatching(/--team is required/i));
   });
 
   it("rejects empty --team string with EXIT_USAGE", async () => {
     const deps = mkDeps();
-    await expect(
-      update({ json: false, slug: "blog", team: "" }, deps),
-    ).rejects.toThrow("__exit__");
+    await expect(update({ json: false, slug: "blog", team: "" }, deps)).rejects.toThrow("__exit__");
     expect(deps.exit).toHaveBeenCalledWith(10);
-    expect(deps.logError).toHaveBeenCalledWith(
-      expect.stringMatching(/--team is required/i),
-    );
+    expect(deps.logError).toHaveBeenCalledWith(expect.stringMatching(/--team is required/i));
   });
 
   it("emits success envelope in JSON mode", async () => {
     const stdout: string[] = [];
-    const writeSpy = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation((chunk: unknown) => {
-        stdout.push(String(chunk));
-        return true;
-      });
+    const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+      stdout.push(String(chunk));
+      return true;
+    });
 
     const deps = mkDeps();
-    await update(
-      { json: true, slug: "blog", team: "news-editors,platform" },
-      deps,
-    );
+    await update({ json: true, slug: "blog", team: "news-editors,platform" }, deps);
     writeSpy.mockRestore();
 
     const env = JSON.parse(stdout.join("").trim());
@@ -118,18 +100,14 @@ describe("sites update command", () => {
     const proxy = mkProxy();
     proxy.updateSite = vi
       .fn()
-      .mockRejectedValue(
-        new ProxyError(404, "not_found", "site is not registered"),
-      );
+      .mockRejectedValue(new ProxyError(404, "not_found", "site is not registered"));
     const deps = mkDeps({
       createProxyClient: vi.fn().mockReturnValue(proxy),
     });
-    await expect(
-      update({ json: false, slug: "ghost", team: "staff" }, deps),
-    ).rejects.toThrow("__exit__");
-    expect(deps.exit).toHaveBeenCalledWith(10);
-    expect(deps.logError).toHaveBeenCalledWith(
-      expect.stringContaining("not_found"),
+    await expect(update({ json: false, slug: "ghost", team: "staff" }, deps)).rejects.toThrow(
+      "__exit__",
     );
+    expect(deps.exit).toHaveBeenCalledWith(10);
+    expect(deps.logError).toHaveBeenCalledWith(expect.stringContaining("not_found"));
   });
 });

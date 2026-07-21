@@ -20,9 +20,7 @@ function mkProxy(): {
     deployUpload: vi.fn(),
     deployFinalize: vi.fn(),
     siteDeploys: vi.fn(),
-    getAlias: vi
-      .fn()
-      .mockResolvedValue({ url: "https://x.freecode.camp", deployId: "PROD1" }),
+    getAlias: vi.fn().mockResolvedValue({ url: "https://x.freecode.camp", deployId: "PROD1" }),
     sitePromote: vi.fn(),
     siteRollback: vi.fn().mockResolvedValue({
       url: "https://my-site.freecode.camp",
@@ -67,9 +65,7 @@ describe("rollback command", () => {
   it("pre-flights getAlias(production) and pins expectedCurrent", async () => {
     const deps = mkDeps();
     await rollback({ json: false, to: "older" }, deps);
-    const proxy = deps.createProxyClient.mock.results[0]?.value as ReturnType<
-      typeof mkProxy
-    >;
+    const proxy = deps.createProxyClient.mock.results[0]?.value as ReturnType<typeof mkProxy>;
     expect(proxy.getAlias).toHaveBeenCalledWith({
       site: "my-site",
       mode: "production",
@@ -97,12 +93,10 @@ describe("rollback command", () => {
 
   it("emits success envelope in JSON mode", async () => {
     const stdout: string[] = [];
-    const writeSpy = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation((chunk: unknown) => {
-        stdout.push(String(chunk));
-        return true;
-      });
+    const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+      stdout.push(String(chunk));
+      return true;
+    });
 
     const deps = mkDeps();
     await rollback({ json: true, to: "older" }, deps);
@@ -117,9 +111,7 @@ describe("rollback command", () => {
 
   it("errors with EXIT_USAGE when --to is missing", async () => {
     const deps = mkDeps();
-    await expect(
-      rollback({ json: false, to: undefined }, deps),
-    ).rejects.toThrow("__exit__");
+    await expect(rollback({ json: false, to: undefined }, deps)).rejects.toThrow("__exit__");
     expect(deps.exit).toHaveBeenCalledWith(10);
     expect(deps.logError).toHaveBeenCalledWith(expect.stringMatching(/--to/i));
   });
@@ -128,62 +120,42 @@ describe("rollback command", () => {
     const deps = mkDeps({
       resolveIdentity: vi.fn().mockResolvedValue(null),
     });
-    await expect(rollback({ json: false, to: "x" }, deps)).rejects.toThrow(
-      "__exit__",
-    );
+    await expect(rollback({ json: false, to: "x" }, deps)).rejects.toThrow("__exit__");
     expect(deps.exit).toHaveBeenCalledWith(12);
-    expect(deps.logError).toHaveBeenCalledWith(
-      expect.stringMatching(/login|identity/i),
-    );
+    expect(deps.logError).toHaveBeenCalledWith(expect.stringMatching(/login|identity/i));
   });
 
   it("propagates 422 deploy_missing as EXIT_STORAGE", async () => {
     const proxy = mkProxy();
     proxy.siteRollback.mockRejectedValue(
-      new ProxyError(
-        422,
-        "deploy_missing",
-        "target deploy no longer exists in r2",
-      ),
+      new ProxyError(422, "deploy_missing", "target deploy no longer exists in r2"),
     );
     const deps = mkDeps({
       createProxyClient: vi.fn().mockReturnValue(proxy),
     });
-    await expect(
-      rollback({ json: false, to: "ancient" }, deps),
-    ).rejects.toThrow("__exit__");
+    await expect(rollback({ json: false, to: "ancient" }, deps)).rejects.toThrow("__exit__");
     expect(deps.exit).toHaveBeenCalledWith(13);
-    expect(deps.logError).toHaveBeenCalledWith(
-      expect.stringContaining("no longer exists"),
-    );
+    expect(deps.logError).toHaveBeenCalledWith(expect.stringContaining("no longer exists"));
   });
 
   describe("409 alias_drift handling", () => {
     it("JSON mode emits envelope with top-level current field, no retry", async () => {
       const proxy = mkProxy();
-      proxy.siteRollback.mockRejectedValueOnce(
-        new AliasDriftError("drift", "newer-id"),
-      );
+      proxy.siteRollback.mockRejectedValueOnce(new AliasDriftError("drift", "newer-id"));
       const deps = mkDeps({
         createProxyClient: vi.fn().mockReturnValue(proxy),
       });
       const stdout: string[] = [];
-      const spy = vi
-        .spyOn(process.stdout, "write")
-        .mockImplementation((chunk: unknown) => {
-          stdout.push(String(chunk));
-          return true;
-        });
-      await expect(rollback({ json: true, to: "older" }, deps)).rejects.toThrow(
-        "__exit__",
-      );
+      const spy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+        stdout.push(String(chunk));
+        return true;
+      });
+      await expect(rollback({ json: true, to: "older" }, deps)).rejects.toThrow("__exit__");
       spy.mockRestore();
       const env = JSON.parse(stdout.join("").trim());
       expect(env.success).toBe(false);
       expect(env.current).toBe("newer-id");
-      expect((env.error as { message: string }).message).toContain(
-        "alias_drift",
-      );
+      expect((env.error as { message: string }).message).toContain("alias_drift");
       expect(deps.exit).toHaveBeenCalledWith(10);
       expect(deps.promptConfirm).not.toHaveBeenCalled();
       expect(proxy.siteRollback).toHaveBeenCalledTimes(1);
@@ -213,16 +185,12 @@ describe("rollback command", () => {
 
     it("non-JSON confirm=no exits with EXIT_USAGE, no retry", async () => {
       const proxy = mkProxy();
-      proxy.siteRollback.mockRejectedValueOnce(
-        new AliasDriftError("drift", "newer-id"),
-      );
+      proxy.siteRollback.mockRejectedValueOnce(new AliasDriftError("drift", "newer-id"));
       const deps = mkDeps({
         createProxyClient: vi.fn().mockReturnValue(proxy),
         promptConfirm: vi.fn().mockResolvedValue(false),
       });
-      await expect(
-        rollback({ json: false, to: "older" }, deps),
-      ).rejects.toThrow("__exit__");
+      await expect(rollback({ json: false, to: "older" }, deps)).rejects.toThrow("__exit__");
       expect(deps.exit).toHaveBeenCalledWith(10);
       expect(proxy.siteRollback).toHaveBeenCalledTimes(1);
     });

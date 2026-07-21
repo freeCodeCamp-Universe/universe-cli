@@ -127,9 +127,7 @@ describe("deploy command (proxy plane)", () => {
       expect(deps.resolveIdentity).toHaveBeenCalledTimes(1);
       expect(deps.runBuild).toHaveBeenCalledTimes(1);
       expect(deps.walkFiles).toHaveBeenCalledWith("/proj/dist");
-      const proxy = deps.createProxyClient.mock.results[0]?.value as ReturnType<
-        typeof mkProxy
-      >;
+      const proxy = deps.createProxyClient.mock.results[0]?.value as ReturnType<typeof mkProxy>;
       expect(proxy.deployInit).toHaveBeenCalledWith(
         expect.objectContaining({
           site: "my-site",
@@ -149,12 +147,10 @@ describe("deploy command (proxy plane)", () => {
 
     it("emits success envelope in JSON mode", async () => {
       const stdout: string[] = [];
-      const writeSpy = vi
-        .spyOn(process.stdout, "write")
-        .mockImplementation((chunk: unknown) => {
-          stdout.push(String(chunk));
-          return true;
-        });
+      const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+        stdout.push(String(chunk));
+        return true;
+      });
 
       const deps = mkDeps();
       await deploy({ json: true }, deps);
@@ -182,9 +178,7 @@ describe("deploy command (proxy plane)", () => {
     it("forwards mode=production to finalize", async () => {
       const deps = mkDeps();
       await deploy({ json: false, promote: true }, deps);
-      const proxy = deps.createProxyClient.mock.results[0]?.value as ReturnType<
-        typeof mkProxy
-      >;
+      const proxy = deps.createProxyClient.mock.results[0]?.value as ReturnType<typeof mkProxy>;
       const finalizeArg = proxy.deployFinalize.mock.calls[0]?.[0] as {
         mode: string;
       };
@@ -215,9 +209,7 @@ describe("deploy command (proxy plane)", () => {
       await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
       expect(deps.runBuild).not.toHaveBeenCalled();
       expect(deps.exit).toHaveBeenCalledWith(12);
-      expect(deps.logError).toHaveBeenCalledWith(
-        expect.stringMatching(/login|identity/i),
-      );
+      expect(deps.logError).toHaveBeenCalledWith(expect.stringMatching(/login|identity/i));
     });
 
     it("errors with EXIT_CONFIG when platform.yaml is missing", async () => {
@@ -228,9 +220,7 @@ describe("deploy command (proxy plane)", () => {
       });
       await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
       expect(deps.exit).toHaveBeenCalledWith(11);
-      expect(deps.logError).toHaveBeenCalledWith(
-        expect.stringMatching(/platform\.yaml/i),
-      );
+      expect(deps.logError).toHaveBeenCalledWith(expect.stringMatching(/platform\.yaml/i));
     });
 
     it("errors with EXIT_CONFIG on v1 platform.yaml fragment", async () => {
@@ -240,9 +230,7 @@ describe("deploy command (proxy plane)", () => {
       });
       await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
       expect(deps.exit).toHaveBeenCalledWith(11);
-      expect(deps.logError).toHaveBeenCalledWith(
-        expect.stringMatching(/v1|migration/i),
-      );
+      expect(deps.logError).toHaveBeenCalledWith(expect.stringMatching(/v1|migration/i));
     });
 
     it("errors with EXIT_CONFIG on invalid site name", async () => {
@@ -359,10 +347,7 @@ describe("deploy command (proxy plane)", () => {
     it("still shows a did-you-mean hint when the list is suppressed", async () => {
       // Scale should not blunt the typo-recovery surface: did-you-mean
       // is the primary fix path and stays inline regardless of size.
-      const big = [
-        "hello-universe",
-        ...Array.from({ length: 24 }, (_, i) => `noise-${i}`),
-      ];
+      const big = ["hello-universe", ...Array.from({ length: 24 }, (_, i) => `noise-${i}`)];
       const proxy = mkProxy();
       proxy.whoami.mockResolvedValue({
         login: "raisedadead",
@@ -382,9 +367,7 @@ describe("deploy command (proxy plane)", () => {
     it("proceeds when site IS in authorizedSites (default happy fixture)", async () => {
       const deps = mkDeps();
       await deploy({ json: false }, deps);
-      const proxy = deps.createProxyClient.mock.results[0]?.value as ReturnType<
-        typeof mkProxy
-      >;
+      const proxy = deps.createProxyClient.mock.results[0]?.value as ReturnType<typeof mkProxy>;
       expect(proxy.whoami).toHaveBeenCalledTimes(1);
       expect(deps.runBuild).toHaveBeenCalledTimes(1);
       expect(proxy.deployInit).toHaveBeenCalledTimes(1);
@@ -398,22 +381,16 @@ describe("deploy command (proxy plane)", () => {
       });
       await deploy({ json: false }, deps);
       expect(deps.logWarn).toHaveBeenCalled();
-      const proxy = deps.createProxyClient.mock.results[0]?.value as ReturnType<
-        typeof mkProxy
-      >;
+      const proxy = deps.createProxyClient.mock.results[0]?.value as ReturnType<typeof mkProxy>;
       expect(proxy.deployInit).toHaveBeenCalled();
     });
 
     it("falls back to a synthetic sha when no git state", async () => {
       const deps = mkDeps({
-        getGitState: vi
-          .fn()
-          .mockReturnValue({ hash: null, dirty: false, error: "no git" }),
+        getGitState: vi.fn().mockReturnValue({ hash: null, dirty: false, error: "no git" }),
       });
       await deploy({ json: false }, deps);
-      const proxy = deps.createProxyClient.mock.results[0]?.value as ReturnType<
-        typeof mkProxy
-      >;
+      const proxy = deps.createProxyClient.mock.results[0]?.value as ReturnType<typeof mkProxy>;
       const initArg = proxy.deployInit.mock.calls[0]?.[0] as { sha: string };
       expect(initArg.sha).toMatch(/^nogit-/);
     });
@@ -429,9 +406,7 @@ describe("deploy command (proxy plane)", () => {
         ]),
       });
       await deploy({ json: false }, deps);
-      const proxy = deps.createProxyClient.mock.results[0]?.value as ReturnType<
-        typeof mkProxy
-      >;
+      const proxy = deps.createProxyClient.mock.results[0]?.value as ReturnType<typeof mkProxy>;
       const initArg = proxy.deployInit.mock.calls[0]?.[0] as {
         files: string[];
       };
@@ -439,10 +414,7 @@ describe("deploy command (proxy plane)", () => {
       const uploadArg = deps.uploadFiles.mock.calls[0]?.[0] as {
         files: { relPath: string }[];
       };
-      expect(uploadArg.files.map((f) => f.relPath)).toEqual([
-        "index.html",
-        "main.js",
-      ]);
+      expect(uploadArg.files.map((f) => f.relPath)).toEqual(["index.html", "main.js"]);
     });
   });
 
@@ -458,12 +430,8 @@ describe("deploy command (proxy plane)", () => {
       });
       await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
       expect(deps.exit).toHaveBeenCalledWith(19);
-      expect(deps.logError).toHaveBeenCalledWith(
-        expect.stringMatching(/partial|failed/i),
-      );
-      const proxy = deps.createProxyClient.mock.results[0]?.value as ReturnType<
-        typeof mkProxy
-      >;
+      expect(deps.logError).toHaveBeenCalledWith(expect.stringMatching(/partial|failed/i));
+      const proxy = deps.createProxyClient.mock.results[0]?.value as ReturnType<typeof mkProxy>;
       expect(proxy.deployFinalize).not.toHaveBeenCalled();
     });
   });
@@ -471,32 +439,24 @@ describe("deploy command (proxy plane)", () => {
   describe("proxy errors", () => {
     it("propagates ProxyError from deployInit", async () => {
       const proxy = mkProxy();
-      proxy.deployInit.mockRejectedValue(
-        new ProxyError(403, "site_unauthorized", "no team"),
-      );
+      proxy.deployInit.mockRejectedValue(new ProxyError(403, "site_unauthorized", "no team"));
       const deps = mkDeps({
         createProxyClient: vi.fn().mockReturnValue(proxy),
       });
       await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
       expect(deps.exit).toHaveBeenCalledWith(12);
-      expect(deps.logError).toHaveBeenCalledWith(
-        expect.stringContaining("no team"),
-      );
+      expect(deps.logError).toHaveBeenCalledWith(expect.stringContaining("no team"));
     });
 
     it("propagates ProxyError from deployFinalize", async () => {
       const proxy = mkProxy();
-      proxy.deployFinalize.mockRejectedValue(
-        new ProxyError(422, "verify_failed", "missing"),
-      );
+      proxy.deployFinalize.mockRejectedValue(new ProxyError(422, "verify_failed", "missing"));
       const deps = mkDeps({
         createProxyClient: vi.fn().mockReturnValue(proxy),
       });
       await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
       expect(deps.exit).toHaveBeenCalledWith(13);
-      expect(deps.logError).toHaveBeenCalledWith(
-        expect.stringContaining("missing"),
-      );
+      expect(deps.logError).toHaveBeenCalledWith(expect.stringContaining("missing"));
     });
   });
 
@@ -573,11 +533,7 @@ describe("deploy command (proxy plane)", () => {
         .fn()
         .mockImplementation(
           async (opts: {
-            onProgress?: (p: {
-              uploaded: number;
-              total: number;
-              current: string;
-            }) => void;
+            onProgress?: (p: { uploaded: number; total: number; current: string }) => void;
           }) => {
             opts.onProgress?.({
               uploaded: 1,
@@ -603,16 +559,10 @@ describe("deploy command (proxy plane)", () => {
 
       expect(createSpinner).toHaveBeenCalledTimes(1);
       expect(spin.start).toHaveBeenCalledTimes(1);
-      expect(spin.start.mock.calls[0]?.[0]).toEqual(
-        expect.stringContaining("0/2"),
-      );
+      expect(spin.start.mock.calls[0]?.[0]).toEqual(expect.stringContaining("0/2"));
       expect(spin.message).toHaveBeenCalledTimes(2);
-      expect(spin.message.mock.calls[0]?.[0]).toEqual(
-        expect.stringContaining("1/2"),
-      );
-      expect(spin.message.mock.calls[1]?.[0]).toEqual(
-        expect.stringContaining("2/2"),
-      );
+      expect(spin.message.mock.calls[0]?.[0]).toEqual(expect.stringContaining("1/2"));
+      expect(spin.message.mock.calls[1]?.[0]).toEqual(expect.stringContaining("2/2"));
       expect(spin.stop).toHaveBeenCalledTimes(1);
       expect(spin.error).not.toHaveBeenCalled();
     });
@@ -646,9 +596,7 @@ describe("deploy command (proxy plane)", () => {
         // exit() throws __exit__ in fixture.
       }
       expect(spin.error).toHaveBeenCalledTimes(1);
-      expect(spin.error.mock.calls[0]?.[0]).toEqual(
-        expect.stringContaining("1"),
-      );
+      expect(spin.error.mock.calls[0]?.[0]).toEqual(expect.stringContaining("1"));
       expect(spin.stop).not.toHaveBeenCalled();
     });
 
@@ -659,11 +607,7 @@ describe("deploy command (proxy plane)", () => {
         .fn()
         .mockImplementation(
           async (opts: {
-            onProgress?: (p: {
-              uploaded: number;
-              total: number;
-              current: string;
-            }) => void;
+            onProgress?: (p: { uploaded: number; total: number; current: string }) => void;
           }) => {
             opts.onProgress?.({
               uploaded: 1,
@@ -680,9 +624,7 @@ describe("deploy command (proxy plane)", () => {
         );
       const walkFiles = vi
         .fn()
-        .mockReturnValue([
-          { relPath: "index.html", absPath: "/proj/dist/index.html" },
-        ]);
+        .mockReturnValue([{ relPath: "index.html", absPath: "/proj/dist/index.html" }]);
       const deps = mkDeps({
         createSpinner,
         uploadFiles: fakeUpload,
@@ -693,13 +635,9 @@ describe("deploy command (proxy plane)", () => {
 
       expect(createSpinner).toHaveBeenCalledTimes(1);
       expect(spin.start).toHaveBeenCalledTimes(1);
-      expect(spin.start.mock.calls[0]?.[0]).toEqual(
-        expect.stringContaining("0/1"),
-      );
+      expect(spin.start.mock.calls[0]?.[0]).toEqual(expect.stringContaining("0/1"));
       expect(spin.message).toHaveBeenCalledTimes(1);
-      expect(spin.message.mock.calls[0]?.[0]).toEqual(
-        expect.stringContaining("1/1"),
-      );
+      expect(spin.message.mock.calls[0]?.[0]).toEqual(expect.stringContaining("1/1"));
       expect(spin.stop).toHaveBeenCalledTimes(1);
       expect(spin.error).not.toHaveBeenCalled();
     });
@@ -731,9 +669,7 @@ describe("deploy command (proxy plane)", () => {
         mode: "preview",
       });
       expect(deps.logWarn).toHaveBeenCalledTimes(1);
-      expect(deps.logWarn.mock.calls[0]?.[0]).toEqual(
-        expect.stringContaining("20260425-old00000"),
-      );
+      expect(deps.logWarn.mock.calls[0]?.[0]).toEqual(expect.stringContaining("20260425-old00000"));
     });
 
     it("does NOT warn when preview alias matches the new deploy id", async () => {
@@ -862,12 +798,10 @@ describe("deploy command (proxy plane)", () => {
         createProxyClient: vi.fn().mockReturnValue(proxy),
       });
       const stdout: string[] = [];
-      const writeSpy = vi
-        .spyOn(process.stdout, "write")
-        .mockImplementation((chunk: unknown) => {
-          stdout.push(String(chunk));
-          return true;
-        });
+      const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+        stdout.push(String(chunk));
+        return true;
+      });
       await deploy({ json: true, promote: true }, deps);
       writeSpy.mockRestore();
 
@@ -886,9 +820,7 @@ describe("deploy command (proxy plane)", () => {
         deployId: "20260512-120000-abc1234",
       });
       const deps = mkDeps({
-        getGitState: vi
-          .fn()
-          .mockReturnValue({ hash: "abc1234567", dirty: true }),
+        getGitState: vi.fn().mockReturnValue({ hash: "abc1234567", dirty: true }),
         createProxyClient: vi.fn().mockReturnValue(proxy),
       });
       await deploy({ json: false, promote: true }, deps);

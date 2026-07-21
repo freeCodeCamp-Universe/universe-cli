@@ -79,11 +79,7 @@ describe("login command", () => {
         .fn()
         .mockImplementation(
           async (opts: {
-            onPrompt: (p: {
-              userCode: string;
-              verificationUri: string;
-              expiresIn: number;
-            }) => void;
+            onPrompt: (p: { userCode: string; verificationUri: string; expiresIn: number }) => void;
           }) => {
             await opts.onPrompt({
               userCode: "ABCD-1234",
@@ -102,23 +98,17 @@ describe("login command", () => {
 
   it("emits JSON envelope with prompt then success in JSON mode", async () => {
     const stdout: string[] = [];
-    const writeSpy = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation((chunk: unknown) => {
-        stdout.push(String(chunk));
-        return true;
-      });
+    const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+      stdout.push(String(chunk));
+      return true;
+    });
 
     const deps = mkDeps({
       runDeviceFlow: vi
         .fn()
         .mockImplementation(
           async (opts: {
-            onPrompt: (p: {
-              userCode: string;
-              verificationUri: string;
-              expiresIn: number;
-            }) => void;
+            onPrompt: (p: { userCode: string; verificationUri: string; expiresIn: number }) => void;
           }) => {
             await opts.onPrompt({
               userCode: "X",
@@ -198,9 +188,7 @@ describe("login command", () => {
     await expect(login({ json: false }, deps)).rejects.toThrow("__exit__");
     expect(deps.saveToken).not.toHaveBeenCalled();
     expect(deps.exit).toHaveBeenCalledWith(12);
-    expect(deps.logError).toHaveBeenCalledWith(
-      expect.stringContaining("denied"),
-    );
+    expect(deps.logError).toHaveBeenCalledWith(expect.stringContaining("denied"));
   });
 
   describe("post-login self-check", () => {
@@ -228,12 +216,10 @@ describe("login command", () => {
 
     it("includes authorizedSitesCount + warning in JSON success envelope", async () => {
       const stdout: string[] = [];
-      const writeSpy = vi
-        .spyOn(process.stdout, "write")
-        .mockImplementation((chunk: unknown) => {
-          stdout.push(String(chunk));
-          return true;
-        });
+      const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+        stdout.push(String(chunk));
+        return true;
+      });
 
       const deps = mkDeps({
         createProxyClient: mkFakeProxyClient(async () => ({
@@ -253,12 +239,10 @@ describe("login command", () => {
 
     it("omits warning from JSON envelope when sites count > 0", async () => {
       const stdout: string[] = [];
-      const writeSpy = vi
-        .spyOn(process.stdout, "write")
-        .mockImplementation((chunk: unknown) => {
-          stdout.push(String(chunk));
-          return true;
-        });
+      const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+        stdout.push(String(chunk));
+        return true;
+      });
 
       const deps = mkDeps();
       await login({ json: true }, deps);

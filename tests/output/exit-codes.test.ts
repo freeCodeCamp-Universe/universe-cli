@@ -102,9 +102,7 @@ describe("exitWithCode", () => {
   });
 
   it("calls process.exit with the given code", () => {
-    const exitSpy = vi
-      .spyOn(process, "exit")
-      .mockImplementation((() => {}) as never);
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {}) as never);
     exitWithCode(11);
     expect(exitSpy).toHaveBeenCalledWith(11);
   });
@@ -115,9 +113,7 @@ describe("exitWithCode", () => {
   // src/output/exit-codes.ts docstring.
   it("never writes to stderr", () => {
     vi.spyOn(process, "exit").mockImplementation((() => {}) as never);
-    const stderrSpy = vi
-      .spyOn(process.stderr, "write")
-      .mockImplementation(() => true);
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
     exitWithCode(12);
     expect(stderrSpy).not.toHaveBeenCalled();
   });

@@ -85,9 +85,7 @@ describe("cachePath", () => {
   it("falls back to $HOME/.config/... when XDG unset", () => {
     delete process.env["XDG_CONFIG_HOME"];
     process.env["HOME"] = tmp;
-    expect(cachePath()).toBe(
-      join(tmp, ".config", "universe-cli", "update-check.json"),
-    );
+    expect(cachePath()).toBe(join(tmp, ".config", "universe-cli", "update-check.json"));
   });
 });
 
@@ -174,38 +172,25 @@ describe("readCache", () => {
 
 describe("fetchLatest", () => {
   it("returns version string on 200 with valid body", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(jsonResponse(200, { version: "0.8.0" }));
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse(200, { version: "0.8.0" }));
     vi.stubGlobal("fetch", fetchMock);
     expect(await fetchLatest()).toBe("0.8.0");
     const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe(
-      "https://registry.npmjs.org/@freecodecamp/universe-cli/latest",
-    );
+    expect(url).toBe("https://registry.npmjs.org/@freecodecamp/universe-cli/latest");
   });
 
   it("returns null on non-2xx", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValueOnce(jsonResponse(500, {})),
-    );
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(jsonResponse(500, {})));
     expect(await fetchLatest()).toBeNull();
   });
 
   it("returns null on network error", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockRejectedValueOnce(new Error("ECONNREFUSED")),
-    );
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValueOnce(new Error("ECONNREFUSED")));
     expect(await fetchLatest()).toBeNull();
   });
 
   it("returns null when body has no version field", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValueOnce(jsonResponse(200, { name: "foo" })),
-    );
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(jsonResponse(200, { name: "foo" })));
     expect(await fetchLatest()).toBeNull();
   });
 });
@@ -232,10 +217,7 @@ describe("refreshIfStale", () => {
     const now = 1_000_000_000_000;
     const day = 24 * 60 * 60 * 1000;
     await seedCache("0.7.0", now - day - 1);
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValueOnce(jsonResponse(200, { version: "0.9.0" })),
-    );
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(jsonResponse(200, { version: "0.9.0" })));
     await refreshIfStale(now);
     const cache = await readCache();
     expect(cache).toEqual({ latest: "0.9.0", lastCheck: now });
@@ -243,10 +225,7 @@ describe("refreshIfStale", () => {
 
   it("fetches when no cache file exists", async () => {
     const now = 1_000_000_000_000;
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValueOnce(jsonResponse(200, { version: "0.9.0" })),
-    );
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(jsonResponse(200, { version: "0.9.0" })));
     await refreshIfStale(now);
     const cache = await readCache();
     expect(cache).toEqual({ latest: "0.9.0", lastCheck: now });
@@ -255,10 +234,7 @@ describe("refreshIfStale", () => {
   it("with force: true, fetches even when cache is fresh (< TTL)", async () => {
     const now = 1_000_000_000_000;
     await seedCache("0.8.0", now - 60_000);
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValueOnce(jsonResponse(200, { version: "0.9.0" })),
-    );
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(jsonResponse(200, { version: "0.9.0" })));
     await refreshIfStale(now, { force: true });
     expect(await readCache()).toEqual({ latest: "0.9.0", lastCheck: now });
   });
@@ -285,10 +261,7 @@ describe("refreshIfStale", () => {
     const now = 1_000_000_000_000;
     const oneHour = 60 * 60 * 1000;
     await seedCache("0.7.0", now - oneHour - 1000);
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValueOnce(jsonResponse(200, { version: "0.9.0" })),
-    );
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(jsonResponse(200, { version: "0.9.0" })));
     await refreshIfStale(now);
     expect(await readCache()).toEqual({ latest: "0.9.0", lastCheck: now });
   });
@@ -300,10 +273,7 @@ describe("refreshIfStale", () => {
   });
 
   it("writes cache file with 0644 mode", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValueOnce(jsonResponse(200, { version: "0.9.0" })),
-    );
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(jsonResponse(200, { version: "0.9.0" })));
     await refreshIfStale();
     const raw = await readFile(cachePath(), "utf-8");
     expect(JSON.parse(raw)).toHaveProperty("latest", "0.9.0");
@@ -377,10 +347,7 @@ describe("UNIVERSE_UPDATE_TTL_MS override", () => {
     const now = 1_000_000_000_000;
     process.env["UNIVERSE_UPDATE_TTL_MS"] = String(10 * 60 * 1000);
     await seedCache("0.7.0", now - 20 * 60 * 1000);
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValueOnce(jsonResponse(200, { version: "0.9.0" })),
-    );
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(jsonResponse(200, { version: "0.9.0" })));
     await refreshIfStale(now);
     expect(await readCache()).toEqual({ latest: "0.9.0", lastCheck: now });
   });
@@ -399,9 +366,7 @@ describe("UNIVERSE_UPDATE_TTL_MS override", () => {
 describe("UNIVERSE_UPDATE_URL override", () => {
   it("fetches from the overridden URL", async () => {
     process.env["UNIVERSE_UPDATE_URL"] = "https://example.test/latest";
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(jsonResponse(200, { version: "3.0.0" }));
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse(200, { version: "3.0.0" }));
     vi.stubGlobal("fetch", fetchMock);
     expect(await fetchLatest()).toBe("3.0.0");
     const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
@@ -462,9 +427,7 @@ describe("spawnRefresh", () => {
 describe("runRefreshWorker", () => {
   it("force-refreshes even when cache is fresh", async () => {
     await seedCache("0.8.0", Date.now() - 60_000);
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(jsonResponse(200, { version: "0.9.0" }));
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse(200, { version: "0.9.0" }));
     vi.stubGlobal("fetch", fetchMock);
     await runRefreshWorker();
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -488,12 +451,10 @@ describe("installExitNotice", () => {
     handlers = {};
     onSpy = vi
       .spyOn(process, "on")
-      .mockImplementation(
-        (ev: string | symbol, fn: (...a: never[]) => void) => {
-          handlers[String(ev)] = fn as () => void;
-          return process;
-        },
-      );
+      .mockImplementation((ev: string | symbol, fn: (...a: never[]) => void) => {
+        handlers[String(ev)] = fn as () => void;
+        return process;
+      });
     installExitNotice(current);
     onSpy.mockRestore();
   }

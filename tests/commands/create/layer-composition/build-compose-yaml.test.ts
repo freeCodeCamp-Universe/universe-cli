@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { parse as parseYaml } from "yaml";
 import { buildComposeYaml } from "../../../../src/commands/create/layer-composition/build-compose-yaml.js";
-import type { FrameworkLayerData, PackageManagerLayerData } from "../../../../src/commands/create/layer-composition/schemas/layers.js";
+import type {
+  FrameworkLayerData,
+  PackageManagerLayerData,
+} from "../../../../src/commands/create/layer-composition/schemas/layers.js";
 
 const framework: FrameworkLayerData = {
   devCopySource: "COPY src/ ./src/",

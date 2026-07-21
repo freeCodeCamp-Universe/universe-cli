@@ -1,24 +1,25 @@
 {
   "name": "@freecodecamp/universe-cli",
   "version": "0.12.0",
-  "main": "dist/index.cjs",
-  "scripts": {
-    "test": "vitest run",
-    "test:smoke": "UNIVERSE_E2E_REAL=1 vitest run tests/e2e/smoke-real-artemis.test.ts",
-    "build": "tsdown",
-    "lint": "oxlint src tests",
-    "typecheck": "tsc --noEmit",
-    "prepare": "husky",
-    "dev": "tsx src/index.ts"
+  "description": "Static site deployment CLI for the freeCodeCamp Universe platform",
+  "keywords": [
+    "cli",
+    "deployment",
+    "freecodecamp",
+    "static-site"
+  ],
+  "homepage": "https://github.com/freeCodeCamp-Universe/universe-cli#readme",
+  "bugs": {
+    "url": "https://github.com/freeCodeCamp-Universe/universe-cli/issues"
   },
-  "author": "Mrugesh Mohapatra <noreply@mrugesh.dev> (https://mrugesh.dev/)",
   "license": "BSD-3-Clause",
+  "author": "Mrugesh Mohapatra <noreply@mrugesh.dev> (https://mrugesh.dev/)",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/freeCodeCamp-Universe/universe-cli.git"
   },
-  "publishConfig": {
-    "access": "public"
+  "bin": {
+    "universe": "dist/index.cjs"
   },
   "files": [
     "dist/",
@@ -26,8 +27,20 @@
     "LICENSE"
   ],
   "type": "module",
-  "bin": {
-    "universe": "dist/index.cjs"
+  "main": "dist/index.cjs",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:smoke": "UNIVERSE_E2E_REAL=1 vitest run tests/e2e/smoke-real-artemis.test.ts",
+    "build": "tsdown",
+    "lint": "oxlint src tests",
+    "typecheck": "tsc --noEmit",
+    "prepare": "husky",
+    "dev": "tsx src/index.ts",
+    "fmt": "oxfmt",
+    "fmt:check": "oxfmt --check"
   },
   "dependencies": {
     "@clack/prompts": "^1.5.0",
@@ -38,6 +51,7 @@
   "devDependencies": {
     "@types/node": "^24.12.2",
     "husky": "^9.1.7",
+    "oxfmt": "^0.59.0",
     "oxlint": "^1.68.0",
     "postject": "1.0.0-alpha.6",
     "tsdown": "0.22.1",
@@ -45,19 +59,8 @@
     "typescript": "^5.9.3",
     "vitest": "^3.2.4"
   },
-  "packageManager": "pnpm@10.33.0",
   "engines": {
     "node": ">=24.0.0"
   },
-  "description": "Static site deployment CLI for the freeCodeCamp Universe platform",
-  "homepage": "https://github.com/freeCodeCamp-Universe/universe-cli#readme",
-  "bugs": {
-    "url": "https://github.com/freeCodeCamp-Universe/universe-cli/issues"
-  },
-  "keywords": [
-    "cli",
-    "static-site",
-    "deployment",
-    "freecodecamp"
-  ]
+  "packageManager": "pnpm@10.33.0"
 }

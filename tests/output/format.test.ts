@@ -8,9 +8,7 @@ describe("outputSuccess", () => {
   });
 
   it("writes JSON envelope to stdout in json mode", () => {
-    const stdoutSpy = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation(() => true);
+    const stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
     const ctx: OutputContext = { json: true, command: "deploy" };
     outputSuccess(ctx, "Deployed!", { deployId: "abc-123" });
 
@@ -25,9 +23,7 @@ describe("outputSuccess", () => {
   });
 
   it("JSON output is a single line (no newlines in body)", () => {
-    const stdoutSpy = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation(() => true);
+    const stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
     const ctx: OutputContext = { json: true, command: "deploy" };
     outputSuccess(ctx, "Done", { id: "x" });
 
@@ -52,9 +48,7 @@ describe("outputError", () => {
   });
 
   it("writes JSON error envelope to stdout in json mode", () => {
-    const stdoutSpy = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation(() => true);
+    const stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
     const ctx: OutputContext = { json: true, command: "deploy" };
     outputError(ctx, 11, "config not found", ["missing bucket"]);
 
@@ -79,9 +73,7 @@ describe("outputError", () => {
   });
 
   it("redacts credentials in error messages (json mode)", () => {
-    const stdoutSpy = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation(() => true);
+    const stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
     const ctx: OutputContext = { json: true, command: "deploy" };
     outputError(ctx, 12, "Bad key: AKIAIOSFODNN7EXAMPLE");
 
@@ -103,9 +95,7 @@ describe("outputError", () => {
   });
 
   it("redacts credentials in issues array", () => {
-    const stdoutSpy = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation(() => true);
+    const stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
     const ctx: OutputContext = { json: true, command: "deploy" };
     outputError(ctx, 12, "error", ["key: AKIAIOSFODNN7EXAMPLE"]);
 
@@ -119,9 +109,7 @@ describe("outputError", () => {
   // extension via opts.extras keeps the single chokepoint while still
   // allowing per-command shape additions.
   it("merges opts.extras into the JSON envelope at the top level", () => {
-    const stdoutSpy = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation(() => true);
+    const stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
     const ctx: OutputContext = { json: true, command: "promote" };
     outputError(ctx, 30, "drift detected", {
       extras: { current: "20260427-abc1234" },
@@ -137,9 +125,7 @@ describe("outputError", () => {
   // only callers pass deploy ids (redact-clean), but the API surface
   // must not be a footgun.
   it("redacts credentials inside opts.extras", () => {
-    const stdoutSpy = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation(() => true);
+    const stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
     const ctx: OutputContext = { json: true, command: "promote" };
     const secret = "abcdef1234567890abcdef1234567890";
     outputError(ctx, 30, "drift detected", {
@@ -172,9 +158,7 @@ describe("outputError", () => {
 
   // Back-compat: third positional may still be a bare issues array.
   it("accepts issues[] as third positional for back-compat", () => {
-    const stdoutSpy = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation(() => true);
+    const stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
     const ctx: OutputContext = { json: true, command: "deploy" };
     outputError(ctx, 11, "broken", ["one", "two"]);
 
@@ -183,9 +167,7 @@ describe("outputError", () => {
   });
 
   it("includes kind and requestId in the JSON error envelope", () => {
-    const stdoutSpy = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation(() => true);
+    const stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
     const ctx: OutputContext = { json: true, command: "repo ls" };
     outputError(ctx, 12, "denied", {
       kind: "user_unauthorized",

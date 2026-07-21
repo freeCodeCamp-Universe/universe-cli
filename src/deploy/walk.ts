@@ -20,9 +20,7 @@ export function walkFiles(base: string): WalkedFile[] {
     try {
       targetIsFile = statSync(full).isFile();
     } catch {
-      throw new StorageError(
-        `"${relPath}" could not be stat'd (dangling symlink?)`,
-      );
+      throw new StorageError(`"${relPath}" could not be stat'd (dangling symlink?)`);
     }
     if (!targetIsFile) continue;
 
@@ -30,9 +28,7 @@ export function walkFiles(base: string): WalkedFile[] {
     try {
       resolved = realpathSync(full);
     } catch {
-      throw new StorageError(
-        `"${relPath}" could not be resolved (dangling symlink?)`,
-      );
+      throw new StorageError(`"${relPath}" could not be resolved (dangling symlink?)`);
     }
     const rel = relative(baseReal, resolved);
     if (rel === ".." || rel.startsWith(`..${sep}`)) {

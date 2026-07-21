@@ -4,10 +4,7 @@ import { confirm, isCancel, log } from "@clack/prompts";
 import { ConfigError, CredentialError } from "../errors.js";
 import { DEFAULT_PROXY_URL } from "../lib/constants.js";
 import { resolveIdentity as defaultResolveIdentity } from "../lib/identity.js";
-import {
-  parsePlatformYaml,
-  type PlatformYamlV2,
-} from "../lib/platform-yaml.js";
+import { parsePlatformYaml, type PlatformYamlV2 } from "../lib/platform-yaml.js";
 import {
   AliasDriftError,
   createProxyClient as defaultCreateProxyClient,
@@ -56,13 +53,8 @@ async function readAndParseConfig(
   try {
     raw = await read(cwd);
   } catch (err) {
-    if (
-      err instanceof Error &&
-      (err as NodeJS.ErrnoException).code === "ENOENT"
-    ) {
-      throw new ConfigError(
-        `platform.yaml not found in ${cwd}. See docs/platform-yaml.md.`,
-      );
+    if (err instanceof Error && (err as NodeJS.ErrnoException).code === "ENOENT") {
+      throw new ConfigError(`platform.yaml not found in ${cwd}. See docs/platform-yaml.md.`);
     }
     throw err;
   }
@@ -71,10 +63,7 @@ async function readAndParseConfig(
   return r.value;
 }
 
-export async function promote(
-  options: PromoteOptions,
-  deps: PromoteDeps = {},
-): Promise<void> {
+export async function promote(options: PromoteOptions, deps: PromoteDeps = {}): Promise<void> {
   const cwd = deps.cwd ?? process.cwd();
   const env = deps.env ?? process.env;
   const readYaml = deps.readPlatformYaml ?? defaultReadPlatformYaml;
@@ -123,9 +112,7 @@ export async function promote(
       } catch (err) {
         if (!(err instanceof AliasDriftError)) throw err;
         if (options.json) throw err;
-        error(
-          `drift: production moved to ${err.current}, expected ${initialExpected}`,
-        );
+        error(`drift: production moved to ${err.current}, expected ${initialExpected}`);
         const ok = await promptConfirm(
           `Retry promote --from with expectedCurrent='${err.current}'?`,
         );
@@ -145,9 +132,7 @@ export async function promote(
         mode: "preview",
       });
       if (preview === null) {
-        throw new ConfigError(
-          "no preview alias to promote — run `universe static deploy` first",
-        );
+        throw new ConfigError("no preview alias to promote — run `universe static deploy` first");
       }
       const prod = await client.getAlias({
         site: config.site,
@@ -155,9 +140,7 @@ export async function promote(
       });
       if (!options.json) {
         // Pre-promote echo (RFC §G Phase 1 row 1).
-        success(
-          `Promoting ${preview.deployId} → ${prod?.deployId ?? "<none>"}`,
-        );
+        success(`Promoting ${preview.deployId} → ${prod?.deployId ?? "<none>"}`);
       }
       const initialExpected = prod?.deployId ?? "";
       try {
@@ -171,12 +154,8 @@ export async function promote(
         // V4: single-shot retry on non-JSON only. JSON path falls through
         // to outer catch which renders the envelope with `current`.
         if (options.json) throw err;
-        error(
-          `drift: production moved to ${err.current}, expected ${initialExpected}`,
-        );
-        const ok = await promptConfirm(
-          `Retry promote with expectedCurrent='${err.current}'?`,
-        );
+        error(`drift: production moved to ${err.current}, expected ${initialExpected}`);
+        const ok = await promptConfirm(`Retry promote with expectedCurrent='${err.current}'?`);
         if (!ok) throw err;
         result = await client.sitePromote({
           site: config.site,
@@ -216,8 +195,7 @@ export async function promote(
     const { code, message } = wrapProxyError("promote", err);
     // V3 additive: top-level `current` so scripted callers can branch +
     // supply a fresh expectedCurrent on next attempt.
-    const extras =
-      err instanceof AliasDriftError ? { current: err.current } : undefined;
+    const extras = err instanceof AliasDriftError ? { current: err.current } : undefined;
     outputError({ json: options.json, command: "promote" }, code, message, {
       logError: error,
       extras,

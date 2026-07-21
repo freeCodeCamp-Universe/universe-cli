@@ -55,18 +55,14 @@ interface AccessTokenError {
 
 type AccessTokenResponse = AccessTokenSuccess | AccessTokenError;
 
-function isAccessTokenSuccess(
-  body: AccessTokenResponse,
-): body is AccessTokenSuccess {
+function isAccessTokenSuccess(body: AccessTokenResponse): body is AccessTokenSuccess {
   return "access_token" in body && typeof body.access_token === "string";
 }
 
 const defaultSleep = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
-export async function runDeviceFlow(
-  opts: RunDeviceFlowOptions,
-): Promise<string> {
+export async function runDeviceFlow(opts: RunDeviceFlowOptions): Promise<string> {
   const fetchImpl = opts.fetch ?? globalThis.fetch.bind(globalThis);
   const sleep = opts.sleep ?? defaultSleep;
 
@@ -130,9 +126,7 @@ export async function runDeviceFlow(
         intervalSec += 5;
         continue;
       case "expired_token":
-        throw new Error(
-          "device flow expired before authorization. Run `universe login` again.",
-        );
+        throw new Error("device flow expired before authorization. Run `universe login` again.");
       case "access_denied":
         throw new Error("device flow access denied by user.");
       default:

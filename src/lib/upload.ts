@@ -25,11 +25,7 @@ export interface UploadFilesOptions {
   jwt: string;
   files: readonly UploadFileEntry[];
   concurrency?: number;
-  onProgress?: (progress: {
-    uploaded: number;
-    total: number;
-    current: string;
-  }) => void;
+  onProgress?: (progress: { uploaded: number; total: number; current: string }) => void;
 }
 
 export interface UploadFilesDeps {
@@ -162,8 +158,7 @@ export async function uploadFiles(
         uploaded.push(file.relPath);
         totalSize += body.byteLength;
       } catch (err) {
-        const message =
-          err instanceof Error ? err.message : "unknown upload error";
+        const message = err instanceof Error ? err.message : "unknown upload error";
         errors.push(`${file.relPath}: ${message}`);
       } finally {
         done += 1;

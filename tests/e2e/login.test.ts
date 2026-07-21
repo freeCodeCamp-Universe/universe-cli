@@ -47,12 +47,10 @@ describe("login E2E (real device-flow loop, token persisted to tmp XDG)", () => 
     vi.stubEnv("XDG_CONFIG_HOME", env.xdgDir);
 
     const stdout: string[] = [];
-    const spy = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation((chunk: unknown) => {
-        stdout.push(String(chunk));
-        return true;
-      });
+    const spy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+      stdout.push(String(chunk));
+      return true;
+    });
     const captured: CapturedExit = {};
     const fastSleep = (_ms: number): Promise<void> => Promise.resolve();
     const fetchOverride = github.rewriteFetch();
@@ -111,12 +109,10 @@ describe("login E2E (real device-flow loop, token persisted to tmp XDG)", () => 
     vi.stubEnv("XDG_CONFIG_HOME", env.xdgDir);
 
     const stdout: string[] = [];
-    const spy = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation((chunk: unknown) => {
-        stdout.push(String(chunk));
-        return true;
-      });
+    const spy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+      stdout.push(String(chunk));
+      return true;
+    });
     const captured: CapturedExit = {};
 
     try {
@@ -128,8 +124,7 @@ describe("login E2E (real device-flow loop, token persisted to tmp XDG)", () => 
           logSuccess: vi.fn(),
           logInfo: vi.fn(),
           logError: vi.fn(),
-          runDeviceFlow: () =>
-            Promise.reject(new Error("device flow should not run")),
+          runDeviceFlow: () => Promise.reject(new Error("device flow should not run")),
         },
       );
     } catch (err) {

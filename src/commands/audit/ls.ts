@@ -28,8 +28,7 @@ function formatTable(rows: AuditRow[]): string {
   const widths = headers.map((h, i) =>
     Math.max(h.length, ...cells.map((row) => row[i]?.length ?? 0)),
   );
-  const fmt = (row: string[]): string =>
-    row.map((c, i) => c.padEnd(widths[i] ?? 0)).join("  ");
+  const fmt = (row: string[]): string => row.map((c, i) => c.padEnd(widths[i] ?? 0)).join("  ");
   return [fmt(headers), ...cells.map(fmt)].join("\n");
 }
 
@@ -43,10 +42,7 @@ function targetOf(r: AuditRow): string {
   return r.site || r.deployId || targetFromDetail(r);
 }
 
-export async function ls(
-  options: AuditLsOptions,
-  deps: AuditCommandDeps = {},
-): Promise<void> {
+export async function ls(options: AuditLsOptions, deps: AuditCommandDeps = {}): Promise<void> {
   const command = "audit ls";
   const message = deps.logMessage ?? ((s: string) => log.message(s));
   const error = deps.logError ?? ((s: string) => log.error(s));
@@ -54,10 +50,7 @@ export async function ls(
 
   let identitySource: string | undefined;
   try {
-    if (
-      options.limit !== undefined &&
-      (!Number.isInteger(options.limit) || options.limit < 0)
-    ) {
+    if (options.limit !== undefined && (!Number.isInteger(options.limit) || options.limit < 0)) {
       throw new UsageError("--limit must be a non-negative integer");
     }
     const setup = await setupClient(deps);
@@ -82,12 +75,7 @@ export async function ls(
       message(formatTable(rows));
     }
   } catch (err) {
-    const {
-      code,
-      message: msg,
-      kind,
-      requestId,
-    } = wrapProxyError(command, err);
+    const { code, message: msg, kind, requestId } = wrapProxyError(command, err);
     outputError({ json: options.json, command }, code, msg, {
       logError: error,
       kind,

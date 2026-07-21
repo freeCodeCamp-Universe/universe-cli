@@ -46,10 +46,7 @@ import {
   type TemplateProvider,
 } from "./layer-composition/template-provider.js";
 import { defaultTemplateVersion } from "./layer-composition/assets.js";
-import {
-  checkTemplateVersion,
-  formatTemplateNotice,
-} from "../../lib/template-version-check.js";
+import { checkTemplateVersion, formatTemplateNotice } from "../../lib/template-version-check.js";
 
 export interface HandlerResult {
   exitCode: number;
@@ -87,10 +84,7 @@ export interface CreateDeps {
   validator?: CreateInputValidator;
 }
 
-export const create = async (
-  options: CreateOptions,
-  deps: CreateDeps = {},
-): Promise<void> => {
+export const create = async (options: CreateOptions, deps: CreateDeps = {}): Promise<void> => {
   const cwd = deps.cwd ?? process.cwd();
   const exit = deps.exit ?? exitWithCode;
   const filesystemWriter = deps.filesystemWriter ?? defaultFilesystemWriter;
@@ -101,13 +95,11 @@ export const create = async (
       pnpm: new PnpmPackageManager(),
       bun: new BunPackageManager(),
     });
-  const platformManifestGenerator =
-    deps.platformManifestGenerator ?? new PlatformManifestService();
+  const platformManifestGenerator = deps.platformManifestGenerator ?? new PlatformManifestService();
   const repoInitialiser = deps.repoInitialiser ?? new GitRepoInitialiser();
   const skillInstaller = deps.skillInstaller ?? new NpxSkillInstaller();
   const isTTY = process.stdin.isTTY;
-  const spinner =
-    deps.spinner ?? (options.json || !isTTY ? silentSpinner() : clackSpinner());
+  const spinner = deps.spinner ?? (options.json || !isTTY ? silentSpinner() : clackSpinner());
 
   try {
     const templatesDir = process.env["UNIVERSE_TEMPLATES_DIR"];
@@ -133,16 +125,11 @@ export const create = async (
     const isTTY = deps.isTTY ?? Boolean(process.stdin.isTTY);
     const interactive = isTTY && !options.yes && !options.json;
 
-    const prompt =
-      deps.prompt ?? new ClackPrompt(registry.runtime, labels);
-    const layerResolver =
-      deps.layerResolver ?? new LayerCompositionService(templateProvider);
+    const prompt = deps.prompt ?? new ClackPrompt(registry.runtime, labels);
+    const layerResolver = deps.layerResolver ?? new LayerCompositionService(templateProvider);
     const validator =
       deps.validator ??
-      new CreateInputValidationService(
-        (path) => existsSync(path),
-        registry.runtime,
-      );
+      new CreateInputValidationService((path) => existsSync(path), registry.runtime);
 
     let selections: CreateSelections;
 
@@ -192,8 +179,7 @@ export const create = async (
     const targetDirectory = `${cwd}/${validatedInput.name}`;
     const projectFiles = {
       ...resolvedLayers.files,
-      "platform.yaml":
-        platformManifestGenerator.generatePlatformManifest(validatedInput),
+      "platform.yaml": platformManifestGenerator.generatePlatformManifest(validatedInput),
     };
 
     spinner.message("Writing project files");
@@ -253,7 +239,7 @@ export const create = async (
       logger.info(startInstruction);
     }
   } catch (err) {
-    spinner.error("Create failed")
+    spinner.error("Create failed");
     const code = err instanceof CliError ? err.exitCode : EXIT_USAGE;
     const message = err instanceof Error ? err.message : String(err);
     outputError({ json: options.json, command: "create" }, code, message, {

@@ -1,10 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { ls } from "../../src/commands/audit/ls.js";
-import type {
-  AuditRow,
-  ProxyClient,
-  ProxyClientConfig,
-} from "../../src/lib/proxy-client.js";
+import type { AuditRow, ProxyClient, ProxyClientConfig } from "../../src/lib/proxy-client.js";
 
 const ROWS: AuditRow[] = [
   {
@@ -42,10 +38,7 @@ describe("audit ls", () => {
     const listAudit = vi.fn().mockResolvedValue(ROWS);
     const deps = mkDeps(listAudit);
 
-    await ls(
-      { json: false, actor: "alice", action: "repo.approve", limit: 10 },
-      deps,
-    );
+    await ls({ json: false, actor: "alice", action: "repo.approve", limit: 10 }, deps);
 
     expect(listAudit).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -63,9 +56,7 @@ describe("audit ls", () => {
   it("emits a json envelope with --json", async () => {
     const listAudit = vi.fn().mockResolvedValue(ROWS);
     const deps = mkDeps(listAudit);
-    const write = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation(() => true);
+    const write = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
 
     await ls({ json: true }, deps);
 

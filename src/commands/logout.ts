@@ -17,10 +17,7 @@ export interface LogoutDeps {
   logInfo?: (msg: string) => void;
 }
 
-export async function logout(
-  options: LogoutOptions,
-  deps: LogoutDeps = {},
-): Promise<void> {
+export async function logout(options: LogoutOptions, deps: LogoutDeps = {}): Promise<void> {
   const load = deps.loadToken ?? defaultLoadToken;
   const del = deps.deleteToken ?? defaultDeleteToken;
   const success = deps.logSuccess ?? ((s: string) => log.success(s));

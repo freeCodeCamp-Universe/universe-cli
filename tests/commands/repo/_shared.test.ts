@@ -19,9 +19,7 @@ function row(over: Partial<RepoRow>): RepoRow {
 describe("formatRepoTable", () => {
   it("returns the empty message when there are no rows", () => {
     expect(formatRepoTable([])).toBe("No repo requests.");
-    expect(formatRepoTable([], "No pending requests.")).toBe(
-      "No pending requests.",
-    );
+    expect(formatRepoTable([], "No pending requests.")).toBe("No pending requests.");
   });
 
   it("renders a header row and one line per request", () => {

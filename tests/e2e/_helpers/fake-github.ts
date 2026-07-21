@@ -1,9 +1,4 @@
-import {
-  createServer,
-  type IncomingMessage,
-  type Server,
-  type ServerResponse,
-} from "node:http";
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 
 /**
@@ -64,10 +59,7 @@ export async function startFakeGithub(): Promise<FakeGithub> {
   const rewriteFetch: FakeGithub["rewriteFetch"] = (impl) => {
     const base = impl ?? globalThis.fetch.bind(globalThis);
     return (async (input, init) => {
-      const target =
-        typeof input === "string" || input instanceof URL
-          ? String(input)
-          : input.url;
+      const target = typeof input === "string" || input instanceof URL ? String(input) : input.url;
       if (target === "https://github.com/login/device/code") {
         return base(`${url}/login/device/code`, init);
       }

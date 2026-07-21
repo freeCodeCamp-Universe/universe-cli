@@ -12,11 +12,7 @@ import {
   saveToken as defaultSaveToken,
 } from "../lib/token-store.js";
 import { buildEnvelope } from "../output/envelope.js";
-import {
-  EXIT_CONFIRM,
-  EXIT_CREDENTIALS,
-  exitWithCode,
-} from "../output/exit-codes.js";
+import { EXIT_CONFIRM, EXIT_CREDENTIALS, exitWithCode } from "../output/exit-codes.js";
 import { emitJson, outputError } from "../output/format.js";
 
 export interface LoginOptions {
@@ -52,10 +48,7 @@ const NO_SITES_WARNING = [
   "     https://github.com/orgs/freeCodeCamp-Universe/teams.",
 ].join("\n");
 
-export async function login(
-  options: LoginOptions,
-  deps: LoginDeps = {},
-): Promise<void> {
+export async function login(options: LoginOptions, deps: LoginDeps = {}): Promise<void> {
   const env = deps.env ?? process.env;
   const runFlow = deps.runDeviceFlow ?? defaultRunDeviceFlow;
   const save = deps.saveToken ?? defaultSaveToken;
@@ -67,9 +60,7 @@ export async function login(
 
   const envClientId = env["UNIVERSE_GH_CLIENT_ID"];
   const clientId =
-    envClientId && envClientId.trim().length > 0
-      ? envClientId
-      : DEFAULT_GH_CLIENT_ID;
+    envClientId && envClientId.trim().length > 0 ? envClientId : DEFAULT_GH_CLIENT_ID;
 
   if (!options.force) {
     const existing = await load();
@@ -120,12 +111,9 @@ export async function login(
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    outputError(
-      { json: options.json, command: "login" },
-      EXIT_CREDENTIALS,
-      message,
-      { logError: error },
-    );
+    outputError({ json: options.json, command: "login" }, EXIT_CREDENTIALS, message, {
+      logError: error,
+    });
     exit(EXIT_CREDENTIALS);
     return;
   }

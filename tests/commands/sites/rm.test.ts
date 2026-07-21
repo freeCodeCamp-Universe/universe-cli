@@ -44,23 +44,17 @@ describe("sites rm command", () => {
 
   it("rejects empty slug with EXIT_USAGE", async () => {
     const deps = mkDeps();
-    await expect(rm({ json: false, slug: "" }, deps)).rejects.toThrow(
-      "__exit__",
-    );
+    await expect(rm({ json: false, slug: "" }, deps)).rejects.toThrow("__exit__");
     expect(deps.exit).toHaveBeenCalledWith(10);
-    expect(deps.logError).toHaveBeenCalledWith(
-      expect.stringMatching(/slug is required/i),
-    );
+    expect(deps.logError).toHaveBeenCalledWith(expect.stringMatching(/slug is required/i));
   });
 
   it("emits success envelope in JSON mode", async () => {
     const stdout: string[] = [];
-    const writeSpy = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation((chunk: unknown) => {
-        stdout.push(String(chunk));
-        return true;
-      });
+    const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+      stdout.push(String(chunk));
+      return true;
+    });
 
     const deps = mkDeps();
     await rm({ json: true, slug: "blog" }, deps);
@@ -81,19 +75,13 @@ describe("sites rm command", () => {
     const proxy = mkProxy();
     proxy.deleteSite = vi
       .fn()
-      .mockRejectedValue(
-        new ProxyError(404, "not_found", "site is not registered"),
-      );
+      .mockRejectedValue(new ProxyError(404, "not_found", "site is not registered"));
     const deps = mkDeps({
       createProxyClient: vi.fn().mockReturnValue(proxy),
     });
-    await expect(rm({ json: false, slug: "ghost" }, deps)).rejects.toThrow(
-      "__exit__",
-    );
+    await expect(rm({ json: false, slug: "ghost" }, deps)).rejects.toThrow("__exit__");
     expect(deps.exit).toHaveBeenCalledWith(10);
-    expect(deps.logError).toHaveBeenCalledWith(
-      expect.stringContaining("not_found"),
-    );
+    expect(deps.logError).toHaveBeenCalledWith(expect.stringContaining("not_found"));
   });
 
   it("maps proxy 403 user_unauthorized to EXIT_CREDENTIALS", async () => {
@@ -101,18 +89,12 @@ describe("sites rm command", () => {
     const proxy = mkProxy();
     proxy.deleteSite = vi
       .fn()
-      .mockRejectedValue(
-        new ProxyError(403, "user_unauthorized", "not on staff team"),
-      );
+      .mockRejectedValue(new ProxyError(403, "user_unauthorized", "not on staff team"));
     const deps = mkDeps({
       createProxyClient: vi.fn().mockReturnValue(proxy),
     });
-    await expect(rm({ json: false, slug: "blog" }, deps)).rejects.toThrow(
-      "__exit__",
-    );
+    await expect(rm({ json: false, slug: "blog" }, deps)).rejects.toThrow("__exit__");
     expect(deps.exit).toHaveBeenCalledWith(12);
-    expect(deps.logError).toHaveBeenCalledWith(
-      expect.stringContaining("user_unauthorized"),
-    );
+    expect(deps.logError).toHaveBeenCalledWith(expect.stringContaining("user_unauthorized"));
   });
 });

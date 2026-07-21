@@ -1,9 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  init,
-  repoNameFromRemote,
-  sanitizeSite,
-} from "../../src/commands/init.js";
+import { init, repoNameFromRemote, sanitizeSite } from "../../src/commands/init.js";
 
 interface FakeDeps {
   cwd: string;
@@ -62,15 +58,11 @@ describe("sanitizeSite", () => {
 
 describe("repoNameFromRemote", () => {
   it("parses ssh remotes", () => {
-    expect(repoNameFromRemote("git@github.com:org/my-repo.git")).toBe(
-      "my-repo",
-    );
+    expect(repoNameFromRemote("git@github.com:org/my-repo.git")).toBe("my-repo");
   });
 
   it("parses https remotes without .git", () => {
-    expect(repoNameFromRemote("https://github.com/org/my-repo")).toBe(
-      "my-repo",
-    );
+    expect(repoNameFromRemote("https://github.com/org/my-repo")).toBe("my-repo");
   });
 });
 
@@ -79,9 +71,7 @@ describe("init command", () => {
     const deps = mkDeps();
     await init({ json: false, yes: true }, deps);
     expect(deps.writeFileText).toHaveBeenCalledTimes(1);
-    expect(deps.writeFileText.mock.calls[0]?.[0]).toBe(
-      "/proj/my-cool-site/platform.yaml",
-    );
+    expect(deps.writeFileText.mock.calls[0]?.[0]).toBe("/proj/my-cool-site/platform.yaml");
     expect(writtenContent(deps)).toContain("site: my-cool-site");
   });
 
@@ -89,9 +79,7 @@ describe("init command", () => {
     const deps = mkDeps({
       detectGitRemote: vi
         .fn()
-        .mockReturnValue(
-          "git@github.com:freeCodeCamp-Universe/hello-world.git",
-        ),
+        .mockReturnValue("git@github.com:freeCodeCamp-Universe/hello-world.git"),
     });
     await init({ json: false, yes: true }, deps);
     expect(writtenContent(deps)).toContain("site: hello-world");
@@ -113,14 +101,8 @@ describe("init command", () => {
 
   it("infers the build command from package.json + lockfile", async () => {
     const deps = mkDeps({
-      readFileText: vi
-        .fn()
-        .mockResolvedValue(
-          JSON.stringify({ scripts: { build: "vite build" } }),
-        ),
-      pathExists: vi
-        .fn()
-        .mockImplementation(async (p: string) => p.endsWith("pnpm-lock.yaml")),
+      readFileText: vi.fn().mockResolvedValue(JSON.stringify({ scripts: { build: "vite build" } })),
+      pathExists: vi.fn().mockImplementation(async (p: string) => p.endsWith("pnpm-lock.yaml")),
     });
     await init({ json: false, yes: true }, deps);
     const content = writtenContent(deps);
@@ -137,25 +119,17 @@ describe("init command", () => {
 
   it("refuses to overwrite an existing platform.yaml without --force", async () => {
     const deps = mkDeps({
-      pathExists: vi
-        .fn()
-        .mockImplementation(async (p: string) => p.endsWith("platform.yaml")),
+      pathExists: vi.fn().mockImplementation(async (p: string) => p.endsWith("platform.yaml")),
     });
-    await expect(init({ json: false, yes: true }, deps)).rejects.toThrow(
-      "__exit__",
-    );
+    await expect(init({ json: false, yes: true }, deps)).rejects.toThrow("__exit__");
     expect(deps.exit).toHaveBeenCalledWith(11);
     expect(deps.writeFileText).not.toHaveBeenCalled();
-    expect(deps.logError).toHaveBeenCalledWith(
-      expect.stringMatching(/already exists|--force/i),
-    );
+    expect(deps.logError).toHaveBeenCalledWith(expect.stringMatching(/already exists|--force/i));
   });
 
   it("overwrites with --force", async () => {
     const deps = mkDeps({
-      pathExists: vi
-        .fn()
-        .mockImplementation(async (p: string) => p.endsWith("platform.yaml")),
+      pathExists: vi.fn().mockImplementation(async (p: string) => p.endsWith("platform.yaml")),
     });
     await init({ json: false, yes: true, force: true }, deps);
     expect(deps.writeFileText).toHaveBeenCalledTimes(1);
@@ -163,12 +137,10 @@ describe("init command", () => {
 
   it("emits a JSON envelope", async () => {
     const stdout: string[] = [];
-    const writeSpy = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation((chunk: unknown) => {
-        stdout.push(String(chunk));
-        return true;
-      });
+    const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+      stdout.push(String(chunk));
+      return true;
+    });
     const deps = mkDeps();
     await init({ json: true }, deps);
     writeSpy.mockRestore();
@@ -184,10 +156,7 @@ describe("init command", () => {
   it("runs prompts in interactive mode", async () => {
     const deps = mkDeps({
       isTTY: true,
-      promptText: vi
-        .fn()
-        .mockResolvedValueOnce("prompted-site")
-        .mockResolvedValueOnce("dist"),
+      promptText: vi.fn().mockResolvedValueOnce("prompted-site").mockResolvedValueOnce("dist"),
       promptConfirm: vi.fn().mockResolvedValue(false),
     });
     await init({ json: false }, deps);
@@ -225,18 +194,11 @@ describe("init command", () => {
 
   it("writes a schema-valid platform.yaml", async () => {
     const deps = mkDeps({
-      readFileText: vi
-        .fn()
-        .mockResolvedValue(
-          JSON.stringify({ scripts: { build: "vite build" } }),
-        ),
-      pathExists: vi
-        .fn()
-        .mockImplementation(async (p: string) => p.endsWith("yarn.lock")),
+      readFileText: vi.fn().mockResolvedValue(JSON.stringify({ scripts: { build: "vite build" } })),
+      pathExists: vi.fn().mockImplementation(async (p: string) => p.endsWith("yarn.lock")),
     });
     await init({ json: false, yes: true, site: "valid-site" }, deps);
-    const { parsePlatformYaml } =
-      await import("../../src/lib/platform-yaml.js");
+    const { parsePlatformYaml } = await import("../../src/lib/platform-yaml.js");
     const result = parsePlatformYaml(writtenContent(deps));
     expect(result.ok).toBe(true);
   });

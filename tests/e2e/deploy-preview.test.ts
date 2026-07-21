@@ -35,12 +35,10 @@ async function runDeploy(
   options: { json: true; promote?: boolean },
 ): Promise<RunResult> {
   const chunks: string[] = [];
-  const spy = vi
-    .spyOn(process.stdout, "write")
-    .mockImplementation((chunk: unknown) => {
-      chunks.push(String(chunk));
-      return true;
-    });
+  const spy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+    chunks.push(String(chunk));
+    return true;
+  });
   const captured: CapturedExit = {};
   const warns: string[] = [];
   try {
@@ -59,8 +57,7 @@ async function runDeploy(
   }
   spy.mockRestore();
   const raw = chunks.join("").trim();
-  const envelope =
-    raw.length > 0 ? (JSON.parse(raw) as Record<string, unknown>) : undefined;
+  const envelope = raw.length > 0 ? (JSON.parse(raw) as Record<string, unknown>) : undefined;
   return { captured, envelope, warns };
 }
 
@@ -183,9 +180,7 @@ describe("static deploy preview E2E (real proxy-client + real upload)", () => {
     expect(deploy!.finalized).toBe(true);
     expect(deploy!.mode).toBe("preview");
     expect(deploy!.uploadedFiles.size).toBe(3);
-    expect(deploy!.uploadedFiles.get("index.html")).toBe(
-      "<html><body>hello</body></html>",
-    );
+    expect(deploy!.uploadedFiles.get("index.html")).toBe("<html><body>hello</body></html>");
     expect(deploy!.uploadedFiles.get("main.js")).toBe("console.log('hi')");
     expect(deploy!.uploadedFiles.get("styles.css")).toBe("body { color: red }");
 
@@ -195,24 +190,16 @@ describe("static deploy preview E2E (real proxy-client + real upload)", () => {
     const calls = server.callLog.map((c) => `${c.method} ${c.path}`);
     expect(calls).toContain("GET /api/whoami");
     expect(calls).toContain("POST /api/deploy/init");
-    expect(calls.filter((c) => c.startsWith("PUT /api/deploy/"))).toHaveLength(
-      3,
-    );
+    expect(calls.filter((c) => c.startsWith("PUT /api/deploy/"))).toHaveLength(3);
     expect(calls).toContain(`POST /api/deploy/${deployId}/finalize`);
 
-    const finalizeCall = server.callLog.find(
-      (c) => c.path === `/api/deploy/${deployId}/finalize`,
-    )!;
+    const finalizeCall = server.callLog.find((c) => c.path === `/api/deploy/${deployId}/finalize`)!;
     const finalizeBody = JSON.parse(finalizeCall.body) as {
       mode: string;
       files: string[];
     };
     expect(finalizeBody.mode).toBe("preview");
-    expect(finalizeBody.files.sort()).toEqual([
-      "index.html",
-      "main.js",
-      "styles.css",
-    ]);
+    expect(finalizeBody.files.sort()).toEqual(["index.html", "main.js", "styles.css"]);
   });
 
   it("non-JSON success hint includes `--from <deployId>` after preview deploy", async () => {

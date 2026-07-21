@@ -37,12 +37,10 @@ async function runLsJson(
   cwd?: string,
 ): Promise<RunResult> {
   const chunks: string[] = [];
-  const spy = vi
-    .spyOn(process.stdout, "write")
-    .mockImplementation((chunk: unknown) => {
-      chunks.push(String(chunk));
-      return true;
-    });
+  const spy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+    chunks.push(String(chunk));
+    return true;
+  });
   const captured: CapturedExit = {};
   const logSuccess = vi.fn();
   const logError = vi.fn();
@@ -61,8 +59,7 @@ async function runLsJson(
   }
   spy.mockRestore();
   const raw = chunks.join("").trim();
-  const envelope =
-    raw.length > 0 ? (JSON.parse(raw) as Record<string, unknown>) : undefined;
+  const envelope = raw.length > 0 ? (JSON.parse(raw) as Record<string, unknown>) : undefined;
   return { captured, envelope, logSuccess, logError, logInfo };
 }
 
@@ -214,9 +211,7 @@ describe("static ls E2E (real proxy-client + real identity chain)", () => {
       authorizedSites: ["from-flag"],
     });
     server.state.registry.set("from-flag", siteRow("from-flag"));
-    server.state.deploysBySite.set("from-flag", [
-      { deployId: "20260301-091500-fff0000" },
-    ]);
+    server.state.deploysBySite.set("from-flag", [{ deployId: "20260301-091500-fff0000" }]);
     env = await makeCliEnv({ proxyUrl: server.url, githubToken: token });
 
     const projectDir = await mkdtemp(join(tmpdir(), "universe-cli-e2e-proj-"));
@@ -227,17 +222,11 @@ describe("static ls E2E (real proxy-client + real identity chain)", () => {
       "utf-8",
     );
 
-    const r = await runLsJson(
-      env.env,
-      { json: true, site: "from-flag" },
-      projectDir,
-    );
+    const r = await runLsJson(env.env, { json: true, site: "from-flag" }, projectDir);
 
     expect(r.captured.code).toBeUndefined();
     expect(r.envelope!["site"]).toBe("from-flag");
     expect(server.callLog).toHaveLength(3);
-    expect(server.callLog.map((c) => c.path)).toContain(
-      "/api/site/from-flag/deploys",
-    );
+    expect(server.callLog.map((c) => c.path)).toContain("/api/site/from-flag/deploys");
   });
 });

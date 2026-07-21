@@ -29,10 +29,7 @@ export interface RunBuildDeps {
   exec?: (req: { command: string; cwd: string }) => Promise<number>;
 }
 
-const defaultExec = async (req: {
-  command: string;
-  cwd: string;
-}): Promise<number> => {
+const defaultExec = async (req: { command: string; cwd: string }): Promise<number> => {
   return new Promise<number>((resolveExit, reject) => {
     const child = spawn(req.command, {
       cwd: req.cwd,
@@ -52,9 +49,7 @@ async function ensureDirectory(absPath: string): Promise<void> {
     throw new ConfigError(`output directory missing after build: ${absPath}`);
   }
   if (!st.isDirectory()) {
-    throw new ConfigError(
-      `output path is not a directory after build: ${absPath}`,
-    );
+    throw new ConfigError(`output path is not a directory after build: ${absPath}`);
   }
 }
 
@@ -75,9 +70,7 @@ export async function runBuild(
 
   const code = await exec({ command: options.command, cwd: absCwd });
   if (code !== 0) {
-    throw new ConfigError(
-      `build command failed with exit code ${code}: ${options.command}`,
-    );
+    throw new ConfigError(`build command failed with exit code ${code}: ${options.command}`);
   }
   await ensureDirectory(absOutput);
   return { skipped: false, outputDir: absOutput };

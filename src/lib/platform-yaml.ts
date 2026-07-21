@@ -1,12 +1,7 @@
 import { parse as parseYaml } from "yaml";
-import {
-  platformYamlSchemaV2,
-  type PlatformYamlV2,
-} from "./platform-yaml.schema.js";
+import { platformYamlSchemaV2, type PlatformYamlV2 } from "./platform-yaml.schema.js";
 
-export type ParseResult =
-  | { ok: true; value: PlatformYamlV2 }
-  | { ok: false; error: string };
+export type ParseResult = { ok: true; value: PlatformYamlV2 } | { ok: false; error: string };
 
 /**
  * v1 schema markers. Presence of any of these triggers the migration error
@@ -69,16 +64,14 @@ export function parsePlatformYaml(text: string): ParseResult {
   if (parsed === null || parsed === undefined) {
     return {
       ok: false,
-      error:
-        "platform.yaml is empty. Required field: `site`. See docs/platform-yaml.md.",
+      error: "platform.yaml is empty. Required field: `site`. See docs/platform-yaml.md.",
     };
   }
 
   if (!isPlainObject(parsed)) {
     return {
       ok: false,
-      error:
-        "platform.yaml must be a YAML mapping at the root. See docs/platform-yaml.md.",
+      error: "platform.yaml must be a YAML mapping at the root. See docs/platform-yaml.md.",
     };
   }
 

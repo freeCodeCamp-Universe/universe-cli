@@ -92,9 +92,7 @@ describe("runDeviceFlow", () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(jsonResponse(200, baseStart))
-      .mockResolvedValueOnce(
-        jsonResponse(200, { access_token: "ghu", token_type: "bearer" }),
-      );
+      .mockResolvedValueOnce(jsonResponse(200, { access_token: "ghu", token_type: "bearer" }));
 
     await runDeviceFlow({
       clientId: "Iv1.test",
@@ -118,15 +116,9 @@ describe("runDeviceFlow", () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(jsonResponse(200, baseStart))
-      .mockResolvedValueOnce(
-        jsonResponse(200, { error: "authorization_pending" }),
-      )
-      .mockResolvedValueOnce(
-        jsonResponse(200, { error: "authorization_pending" }),
-      )
-      .mockResolvedValueOnce(
-        jsonResponse(200, { access_token: "ghu", token_type: "bearer" }),
-      );
+      .mockResolvedValueOnce(jsonResponse(200, { error: "authorization_pending" }))
+      .mockResolvedValueOnce(jsonResponse(200, { error: "authorization_pending" }))
+      .mockResolvedValueOnce(jsonResponse(200, { access_token: "ghu", token_type: "bearer" }));
 
     const tok = await runDeviceFlow({
       clientId: "Iv1.test",
@@ -145,9 +137,7 @@ describe("runDeviceFlow", () => {
       .fn()
       .mockResolvedValueOnce(jsonResponse(200, { ...baseStart, interval: 5 }))
       .mockResolvedValueOnce(jsonResponse(200, { error: "slow_down" }))
-      .mockResolvedValueOnce(
-        jsonResponse(200, { access_token: "ghu", token_type: "bearer" }),
-      );
+      .mockResolvedValueOnce(jsonResponse(200, { access_token: "ghu", token_type: "bearer" }));
 
     await runDeviceFlow({
       clientId: "Iv1.test",
@@ -198,9 +188,7 @@ describe("runDeviceFlow", () => {
   });
 
   it("throws when device code request fails", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(jsonResponse(404, { error: "not_found" }));
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse(404, { error: "not_found" }));
 
     await expect(
       runDeviceFlow({
@@ -216,9 +204,7 @@ describe("runDeviceFlow", () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(jsonResponse(200, baseStart))
-      .mockResolvedValueOnce(
-        jsonResponse(200, { error: "unsupported_grant_type" }),
-      );
+      .mockResolvedValueOnce(jsonResponse(200, { error: "unsupported_grant_type" }));
 
     await expect(
       runDeviceFlow({

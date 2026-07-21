@@ -1,5 +1,4 @@
-const AWS_KEY_PREFIX_PATTERN =
-  /(?:AKIA|ASIA|AROA|AIDA|ACCA|ANPA|ABIA|AGPA)[A-Z0-9]{12,}/g;
+const AWS_KEY_PREFIX_PATTERN = /(?:AKIA|ASIA|AROA|AIDA|ACCA|ANPA|ABIA|AGPA)[A-Z0-9]{12,}/g;
 const URL_CREDS_PATTERN = /https?:\/\/[^@\s]+@/g;
 const CREDENTIAL_CONTEXT_PATTERN =
   /(?:access_key_id|secret_access_key|accessKeyId|secretAccessKey|secret|password|token|key|credential|auth)\s*[=:]\s*([A-Za-z0-9/+=]{21,})/gi;
@@ -36,21 +35,18 @@ export function redact(value: string): string {
     const colonIndex = match.indexOf(":");
     return match.slice(0, colonIndex + 1) + '"****"';
   });
-  result = result.replace(
-    CREDENTIAL_CONTEXT_PATTERN,
-    (_match, _secret, _offset, _full) => {
-      const eqIndex = _match.indexOf("=");
-      const colonIndex = _match.indexOf(":");
-      const sepIndex =
-        eqIndex >= 0 && colonIndex >= 0
-          ? Math.min(eqIndex, colonIndex)
-          : eqIndex >= 0
-            ? eqIndex
-            : colonIndex;
-      const prefix = _match.slice(0, sepIndex + 1);
-      return prefix + "****";
-    },
-  );
+  result = result.replace(CREDENTIAL_CONTEXT_PATTERN, (_match, _secret, _offset, _full) => {
+    const eqIndex = _match.indexOf("=");
+    const colonIndex = _match.indexOf(":");
+    const sepIndex =
+      eqIndex >= 0 && colonIndex >= 0
+        ? Math.min(eqIndex, colonIndex)
+        : eqIndex >= 0
+          ? eqIndex
+          : colonIndex;
+    const prefix = _match.slice(0, sepIndex + 1);
+    return prefix + "****";
+  });
   result = result.replace(HEX_CREDENTIAL_CONTEXT_PATTERN, (_match, _secret) => {
     const eqIndex = _match.indexOf("=");
     const colonIndex = _match.indexOf(":");
@@ -91,9 +87,7 @@ function redactValue(value: unknown, keyName?: string): unknown {
   return value;
 }
 
-export function redactObject(
-  obj: Record<string, unknown>,
-): Record<string, unknown> {
+export function redactObject(obj: Record<string, unknown>): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(obj)) {
     result[key] = redactValue(value, key);
