@@ -105,8 +105,9 @@ export const create = async (
     deps.platformManifestGenerator ?? new PlatformManifestService();
   const repoInitialiser = deps.repoInitialiser ?? new GitRepoInitialiser();
   const skillInstaller = deps.skillInstaller ?? new NpxSkillInstaller();
+  const isTTY = process.stdin.isTTY;
   const spinner =
-    deps.spinner ?? (options.json ? silentSpinner() : clackSpinner());
+    deps.spinner ?? (options.json || !isTTY ? silentSpinner() : clackSpinner());
 
   try {
     const templatesDir = process.env["UNIVERSE_TEMPLATES_DIR"];
