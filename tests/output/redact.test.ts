@@ -26,9 +26,7 @@ describe("redact", () => {
   });
 
   it("masks embedded credentials in S3 endpoint URLs", () => {
-    const result = redact(
-      "https://AKIAIOSFODNN7EXAMPLE:secretkey@s3.amazonaws.com/bucket",
-    );
+    const result = redact("https://AKIAIOSFODNN7EXAMPLE:secretkey@s3.amazonaws.com/bucket");
     expect(result).toContain("s3.amazonaws.com");
     expect(result).not.toContain("AKIAIOSFODNN7EXAMPLE");
     expect(result).not.toContain("secretkey");
@@ -62,9 +60,7 @@ describe("redact", () => {
   });
 
   it("masks credentials with whitespace before separator", () => {
-    const result = redact(
-      "access_key_id = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
-    );
+    const result = redact("access_key_id = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY");
     expect(result).not.toContain("wJalrXUtnFEMI");
     expect(result).toContain("****");
   });
@@ -76,9 +72,7 @@ describe("redact", () => {
   });
 
   it("masks Bearer authorization tokens", () => {
-    const result = redact(
-      "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.payload.signature",
-    );
+    const result = redact("Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.payload.signature");
     expect(result).not.toContain("eyJhbGciOiJIUzI1NiJ9.payload.signature");
     expect(result).toContain("****");
   });

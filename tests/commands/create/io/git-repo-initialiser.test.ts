@@ -24,8 +24,6 @@ describe(GitRepoInitialiser, () => {
     const run = vi.fn(() => Promise.reject(new Error("git exited with code 128")));
     const adapter = new GitRepoInitialiser(run);
 
-    await expect(adapter.initialise("/some/project")).rejects.toBeInstanceOf(
-      GitError,
-    );
+    await expect(adapter.initialise("/some/project")).rejects.toBeInstanceOf(GitError);
   });
 });

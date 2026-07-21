@@ -26,11 +26,7 @@ describe(NpxSkillInstaller, () => {
         ["--yes", "skills", "add", "--yes", "org/a", "--skill", "a1", "--skill", "a2"],
         "/some/project",
       ],
-      [
-        "npx",
-        ["--yes", "skills", "add", "--yes", "org/b", "--skill", "b1"],
-        "/some/project",
-      ],
+      ["npx", ["--yes", "skills", "add", "--yes", "org/b", "--skill", "b1"], "/some/project"],
     ]);
   });
 
@@ -39,10 +35,7 @@ describe(NpxSkillInstaller, () => {
     const installer = new NpxSkillInstaller(run);
 
     await expect(
-      installer.installSkills(
-        [{ repo: "org/a", skill: "a1" }],
-        "/some/project",
-      ),
+      installer.installSkills([{ repo: "org/a", skill: "a1" }], "/some/project"),
     ).rejects.toBeInstanceOf(ConfigError);
   });
 
@@ -50,9 +43,7 @@ describe(NpxSkillInstaller, () => {
     const run = vi.fn(() => Promise.resolve());
     const installer = new NpxSkillInstaller(run);
 
-    await expect(
-      installer.installSkills([], "/some/project"),
-    ).resolves.toBeUndefined();
+    await expect(installer.installSkills([], "/some/project")).resolves.toBeUndefined();
     expect(run).not.toHaveBeenCalled();
   });
 });

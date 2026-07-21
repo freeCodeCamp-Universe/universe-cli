@@ -18,10 +18,4 @@ interface Prompt {
   promptForCreateInputs(): Promise<CreateSelections | null>;
 }
 
-export type {
-  CreateSelections,
-  DatabaseOption,
-  PackageManagerOption,
-  ServiceOption,
-  Prompt,
-};
+export type { CreateSelections, DatabaseOption, PackageManagerOption, ServiceOption, Prompt };

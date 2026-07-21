@@ -74,13 +74,9 @@ export function outputError(
     // Today's only callers (promote / rollback drift) pass `{ current:
     // <deployId> }`; redact() is a no-op on a deploy id, so the
     // observable behaviour is unchanged.
-    const payload = opts.extras
-      ? { ...envelope, ...redactObject(opts.extras) }
-      : envelope;
+    const payload = opts.extras ? { ...envelope, ...redactObject(opts.extras) } : envelope;
     process.stdout.write(JSON.stringify(payload) + "\n");
   } else {
-    (
-      opts.logError ?? ((m: string) => log.error(m, { output: process.stderr }))
-    )(redactedMessage);
+    (opts.logError ?? ((m: string) => log.error(m, { output: process.stderr })))(redactedMessage);
   }
 }

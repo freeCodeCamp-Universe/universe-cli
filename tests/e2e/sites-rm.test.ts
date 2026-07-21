@@ -30,12 +30,10 @@ async function runRm(
   options: { json: true; slug: string },
 ): Promise<RunResult> {
   const chunks: string[] = [];
-  const spy = vi
-    .spyOn(process.stdout, "write")
-    .mockImplementation((chunk: unknown) => {
-      chunks.push(String(chunk));
-      return true;
-    });
+  const spy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+    chunks.push(String(chunk));
+    return true;
+  });
   const captured: CapturedExit = {};
   try {
     await sitesRm(options, {
@@ -49,8 +47,7 @@ async function runRm(
   }
   spy.mockRestore();
   const raw = chunks.join("").trim();
-  const envelope =
-    raw.length > 0 ? (JSON.parse(raw) as Record<string, unknown>) : undefined;
+  const envelope = raw.length > 0 ? (JSON.parse(raw) as Record<string, unknown>) : undefined;
   return { captured, envelope };
 }
 

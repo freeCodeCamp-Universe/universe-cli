@@ -102,11 +102,7 @@ const resolveWithLayers = (
 
   const runtimeData = layers.runtime?.[input.runtime];
 
-  if (
-    runtimeData !== undefined &&
-    frameworkData !== undefined &&
-    pmData !== undefined
-  ) {
+  if (runtimeData !== undefined && frameworkData !== undefined && pmData !== undefined) {
     renderedFiles["Dockerfile"] = renderer.render(
       renderDockerfile(buildDockerfileData(runtimeData, frameworkData, pmData)),
       context,

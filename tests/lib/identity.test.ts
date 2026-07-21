@@ -1,9 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { resolveIdentity } from "../../src/lib/identity.js";
 
-function mkEnv(
-  overrides: Record<string, string | undefined>,
-): NodeJS.ProcessEnv {
+function mkEnv(overrides: Record<string, string | undefined>): NodeJS.ProcessEnv {
   // Strip undefined keys to mimic a clean env.
   const out: NodeJS.ProcessEnv = {};
   for (const [k, v] of Object.entries(overrides)) {

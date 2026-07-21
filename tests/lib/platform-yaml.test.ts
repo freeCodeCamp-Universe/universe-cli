@@ -11,12 +11,7 @@ describe("parsePlatformYaml — v2 schema", () => {
       if (r.ok) {
         expect(r.value.site).toBe("my-site");
         expect(r.value.deploy.preview).toBe(true);
-        expect(r.value.deploy.ignore).toEqual([
-          "*.map",
-          "node_modules/**",
-          ".git/**",
-          ".env*",
-        ]);
+        expect(r.value.deploy.ignore).toEqual(["*.map", "node_modules/**", ".git/**", ".env*"]);
         // F3 — build defaults via schema prefault to keep
         // `config.build.output` reachable without `?? "dist"` fallback
         // in command code.
@@ -97,14 +92,7 @@ describe("parsePlatformYaml — v2 schema", () => {
       });
     }
 
-    const good: string[] = [
-      "a",
-      "my-site",
-      "my-site-1",
-      "site2",
-      "1site",
-      "a".repeat(63),
-    ];
+    const good: string[] = ["a", "my-site", "my-site-1", "site2", "1site", "a".repeat(63)];
     for (const name of good) {
       it(`accepts '${name}'`, () => {
         const r = parsePlatformYaml(`site: '${name}'\n`);
@@ -115,13 +103,7 @@ describe("parsePlatformYaml — v2 schema", () => {
 
   describe("v1 migration detection", () => {
     it("rejects v1 with r2.* block and points at migration doc", () => {
-      const text = [
-        "site: my-site",
-        "r2:",
-        "  bucket: my-bucket",
-        "  region: auto",
-        "",
-      ].join("\n");
+      const text = ["site: my-site", "r2:", "  bucket: my-bucket", "  region: auto", ""].join("\n");
       const r = parsePlatformYaml(text);
       expect(r.ok).toBe(false);
       if (!r.ok) {
@@ -138,9 +120,7 @@ describe("parsePlatformYaml — v2 schema", () => {
     });
 
     it("rejects v1 marker `domain`", () => {
-      const r = parsePlatformYaml(
-        "site: my-site\ndomain:\n  production: x\n  preview: y\n",
-      );
+      const r = parsePlatformYaml("site: my-site\ndomain:\n  production: x\n  preview: y\n");
       expect(r.ok).toBe(false);
       if (!r.ok) expect(r.error).toMatch(/v1/i);
     });
@@ -165,16 +145,12 @@ describe("parsePlatformYaml — v2 schema", () => {
     });
 
     it("rejects unknown build key", () => {
-      const r = parsePlatformYaml(
-        "site: my-site\nbuild:\n  command: x\n  unknown: y\n",
-      );
+      const r = parsePlatformYaml("site: my-site\nbuild:\n  command: x\n  unknown: y\n");
       expect(r.ok).toBe(false);
     });
 
     it("rejects unknown deploy key", () => {
-      const r = parsePlatformYaml(
-        "site: my-site\ndeploy:\n  preview: true\n  unknown: 1\n",
-      );
+      const r = parsePlatformYaml("site: my-site\ndeploy:\n  preview: true\n  unknown: 1\n");
       expect(r.ok).toBe(false);
     });
   });
@@ -186,16 +162,12 @@ describe("parsePlatformYaml — v2 schema", () => {
     });
 
     it("rejects deploy.ignore as string", () => {
-      const r = parsePlatformYaml(
-        "site: my-site\ndeploy:\n  ignore: '*.log'\n",
-      );
+      const r = parsePlatformYaml("site: my-site\ndeploy:\n  ignore: '*.log'\n");
       expect(r.ok).toBe(false);
     });
 
     it("rejects empty build.output", () => {
-      const r = parsePlatformYaml(
-        "site: my-site\nbuild:\n  command: x\n  output: ''\n",
-      );
+      const r = parsePlatformYaml("site: my-site\nbuild:\n  command: x\n  output: ''\n");
       expect(r.ok).toBe(false);
     });
   });

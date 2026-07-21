@@ -30,12 +30,10 @@ async function runUpdate(
   options: { json: true; slug: string; team?: string | string[] },
 ): Promise<RunResult> {
   const chunks: string[] = [];
-  const spy = vi
-    .spyOn(process.stdout, "write")
-    .mockImplementation((chunk: unknown) => {
-      chunks.push(String(chunk));
-      return true;
-    });
+  const spy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+    chunks.push(String(chunk));
+    return true;
+  });
   const captured: CapturedExit = {};
   try {
     await update(options, {
@@ -49,8 +47,7 @@ async function runUpdate(
   }
   spy.mockRestore();
   const raw = chunks.join("").trim();
-  const envelope =
-    raw.length > 0 ? (JSON.parse(raw) as Record<string, unknown>) : undefined;
+  const envelope = raw.length > 0 ? (JSON.parse(raw) as Record<string, unknown>) : undefined;
   return { captured, envelope };
 }
 
@@ -94,10 +91,7 @@ describe("sites update E2E (real proxy-client + real identity chain)", () => {
     expect(r.envelope!["slug"]).toBe("blog");
     expect(r.envelope!["teams"]).toEqual(["news-editors", "platform"]);
 
-    expect(server.state.registry.get("blog")!.teams).toEqual([
-      "news-editors",
-      "platform",
-    ]);
+    expect(server.state.registry.get("blog")!.teams).toEqual(["news-editors", "platform"]);
 
     expect(server.callLog).toHaveLength(1);
     const call = server.callLog[0];

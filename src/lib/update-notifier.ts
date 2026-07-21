@@ -131,10 +131,7 @@ export function getNoticeSync(current: string): UpdateNotice | null {
   return { current, latest: cache.latest };
 }
 
-export function formatNotice(
-  n: UpdateNotice,
-  color: boolean = useColor(),
-): string {
+export function formatNotice(n: UpdateNotice, color: boolean = useColor()): string {
   const dim = (s: string): string => paint(s, "2", color);
   const yellow = (s: string): string => paint(s, "33", color);
   const cyan = (s: string): string => paint(s, "36", color);

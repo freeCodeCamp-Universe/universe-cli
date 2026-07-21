@@ -1,10 +1,6 @@
 import { UsageError } from "../../../errors.js";
 import type { CreateSelections } from "../prompt/prompt.port.js";
-import type {
-  FrameworkLayerData,
-  PackageManagerLayerData,
-  Runtime,
-} from "./schemas/layers.js";
+import type { FrameworkLayerData, PackageManagerLayerData, Runtime } from "./schemas/layers.js";
 
 type RuntimeEntryData = Runtime[string];
 

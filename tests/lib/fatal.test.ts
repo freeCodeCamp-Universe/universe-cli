@@ -24,9 +24,7 @@ describe("installFatalHandlers", () => {
   });
 
   it("registers handlers for unhandledRejection and uncaughtException", () => {
-    const onSpy = vi
-      .spyOn(process, "on")
-      .mockReturnValue(process as unknown as NodeJS.Process);
+    const onSpy = vi.spyOn(process, "on").mockReturnValue(process as unknown as NodeJS.Process);
     installFatalHandlers(vi.fn());
     const events = onSpy.mock.calls.map((c) => c[0]);
     expect(events).toContain("unhandledRejection");

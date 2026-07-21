@@ -83,9 +83,7 @@ class CreateInputValidationService implements CreateInputValidator {
         );
       }
     } else if (input.packageManager !== undefined) {
-      throw new UsageError(
-        "This runtime does not support a package manager",
-      );
+      throw new UsageError("This runtime does not support a package manager");
     }
 
     this.ensureNoneExclusive("databases", input.databases);

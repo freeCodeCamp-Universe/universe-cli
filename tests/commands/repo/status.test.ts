@@ -44,9 +44,7 @@ function mkProxy() {
 function mkDeps(overrides: Record<string, unknown> = {}) {
   return {
     env: {} as NodeJS.ProcessEnv,
-    resolveIdentity: vi
-      .fn()
-      .mockResolvedValue({ token: "ghp_x", source: "env_GITHUB_TOKEN" }),
+    resolveIdentity: vi.fn().mockResolvedValue({ token: "ghp_x", source: "env_GITHUB_TOKEN" }),
     createProxyClient: vi.fn().mockReturnValue(mkProxy()),
     logMessage: vi.fn(),
     logError: vi.fn(),
@@ -60,20 +58,16 @@ function mkDeps(overrides: Record<string, unknown> = {}) {
 describe("repo status command", () => {
   it("requires an id", async () => {
     const deps = mkDeps();
-    await expect(status({ json: false, id: "" }, deps)).rejects.toThrow(
-      "__exit__",
-    );
+    await expect(status({ json: false, id: "" }, deps)).rejects.toThrow("__exit__");
     expect(deps.exit).toHaveBeenCalledWith(10);
   });
 
   it("emits the row as a JSON envelope", async () => {
     const stdout: string[] = [];
-    const writeSpy = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation((c: unknown) => {
-        stdout.push(String(c));
-        return true;
-      });
+    const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((c: unknown) => {
+      stdout.push(String(c));
+      return true;
+    });
     const deps = mkDeps();
     await status({ json: true, id: "req_001" }, deps);
     writeSpy.mockRestore();
@@ -86,20 +80,16 @@ describe("repo status command", () => {
 
   it("includes identitySource and error.kind in the JSON error envelope", async () => {
     const stdout: string[] = [];
-    const writeSpy = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation((c: unknown) => {
-        stdout.push(String(c));
-        return true;
-      });
+    const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((c: unknown) => {
+      stdout.push(String(c));
+      return true;
+    });
     const proxy = mkProxy();
     proxy.getRepoRequest = vi
       .fn()
       .mockRejectedValue(new ProxyError(403, "user_unauthorized", "denied"));
     const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
-    await expect(status({ json: true, id: "req_001" }, deps)).rejects.toThrow(
-      "__exit__",
-    );
+    await expect(status({ json: true, id: "req_001" }, deps)).rejects.toThrow("__exit__");
     writeSpy.mockRestore();
 
     const env = JSON.parse(stdout.join("").trim());
@@ -111,8 +101,6 @@ describe("repo status command", () => {
   it("renders a human key/value block", async () => {
     const deps = mkDeps();
     await status({ json: false, id: "req_001" }, deps);
-    expect(deps.logMessage).toHaveBeenCalledWith(
-      expect.stringContaining("Status:       active"),
-    );
+    expect(deps.logMessage).toHaveBeenCalledWith(expect.stringContaining("Status:       active"));
   });
 });

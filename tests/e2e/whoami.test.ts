@@ -23,12 +23,10 @@ function makeExit(captured: CapturedExit): (code: number) => never {
 
 function captureStdout(): { read: () => string; restore: () => void } {
   const chunks: string[] = [];
-  const spy = vi
-    .spyOn(process.stdout, "write")
-    .mockImplementation((chunk: unknown) => {
-      chunks.push(String(chunk));
-      return true;
-    });
+  const spy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+    chunks.push(String(chunk));
+    return true;
+  });
   return {
     read: () => chunks.join(""),
     restore: () => spy.mockRestore(),
@@ -48,17 +46,13 @@ async function runWhoamiJson(env: NodeJS.ProcessEnv): Promise<RunResult> {
   const logSuccess = vi.fn();
   const logError = vi.fn();
   try {
-    await whoami(
-      { json: true },
-      { env, exit: makeExit(captured), logSuccess, logError },
-    );
+    await whoami({ json: true }, { env, exit: makeExit(captured), logSuccess, logError });
   } catch (err) {
     if (!(err instanceof Error) || !("__exit__" in err)) throw err;
   }
   stdout.restore();
   const raw = stdout.read().trim();
-  const envelope =
-    raw.length > 0 ? (JSON.parse(raw) as Record<string, unknown>) : undefined;
+  const envelope = raw.length > 0 ? (JSON.parse(raw) as Record<string, unknown>) : undefined;
   return { captured, envelope, logSuccess, logError };
 }
 

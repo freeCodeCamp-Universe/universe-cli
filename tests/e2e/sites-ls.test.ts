@@ -1,11 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ls as sitesLs } from "../../src/commands/sites/ls.js";
 import { type CliEnv, makeCliEnv } from "./_helpers/cli-env.js";
-import {
-  type FakeArtemis,
-  type SiteRow,
-  startFakeArtemis,
-} from "./_helpers/fake-artemis.js";
+import { type FakeArtemis, type SiteRow, startFakeArtemis } from "./_helpers/fake-artemis.js";
 
 interface CapturedExit {
   code?: number;
@@ -34,12 +30,10 @@ async function runSitesLs(
   options: { json: true; mine?: boolean },
 ): Promise<RunResult> {
   const chunks: string[] = [];
-  const spy = vi
-    .spyOn(process.stdout, "write")
-    .mockImplementation((chunk: unknown) => {
-      chunks.push(String(chunk));
-      return true;
-    });
+  const spy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+    chunks.push(String(chunk));
+    return true;
+  });
   const captured: CapturedExit = {};
   try {
     await sitesLs(options, {
@@ -53,8 +47,7 @@ async function runSitesLs(
   }
   spy.mockRestore();
   const raw = chunks.join("").trim();
-  const envelope =
-    raw.length > 0 ? (JSON.parse(raw) as Record<string, unknown>) : undefined;
+  const envelope = raw.length > 0 ? (JSON.parse(raw) as Record<string, unknown>) : undefined;
   return { captured, envelope };
 }
 
@@ -100,11 +93,7 @@ describe("sites ls E2E (real proxy-client + real identity chain)", () => {
     expect(r.envelope!["scope"]).toBe("all");
     expect(r.envelope!["count"]).toBe(3);
     const sites = r.envelope!["sites"] as SiteRow[];
-    expect(sites.map((s) => s.slug).sort()).toEqual([
-      "alpha",
-      "bravo",
-      "charlie",
-    ]);
+    expect(sites.map((s) => s.slug).sort()).toEqual(["alpha", "bravo", "charlie"]);
 
     expect(server.callLog).toHaveLength(1);
     expect(server.callLog[0].path).toBe("/api/sites");

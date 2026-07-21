@@ -39,12 +39,10 @@ describe("logout command", () => {
 
   it("emits success envelope in JSON mode (token existed)", async () => {
     const stdout: string[] = [];
-    const writeSpy = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation((chunk: unknown) => {
-        stdout.push(String(chunk));
-        return true;
-      });
+    const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+      stdout.push(String(chunk));
+      return true;
+    });
 
     const deps = mkDeps();
     await logout({ json: true }, deps);
@@ -58,12 +56,10 @@ describe("logout command", () => {
 
   it("emits envelope with removed=false when no token existed (JSON mode)", async () => {
     const stdout: string[] = [];
-    const writeSpy = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation((chunk: unknown) => {
-        stdout.push(String(chunk));
-        return true;
-      });
+    const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+      stdout.push(String(chunk));
+      return true;
+    });
 
     const deps = mkDeps({ loadToken: vi.fn().mockResolvedValue(null) });
     await logout({ json: true }, deps);

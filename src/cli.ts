@@ -22,11 +22,7 @@ import { ls as auditLs } from "./commands/audit/ls.js";
 import { type OutputContext, outputError } from "./output/format.js";
 import { EXIT_USAGE, exitWithCode } from "./output/exit-codes.js";
 import { CliError } from "./errors.js";
-import {
-  installExitNotice,
-  refreshIfStale,
-  spawnRefresh,
-} from "./lib/update-notifier.js";
+import { installExitNotice, refreshIfStale, spawnRefresh } from "./lib/update-notifier.js";
 
 declare const __VERSION__: string;
 const version = typeof __VERSION__ !== "undefined" ? __VERSION__ : "0.0.0";
@@ -92,10 +88,7 @@ export async function run(argv = process.argv): Promise<void> {
 
   const sitesCli = namespaceGroup("sites", "Static site registry commands");
   const staticCli = namespaceGroup("static", "Static site deployment commands");
-  const repoCli = namespaceGroup(
-    "repo",
-    "Repository creation + approval queue commands",
-  );
+  const repoCli = namespaceGroup("repo", "Repository creation + approval queue commands");
   const auditCli = namespaceGroup("audit", "Audit trail query commands");
 
   sitesCli
@@ -140,10 +133,7 @@ export async function run(argv = process.argv): Promise<void> {
   sitesCli
     .command("update <slug>")
     .description("Replace the teams list for an existing site (staff only)")
-    .option(
-      "--team <name>",
-      "GitHub team slug (repeatable, or comma-separated). Required.",
-    )
+    .option("--team <name>", "GitHub team slug (repeatable, or comma-separated). Required.")
     .action(async (slug: string, _opts, cmd: Command) => {
       const opts = cmd.optsWithGlobals<{
         json?: boolean;
@@ -174,15 +164,10 @@ export async function run(argv = process.argv): Promise<void> {
 
   repoCli
     .command("create [name]")
-    .description(
-      "Request a new repository under freeCodeCamp-Universe (staff only)",
-    )
+    .description("Request a new repository under freeCodeCamp-Universe (staff only)")
     .option("--visibility <vis>", "public or private (default: private)")
     .option("--description <text>", "Repository description")
-    .option(
-      "--template <name>",
-      "Org template repo to generate from; omit for a blank repo",
-    )
+    .option("--template <name>", "Org template repo to generate from; omit for a blank repo")
     .option("--yes", "Skip confirmation prompts (required for non-TTY/CI)")
     .action(async (name: string | undefined, _opts, cmd: Command) => {
       const opts = cmd.optsWithGlobals<{
@@ -209,10 +194,7 @@ export async function run(argv = process.argv): Promise<void> {
   repoCli
     .command("ls")
     .description("List repo requests (default: pending)")
-    .option(
-      "--status <status>",
-      "pending | approved | active | rejected | failed | all",
-    )
+    .option("--status <status>", "pending | approved | active | rejected | failed | all")
     .option("--mine", "Only requests you submitted")
     .option("--all", "Show every state (shorthand for --status all)")
     .action(async (_opts, cmd: Command) => {
@@ -328,10 +310,7 @@ export async function run(argv = process.argv): Promise<void> {
   staticCli
     .command("promote")
     .description("Promote the current preview to production")
-    .option(
-      "--from <deployId>",
-      "Promote a specific past deploy id (alias rewrite)",
-    )
+    .option("--from <deployId>", "Promote a specific past deploy id (alias rewrite)")
     .action(async (_opts, cmd: Command) => {
       const opts = cmd.optsWithGlobals<{ json?: boolean; from?: string }>();
       try {
@@ -383,10 +362,7 @@ export async function run(argv = process.argv): Promise<void> {
     .option("--yes", "Skip prompts; use flag values (required for non-TTY/CI)")
     .option("--name <name>", "Project name (required in non-interactive mode)")
     .option("--runtime <runtime>", "Runtime: e.g. node | static_web")
-    .option(
-      "--framework <framework>",
-      "Framework (must be valid for chosen runtime)",
-    )
+    .option("--framework <framework>", "Framework (must be valid for chosen runtime)")
     .option("--database <db...>", "Databases")
     .option("--service <svc...>", "Platform services")
     .option("--pkg-manager <pm>", "Package manager: e.g pnpm | bun")
@@ -494,9 +470,7 @@ export async function run(argv = process.argv): Promise<void> {
     .option("--action <action>", "Filter by action (e.g. repo.approve)")
     .option("--site <slug>", "Filter by site")
     .option("--since <rfc3339>", "Only events at or after this timestamp")
-    .option("--limit <n>", "Max rows (default 100, max 500)", (v: string) =>
-      Number.parseInt(v, 10),
-    )
+    .option("--limit <n>", "Max rows (default 100, max 500)", (v: string) => Number.parseInt(v, 10))
     .action(async (_opts, cmd: Command) => {
       const opts = cmd.optsWithGlobals<{
         json?: boolean;

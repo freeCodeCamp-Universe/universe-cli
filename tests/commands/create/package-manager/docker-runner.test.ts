@@ -13,10 +13,7 @@ vi.mock("node:child_process", () => ({
 const CONTAINER_ID = "abc123def456";
 const CWD = "/project";
 
-type MockCallback = (
-  err: Error | null,
-  result?: { stdout: string; stderr: string },
-) => void;
+type MockCallback = (err: Error | null, result?: { stdout: string; stderr: string }) => void;
 
 const makeSucceed = (stdout = "") =>
   ((...rawArgs: unknown[]) => {
@@ -53,9 +50,7 @@ const setupMock = (stdoutForStart = "") => {
 describe("docker runner", () => {
   const dockerCalls = () =>
     // eslint-disable-next-line vitest/hoisted-apis-on-top
-    vi
-      .mocked(execFile)
-      .mock.calls.map((call) => (call[1] as string[]).join(" "));
+    vi.mocked(execFile).mock.calls.map((call) => (call[1] as string[]).join(" "));
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -64,12 +59,7 @@ describe("docker runner", () => {
 
   describe(runCmdForFiles, () => {
     it("creates the container before copying inputs", async () => {
-      await runCmdForFiles(
-        CWD,
-        ["pnpm", "install"],
-        ["package.json"],
-        ["pnpm-lock.yaml"],
-      );
+      await runCmdForFiles(CWD, ["pnpm", "install"], ["package.json"], ["pnpm-lock.yaml"]);
       const calls = dockerCalls();
       const createIdx = calls.findIndex((c) => c.startsWith("create"));
       const cpInIdx = calls.findIndex((c) => c.includes("package.json"));
@@ -77,38 +67,19 @@ describe("docker runner", () => {
     });
 
     it("copies each input file into /app/<filename> before start", async () => {
-      await runCmdForFiles(
-        CWD,
-        ["pnpm", "install"],
-        ["package.json"],
-        ["pnpm-lock.yaml"],
-      );
+      await runCmdForFiles(CWD, ["pnpm", "install"], ["package.json"], ["pnpm-lock.yaml"]);
       const calls = dockerCalls();
-      expect(calls).toContain(
-        `cp ${CWD}/package.json ${CONTAINER_ID}:/app/package.json`,
-      );
+      expect(calls).toContain(`cp ${CWD}/package.json ${CONTAINER_ID}:/app/package.json`);
     });
 
     it("copies each output file from /app/<filename> to cwd after start", async () => {
-      await runCmdForFiles(
-        CWD,
-        ["pnpm", "install"],
-        ["package.json"],
-        ["pnpm-lock.yaml"],
-      );
+      await runCmdForFiles(CWD, ["pnpm", "install"], ["package.json"], ["pnpm-lock.yaml"]);
       const calls = dockerCalls();
-      expect(calls).toContain(
-        `cp ${CONTAINER_ID}:/app/pnpm-lock.yaml ${CWD}/pnpm-lock.yaml`,
-      );
+      expect(calls).toContain(`cp ${CONTAINER_ID}:/app/pnpm-lock.yaml ${CWD}/pnpm-lock.yaml`);
     });
 
     it("copies outputs only after start", async () => {
-      await runCmdForFiles(
-        CWD,
-        ["pnpm", "install"],
-        ["package.json"],
-        ["pnpm-lock.yaml"],
-      );
+      await runCmdForFiles(CWD, ["pnpm", "install"], ["package.json"], ["pnpm-lock.yaml"]);
       const calls = dockerCalls();
       const startIdx = calls.findIndex((c) => c.startsWith("start"));
       const cpOutIdx = calls.findIndex((c) => c.includes("pnpm-lock.yaml"));
@@ -116,12 +87,7 @@ describe("docker runner", () => {
     });
 
     it("removes the container after completion", async () => {
-      await runCmdForFiles(
-        CWD,
-        ["pnpm", "install"],
-        ["package.json"],
-        ["pnpm-lock.yaml"],
-      );
+      await runCmdForFiles(CWD, ["pnpm", "install"], ["package.json"], ["pnpm-lock.yaml"]);
       expect(dockerCalls()).toContain(`rm ${CONTAINER_ID}`);
     });
 
@@ -139,23 +105,13 @@ describe("docker runner", () => {
       mock.mockImplementationOnce(makeSucceed());
 
       await expect(
-        runCmdForFiles(
-          CWD,
-          ["pnpm", "install"],
-          ["package.json"],
-          ["pnpm-lock.yaml"],
-        ),
+        runCmdForFiles(CWD, ["pnpm", "install"], ["package.json"], ["pnpm-lock.yaml"]),
       ).rejects.toThrow("container failed");
       expect(dockerCalls()).toContain(`rm ${CONTAINER_ID}`);
     });
 
     it("does not use a -v bind-mount flag", async () => {
-      await runCmdForFiles(
-        CWD,
-        ["pnpm", "install"],
-        ["package.json"],
-        ["pnpm-lock.yaml"],
-      );
+      await runCmdForFiles(CWD, ["pnpm", "install"], ["package.json"], ["pnpm-lock.yaml"]);
       expect(dockerCalls().join(" ")).not.toContain("-v");
     });
   });
@@ -163,27 +119,15 @@ describe("docker runner", () => {
   describe(runCmdForStdout, () => {
     it("returns the container stdout", async () => {
       setupMock("hello from container\n");
-      const result = await runCmdForStdout(
-        CWD,
-        ["pnpm", "list"],
-        ["package.json"],
-      );
+      const result = await runCmdForStdout(CWD, ["pnpm", "list"], ["package.json"]);
       expect(result).toBe("hello from container\n");
     });
 
     it("copies each input file into /app/<filename> before start", async () => {
-      await runCmdForStdout(
-        CWD,
-        ["pnpm", "list"],
-        ["package.json", "pnpm-lock.yaml"],
-      );
+      await runCmdForStdout(CWD, ["pnpm", "list"], ["package.json", "pnpm-lock.yaml"]);
       const calls = dockerCalls();
-      expect(calls).toContain(
-        `cp ${CWD}/package.json ${CONTAINER_ID}:/app/package.json`,
-      );
-      expect(calls).toContain(
-        `cp ${CWD}/pnpm-lock.yaml ${CONTAINER_ID}:/app/pnpm-lock.yaml`,
-      );
+      expect(calls).toContain(`cp ${CWD}/package.json ${CONTAINER_ID}:/app/package.json`);
+      expect(calls).toContain(`cp ${CWD}/pnpm-lock.yaml ${CONTAINER_ID}:/app/pnpm-lock.yaml`);
     });
 
     it("removes the container after completion", async () => {

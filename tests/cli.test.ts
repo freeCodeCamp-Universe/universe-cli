@@ -5,18 +5,17 @@ import { dirname, join } from "node:path";
 import { run, isVersionRequest } from "../src/cli.js";
 
 vi.mock("../src/output/format.js", async () => {
-  const actual = await vi.importActual<
-    typeof import("../src/output/format.js")
-  >("../src/output/format.js");
+  const actual =
+    await vi.importActual<typeof import("../src/output/format.js")>("../src/output/format.js");
   return {
     ...actual,
     outputError: vi.fn(),
   };
 });
 vi.mock("../src/output/exit-codes.js", async () => {
-  const actual = await vi.importActual<
-    typeof import("../src/output/exit-codes.js")
-  >("../src/output/exit-codes.js");
+  const actual = await vi.importActual<typeof import("../src/output/exit-codes.js")>(
+    "../src/output/exit-codes.js",
+  );
   return {
     ...actual,
     exitWithCode: vi.fn(),
@@ -53,12 +52,7 @@ describe("CLI module", () => {
   });
 
   it("uses only static imports for command modules (SEA useCodeCache compat)", () => {
-    const cliPath = join(
-      dirname(fileURLToPath(import.meta.url)),
-      "..",
-      "src",
-      "cli.ts",
-    );
+    const cliPath = join(dirname(fileURLToPath(import.meta.url)), "..", "src", "cli.ts");
     const source = readFileSync(cliPath, "utf8");
     expect(source).not.toMatch(/await\s+import\s*\(/);
   });
@@ -70,9 +64,7 @@ describe("top-level CLI", () => {
 
   beforeEach(() => {
     output = "";
-    stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(((
-      chunk: unknown,
-    ) => {
+    stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(((chunk: unknown) => {
       output += String(chunk);
       return true;
     }) as never);
@@ -120,15 +112,9 @@ describe("top-level CLI", () => {
 
   it("--version outputs package version", async () => {
     const pkg = JSON.parse(
-      readFileSync(
-        join(dirname(fileURLToPath(import.meta.url)), "..", "package.json"),
-        "utf8",
-      ),
+      readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "package.json"), "utf8"),
     );
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue(new Response("{}", { status: 500 })),
-    );
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("{}", { status: 500 })));
     await run(["node", "universe", "--version"]);
     expect(output).toContain(pkg.version);
     vi.unstubAllGlobals();
@@ -201,8 +187,7 @@ describe("top-level error handling", () => {
 
   it("maps CliError subclasses to their declared exit code", async () => {
     const { ConfigError } = await import("../src/errors.js");
-    const { EXIT_CONFIG, EXIT_USAGE } =
-      await import("../src/output/exit-codes.js");
+    const { EXIT_CONFIG, EXIT_USAGE } = await import("../src/output/exit-codes.js");
     mockDeploy.mockRejectedValue(new ConfigError("bad platform.yaml"));
 
     run(["node", "universe", "static", "deploy"]);
@@ -237,36 +222,28 @@ describe("top-level error handling", () => {
     mockLogin.mockResolvedValue(undefined);
     run(["node", "universe", "login"]);
     await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(mockLogin).toHaveBeenCalledWith(
-      expect.objectContaining({ json: false }),
-    );
+    expect(mockLogin).toHaveBeenCalledWith(expect.objectContaining({ json: false }));
   });
 
   it("invokes logout command with --json flag forwarded", async () => {
     mockLogout.mockResolvedValue(undefined);
     run(["node", "universe", "logout", "--json"]);
     await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(mockLogout).toHaveBeenCalledWith(
-      expect.objectContaining({ json: true }),
-    );
+    expect(mockLogout).toHaveBeenCalledWith(expect.objectContaining({ json: true }));
   });
 
   it("invokes whoami command", async () => {
     mockWhoami.mockResolvedValue(undefined);
     run(["node", "universe", "whoami"]);
     await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(mockWhoami).toHaveBeenCalledWith(
-      expect.objectContaining({ json: false }),
-    );
+    expect(mockWhoami).toHaveBeenCalledWith(expect.objectContaining({ json: false }));
   });
 
   it("login --force forwards force flag", async () => {
     mockLogin.mockResolvedValue(undefined);
     run(["node", "universe", "login", "--force"]);
     await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(mockLogin).toHaveBeenCalledWith(
-      expect.objectContaining({ force: true }),
-    );
+    expect(mockLogin).toHaveBeenCalledWith(expect.objectContaining({ force: true }));
   });
 
   it("routes login errors through outputError + exit code map", async () => {
@@ -327,18 +304,14 @@ describe("universe static namespace", () => {
     mockDeploy.mockResolvedValue(undefined);
     run(["node", "universe", "--json", "static", "deploy"]);
     await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(mockDeploy).toHaveBeenCalledWith(
-      expect.objectContaining({ json: true }),
-    );
+    expect(mockDeploy).toHaveBeenCalledWith(expect.objectContaining({ json: true }));
   });
 
   it("flags AFTER 'static deploy' still parse correctly", async () => {
     mockDeploy.mockResolvedValue(undefined);
     run(["node", "universe", "static", "deploy", "--json", "--promote"]);
     await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(mockDeploy).toHaveBeenCalledWith(
-      expect.objectContaining({ json: true, promote: true }),
-    );
+    expect(mockDeploy).toHaveBeenCalledWith(expect.objectContaining({ json: true, promote: true }));
   });
 });
 
@@ -384,9 +357,7 @@ describe("universe repo namespace", () => {
     mockRepoLs.mockResolvedValue(undefined);
     run(["node", "universe", "--json", "repo", "ls"]);
     await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(mockRepoLs).toHaveBeenCalledWith(
-      expect.objectContaining({ json: true }),
-    );
+    expect(mockRepoLs).toHaveBeenCalledWith(expect.objectContaining({ json: true }));
   });
 
   it("repo create passes the positional name + flags", async () => {

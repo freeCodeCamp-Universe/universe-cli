@@ -3,21 +3,14 @@ import { wrapProxyError } from "../../lib/proxy-client.js";
 import { buildEnvelope } from "../../output/envelope.js";
 import { exitWithCode } from "../../output/exit-codes.js";
 import { emitJson, outputError } from "../../output/format.js";
-import {
-  setupClient,
-  UsageError,
-  type SitesCommandDeps,
-} from "./_shared.js";
+import { setupClient, UsageError, type SitesCommandDeps } from "./_shared.js";
 
 export interface RmOptions {
   json: boolean;
   slug: string;
 }
 
-export async function rm(
-  options: RmOptions,
-  deps: SitesCommandDeps = {},
-): Promise<void> {
+export async function rm(options: RmOptions, deps: SitesCommandDeps = {}): Promise<void> {
   const command = "sites rm";
   const success = deps.logSuccess ?? ((s: string) => log.success(s));
   const error = deps.logError ?? ((s: string) => log.error(s));

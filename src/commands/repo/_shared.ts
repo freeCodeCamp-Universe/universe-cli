@@ -101,10 +101,7 @@ function resolveLatency(r: RepoRow): string {
   return humanizeDuration(ms);
 }
 
-export function formatRepoTable(
-  rows: RepoRow[],
-  emptyMsg = "No repo requests.",
-): string {
+export function formatRepoTable(rows: RepoRow[], emptyMsg = "No repo requests."): string {
   if (rows.length === 0) return emptyMsg;
   const headers = [
     "ID",
@@ -129,8 +126,7 @@ export function formatRepoTable(
   const widths = headers.map((h, i) =>
     Math.max(h.length, ...cells.map((row) => row[i]?.length ?? 0)),
   );
-  const fmt = (row: string[]): string =>
-    row.map((c, i) => c.padEnd(widths[i] ?? 0)).join("  ");
+  const fmt = (row: string[]): string => row.map((c, i) => c.padEnd(widths[i] ?? 0)).join("  ");
   return [fmt(headers), ...cells.map(fmt)].join("\n");
 }
 

@@ -75,12 +75,10 @@ describe("sites ls command", () => {
 
   it("emits envelope with count + sites in JSON mode", async () => {
     const stdout: string[] = [];
-    const writeSpy = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation((chunk: unknown) => {
-        stdout.push(String(chunk));
-        return true;
-      });
+    const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+      stdout.push(String(chunk));
+      return true;
+    });
 
     const deps = mkDeps();
     await ls({ json: true }, deps);
@@ -102,9 +100,7 @@ describe("sites ls command", () => {
     });
     await expect(ls({ json: false }, deps)).rejects.toThrow("__exit__");
     expect(deps.exit).toHaveBeenCalledWith(12);
-    expect(deps.logError).toHaveBeenCalledWith(
-      expect.stringMatching(/login|identity/i),
-    );
+    expect(deps.logError).toHaveBeenCalledWith(expect.stringMatching(/login|identity/i));
   });
 
   it("maps proxy 502 registry_read_failed to EXIT_STORAGE", async () => {
@@ -112,16 +108,12 @@ describe("sites ls command", () => {
     const proxy = mkProxy();
     proxy.listSites = vi
       .fn()
-      .mockRejectedValue(
-        new ProxyError(502, "registry_read_failed", "valkey down"),
-      );
+      .mockRejectedValue(new ProxyError(502, "registry_read_failed", "valkey down"));
     const deps = mkDeps({
       createProxyClient: vi.fn().mockReturnValue(proxy),
     });
     await expect(ls({ json: false }, deps)).rejects.toThrow("__exit__");
     expect(deps.exit).toHaveBeenCalledWith(13);
-    expect(deps.logError).toHaveBeenCalledWith(
-      expect.stringContaining("registry_read_failed"),
-    );
+    expect(deps.logError).toHaveBeenCalledWith(expect.stringContaining("registry_read_failed"));
   });
 });

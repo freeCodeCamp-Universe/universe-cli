@@ -21,13 +21,7 @@ const repoName = z
 export const visibilitySchema = z.enum(["public", "private"]);
 export type Visibility = z.infer<typeof visibilitySchema>;
 
-export const repoStatusSchema = z.enum([
-  "pending",
-  "approved",
-  "active",
-  "rejected",
-  "failed",
-]);
+export const repoStatusSchema = z.enum(["pending", "approved", "active", "rejected", "failed"]);
 export type RepoStatus = z.infer<typeof repoStatusSchema>;
 
 /**

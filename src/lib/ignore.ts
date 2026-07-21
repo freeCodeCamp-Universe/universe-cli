@@ -84,9 +84,7 @@ function normalize(rel: string): string {
   return out;
 }
 
-export function createIgnoreFilter(
-  patterns: readonly string[],
-): (relPath: string) => boolean {
+export function createIgnoreFilter(patterns: readonly string[]): (relPath: string) => boolean {
   const compiled = patterns.filter((p) => p.length > 0).map(compilePattern);
   return (relPath: string) => {
     const norm = normalize(relPath);

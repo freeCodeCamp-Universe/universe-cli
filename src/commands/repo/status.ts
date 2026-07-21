@@ -3,11 +3,7 @@ import { type RepoRow, wrapProxyError } from "../../lib/proxy-client.js";
 import { buildEnvelope } from "../../output/envelope.js";
 import { exitWithCode } from "../../output/exit-codes.js";
 import { emitJson, outputError } from "../../output/format.js";
-import {
-  type RepoCommandDeps,
-  setupClient,
-  UsageError,
-} from "./_shared.js";
+import { type RepoCommandDeps, setupClient, UsageError } from "./_shared.js";
 
 export interface RepoStatusOptions {
   json: boolean;
@@ -58,12 +54,7 @@ export async function status(
       message(humanRow(row));
     }
   } catch (err) {
-    const {
-      code,
-      message: msg,
-      kind,
-      requestId,
-    } = wrapProxyError(command, err);
+    const { code, message: msg, kind, requestId } = wrapProxyError(command, err);
     outputError({ json: options.json, command }, code, msg, {
       logError: error,
       kind,

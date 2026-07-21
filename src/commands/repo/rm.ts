@@ -4,12 +4,7 @@ import { wrapProxyError } from "../../lib/proxy-client.js";
 import { buildEnvelope } from "../../output/envelope.js";
 import { exitWithCode } from "../../output/exit-codes.js";
 import { emitJson, outputError } from "../../output/format.js";
-import {
-  defaultRepoPrompts,
-  type RepoCommandDeps,
-  setupClient,
-  UsageError,
-} from "./_shared.js";
+import { defaultRepoPrompts, type RepoCommandDeps, setupClient, UsageError } from "./_shared.js";
 
 export interface RepoRmOptions {
   json: boolean;
@@ -17,10 +12,7 @@ export interface RepoRmOptions {
   yes?: boolean;
 }
 
-export async function rm(
-  options: RepoRmOptions,
-  deps: RepoCommandDeps = {},
-): Promise<void> {
+export async function rm(options: RepoRmOptions, deps: RepoCommandDeps = {}): Promise<void> {
   const command = "repo rm";
   const success = deps.logSuccess ?? ((s: string) => log.success(s));
   const error = deps.logError ?? ((s: string) => log.error(s));
@@ -39,9 +31,7 @@ export async function rm(
 
     if (!options.json && !options.yes) {
       if (!isTTY) {
-        throw new UsageError(
-          "non-interactive session: pass --yes to delete without confirmation",
-        );
+        throw new UsageError("non-interactive session: pass --yes to delete without confirmation");
       }
       const cur = await client.getRepoRequest(options.id);
       const ok = await prompts.confirm({
@@ -63,9 +53,7 @@ export async function rm(
         }),
       );
     } else {
-      success(
-        `Deleted request ${options.id} — the repo name is free to request again`,
-      );
+      success(`Deleted request ${options.id} — the repo name is free to request again`);
     }
   } catch (err) {
     const { code, message, kind, requestId } = wrapProxyError(command, err);

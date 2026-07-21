@@ -7,13 +7,11 @@ interface Spinner {
   stop(msg?: string): void;
 }
 
-const clackSpinner = (): Spinner => 
-  spinner();
+const clackSpinner = (): Spinner => spinner();
 
 const silentSpinner = (): Spinner => ({
-  error: 
-() => {},
-   start: () => {},
+  error: () => {},
+  start: () => {},
   message: () => {},
   stop: () => {},
 });

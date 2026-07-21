@@ -73,12 +73,10 @@ describe("whoami command", () => {
 
   it("emits success envelope in JSON mode (login + count + source, no list)", async () => {
     const stdout: string[] = [];
-    const writeSpy = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation((chunk: unknown) => {
-        stdout.push(String(chunk));
-        return true;
-      });
+    const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+      stdout.push(String(chunk));
+      return true;
+    });
 
     const deps = mkDeps();
     await whoami({ json: true }, deps);
@@ -117,40 +115,30 @@ describe("whoami command", () => {
     await expect(whoami({ json: false }, deps)).rejects.toThrow("__exit__");
     expect(deps.createProxyClient).not.toHaveBeenCalled();
     expect(deps.exit).toHaveBeenCalledWith(12);
-    expect(deps.logError).toHaveBeenCalledWith(
-      expect.stringMatching(/login|identity/i),
-    );
+    expect(deps.logError).toHaveBeenCalledWith(expect.stringMatching(/login|identity/i));
   });
 
   it("propagates proxy 401 as EXIT_CREDENTIALS", async () => {
     const deps = mkDeps({
       createProxyClient: vi.fn().mockReturnValue({
-        whoami: vi
-          .fn()
-          .mockRejectedValue(new ProxyError(401, "unauth", "bad token")),
+        whoami: vi.fn().mockRejectedValue(new ProxyError(401, "unauth", "bad token")),
       }),
     });
     await expect(whoami({ json: false }, deps)).rejects.toThrow("__exit__");
     expect(deps.exit).toHaveBeenCalledWith(12);
-    expect(deps.logError).toHaveBeenCalledWith(
-      expect.stringContaining("bad token"),
-    );
+    expect(deps.logError).toHaveBeenCalledWith(expect.stringContaining("bad token"));
   });
 
   it("emits error envelope in JSON mode on proxy failure", async () => {
     const stdout: string[] = [];
-    const writeSpy = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation((chunk: unknown) => {
-        stdout.push(String(chunk));
-        return true;
-      });
+    const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+      stdout.push(String(chunk));
+      return true;
+    });
 
     const deps = mkDeps({
       createProxyClient: vi.fn().mockReturnValue({
-        whoami: vi
-          .fn()
-          .mockRejectedValue(new ProxyError(503, "upstream", "down")),
+        whoami: vi.fn().mockRejectedValue(new ProxyError(503, "upstream", "down")),
       }),
     });
 

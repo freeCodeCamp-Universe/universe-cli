@@ -2,12 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import {
-  deleteToken,
-  loadToken,
-  saveToken,
-  tokenPath,
-} from "../../src/lib/token-store.js";
+import { deleteToken, loadToken, saveToken, tokenPath } from "../../src/lib/token-store.js";
 
 let tmp: string;
 const origXdg = process.env["XDG_CONFIG_HOME"];

@@ -43,9 +43,7 @@ function mkProxy() {
 function mkDeps(overrides: Record<string, unknown> = {}) {
   return {
     env: {} as NodeJS.ProcessEnv,
-    resolveIdentity: vi
-      .fn()
-      .mockResolvedValue({ token: "ghp_x", source: "env_GITHUB_TOKEN" }),
+    resolveIdentity: vi.fn().mockResolvedValue({ token: "ghp_x", source: "env_GITHUB_TOKEN" }),
     createProxyClient: vi.fn().mockReturnValue(mkProxy()),
     logSuccess: vi.fn(),
     logError: vi.fn(),
@@ -69,10 +67,7 @@ describe("repo reject command", () => {
 
   it("stringifies a numeric --reason (CA-3)", async () => {
     const deps = mkDeps();
-    await reject(
-      { json: true, id: "req_001", reason: 42 as unknown as string },
-      deps,
-    );
+    await reject({ json: true, id: "req_001", reason: 42 as unknown as string }, deps);
     const proxy = deps.createProxyClient.mock.results[0]?.value;
     expect(proxy.rejectRepoRequest).toHaveBeenCalledWith({
       id: "req_001",
@@ -82,9 +77,7 @@ describe("repo reject command", () => {
 
   it("requires an id", async () => {
     const deps = mkDeps();
-    await expect(reject({ json: false, id: "" }, deps)).rejects.toThrow(
-      "__exit__",
-    );
+    await expect(reject({ json: false, id: "" }, deps)).rejects.toThrow("__exit__");
     expect(deps.exit).toHaveBeenCalledWith(10);
   });
 
@@ -101,9 +94,7 @@ describe("repo reject command", () => {
       isTTY: true,
       prompts,
     });
-    await expect(reject({ json: false, id: "req_001" }, deps)).rejects.toThrow(
-      "__exit__",
-    );
+    await expect(reject({ json: false, id: "req_001" }, deps)).rejects.toThrow("__exit__");
     expect(proxy.rejectRepoRequest).not.toHaveBeenCalled();
     expect(deps.exit).toHaveBeenCalledWith(18);
   });
@@ -111,9 +102,7 @@ describe("repo reject command", () => {
   it("requires --yes in a non-interactive (non-TTY) session", async () => {
     const proxy = mkProxy();
     const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
-    await expect(reject({ json: false, id: "req_001" }, deps)).rejects.toThrow(
-      "__exit__",
-    );
+    await expect(reject({ json: false, id: "req_001" }, deps)).rejects.toThrow("__exit__");
     expect(proxy.rejectRepoRequest).not.toHaveBeenCalled();
     expect(deps.exit).toHaveBeenCalledWith(10); // EXIT_USAGE
   });
@@ -135,9 +124,7 @@ describe("repo reject command", () => {
       isTTY: true,
       prompts,
     });
-    await expect(reject({ json: false, id: "ghost" }, deps)).rejects.toThrow(
-      "__exit__",
-    );
+    await expect(reject({ json: false, id: "ghost" }, deps)).rejects.toThrow("__exit__");
     expect(deps.exit).toHaveBeenCalledWith(10); // EXIT_USAGE
     expect(prompts.confirm).not.toHaveBeenCalled();
     expect(proxy.rejectRepoRequest).not.toHaveBeenCalled();

@@ -7,11 +7,7 @@ import {
   ProxyError,
   wrapProxyError,
 } from "../../src/lib/proxy-client.js";
-import {
-  EXIT_CREDENTIALS,
-  EXIT_STORAGE,
-  EXIT_USAGE,
-} from "../../src/output/exit-codes.js";
+import { EXIT_CREDENTIALS, EXIT_STORAGE, EXIT_USAGE } from "../../src/output/exit-codes.js";
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -39,9 +35,7 @@ describe("createProxyClient", () => {
     it("issues GET /api/whoami with bearer token", async () => {
       const fetchMock = vi
         .fn()
-        .mockResolvedValue(
-          jsonResponse(200, { login: "alice", authorizedSites: ["x"] }),
-        );
+        .mockResolvedValue(jsonResponse(200, { login: "alice", authorizedSites: ["x"] }));
       const client = createProxyClient({
         baseUrl,
         getAuthToken,
@@ -50,9 +44,7 @@ describe("createProxyClient", () => {
       const r = await client.whoami();
       expect(fetchMock).toHaveBeenCalledTimes(1);
       const init = getInit(fetchMock.mock.calls[0]);
-      expect(getUrl(fetchMock.mock.calls[0])).toBe(
-        "https://uploads.freecode.camp/api/whoami",
-      );
+      expect(getUrl(fetchMock.mock.calls[0])).toBe("https://uploads.freecode.camp/api/whoami");
       expect(init.method).toBe("GET");
       expect(init.headers["Authorization"]).toBe("Bearer ghp_test");
       expect(r).toEqual({ login: "alice", authorizedSites: ["x"] });
@@ -93,9 +85,7 @@ describe("createProxyClient", () => {
       });
       const r = await client.deployInit({ site: "my-site", sha: "abc1234" });
       const init = getInit(fetchMock.mock.calls[0]);
-      expect(getUrl(fetchMock.mock.calls[0])).toBe(
-        "https://uploads.freecode.camp/api/deploy/init",
-      );
+      expect(getUrl(fetchMock.mock.calls[0])).toBe("https://uploads.freecode.camp/api/deploy/init");
       expect(init.method).toBe("POST");
       expect(init.headers["Authorization"]).toBe("Bearer ghp_test");
       expect(init.headers["Content-Type"]).toBe("application/json");
@@ -110,9 +100,7 @@ describe("createProxyClient", () => {
     it("includes optional files manifest in body", async () => {
       const fetchMock = vi
         .fn()
-        .mockResolvedValue(
-          jsonResponse(200, { deployId: "x", jwt: "y", expiresAt: "z" }),
-        );
+        .mockResolvedValue(jsonResponse(200, { deployId: "x", jwt: "y", expiresAt: "z" }));
       const client = createProxyClient({
         baseUrl,
         getAuthToken,
@@ -167,9 +155,7 @@ describe("createProxyClient", () => {
     it("URL-encodes path query parameter", async () => {
       const fetchMock = vi
         .fn()
-        .mockResolvedValue(
-          jsonResponse(200, { received: "a b/c.html", key: "x" }),
-        );
+        .mockResolvedValue(jsonResponse(200, { received: "a b/c.html", key: "x" }));
       const client = createProxyClient({
         baseUrl,
         getAuthToken,
@@ -187,9 +173,7 @@ describe("createProxyClient", () => {
     });
 
     it("uses application/octet-stream when contentType omitted", async () => {
-      const fetchMock = vi
-        .fn()
-        .mockResolvedValue(jsonResponse(200, { received: "x", key: "y" }));
+      const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, { received: "x", key: "y" }));
       const client = createProxyClient({
         baseUrl,
         getAuthToken,
@@ -273,9 +257,7 @@ describe("createProxyClient", () => {
     it("GETs /api/site/{site}/deploys with bearer", async () => {
       const fetchMock = vi
         .fn()
-        .mockResolvedValue(
-          jsonResponse(200, [{ deployId: "x" }, { deployId: "y" }]),
-        );
+        .mockResolvedValue(jsonResponse(200, [{ deployId: "x" }, { deployId: "y" }]));
       const client = createProxyClient({
         baseUrl,
         getAuthToken,
@@ -303,17 +285,13 @@ describe("createProxyClient", () => {
     });
 
     it("rejects a response whose shape is not DeploySummary[]", async () => {
-      const fetchMock = vi
-        .fn()
-        .mockResolvedValue(jsonResponse(200, [{ notADeployId: 1 }]));
+      const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, [{ notADeployId: 1 }]));
       const client = createProxyClient({
         baseUrl,
         getAuthToken,
         fetch: fetchMock,
       });
-      const err = await client
-        .siteDeploys({ site: "my-site" })
-        .catch((e: unknown) => e);
+      const err = await client.siteDeploys({ site: "my-site" }).catch((e: unknown) => e);
       expect(err).toBeInstanceOf(ProxyError);
       expect((err as ProxyError).code).toBe("malformed_response");
     });
@@ -383,9 +361,7 @@ describe("createProxyClient", () => {
     });
 
     it("URL-encodes site path segment", async () => {
-      const fetchMock = vi
-        .fn()
-        .mockResolvedValue(jsonResponse(200, { url: "x", deployId: "y" }));
+      const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, { url: "x", deployId: "y" }));
       const client = createProxyClient({
         baseUrl,
         getAuthToken,
@@ -400,9 +376,7 @@ describe("createProxyClient", () => {
 
   describe("sitePromote", () => {
     it("POSTs /api/site/{site}/promote with bearer", async () => {
-      const fetchMock = vi
-        .fn()
-        .mockResolvedValue(jsonResponse(200, { url: "x", deployId: "y" }));
+      const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, { url: "x", deployId: "y" }));
       const client = createProxyClient({
         baseUrl,
         getAuthToken,
@@ -490,9 +464,7 @@ describe("createProxyClient", () => {
 
   describe("siteRollback", () => {
     it("POSTs body { to } with bearer", async () => {
-      const fetchMock = vi
-        .fn()
-        .mockResolvedValue(jsonResponse(200, { url: "x", deployId: "old" }));
+      const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, { url: "x", deployId: "old" }));
       const client = createProxyClient({
         baseUrl,
         getAuthToken,
@@ -509,9 +481,7 @@ describe("createProxyClient", () => {
     });
 
     it("includes expectedCurrent in body when provided", async () => {
-      const fetchMock = vi
-        .fn()
-        .mockResolvedValue(jsonResponse(200, { url: "x", deployId: "old" }));
+      const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, { url: "x", deployId: "old" }));
       const client = createProxyClient({
         baseUrl,
         getAuthToken,
@@ -566,9 +536,7 @@ describe("createProxyClient", () => {
         getAuthToken,
         fetch: fetchMock,
       });
-      const err = (await client
-        .whoami()
-        .catch((e: unknown) => e)) as ProxyError;
+      const err = (await client.whoami().catch((e: unknown) => e)) as ProxyError;
       expect(err.exitCode).toBe(EXIT_CREDENTIALS);
     });
 
@@ -583,9 +551,7 @@ describe("createProxyClient", () => {
         getAuthToken,
         fetch: fetchMock,
       });
-      const err = (await client
-        .whoami()
-        .catch((e: unknown) => e)) as ProxyError;
+      const err = (await client.whoami().catch((e: unknown) => e)) as ProxyError;
       expect(err.exitCode).toBe(EXIT_CREDENTIALS);
     });
 
@@ -612,17 +578,13 @@ describe("createProxyClient", () => {
     });
 
     it("maps status 5xx to EXIT_STORAGE exit code", async () => {
-      const fetchMock = vi
-        .fn()
-        .mockResolvedValue(new Response("oops", { status: 500 }));
+      const fetchMock = vi.fn().mockResolvedValue(new Response("oops", { status: 500 }));
       const client = createProxyClient({
         baseUrl,
         getAuthToken,
         fetch: fetchMock,
       });
-      const err = (await client
-        .whoami()
-        .catch((e: unknown) => e)) as ProxyError;
+      const err = (await client.whoami().catch((e: unknown) => e)) as ProxyError;
       expect(err.exitCode).toBe(EXIT_STORAGE);
       expect(err.status).toBe(500);
       expect(err.code).toBe("http_500");
@@ -642,9 +604,7 @@ describe("createProxyClient", () => {
         getAuthToken,
         fetch: fetchMock,
       });
-      const err = (await client
-        .whoami()
-        .catch((e: unknown) => e)) as ProxyError;
+      const err = (await client.whoami().catch((e: unknown) => e)) as ProxyError;
       expect(err.exitCode).toBe(EXIT_STORAGE);
       expect(err.status).toBe(429);
     });
@@ -668,17 +628,13 @@ describe("createProxyClient", () => {
     });
 
     it("wraps fetch network error as ProxyError with status 0", async () => {
-      const fetchMock = vi
-        .fn()
-        .mockRejectedValue(new TypeError("network down"));
+      const fetchMock = vi.fn().mockRejectedValue(new TypeError("network down"));
       const client = createProxyClient({
         baseUrl,
         getAuthToken,
         fetch: fetchMock,
       });
-      const err = (await client
-        .whoami()
-        .catch((e: unknown) => e)) as ProxyError;
+      const err = (await client.whoami().catch((e: unknown) => e)) as ProxyError;
       expect(err).toBeInstanceOf(ProxyError);
       expect(err.status).toBe(0);
       expect(err.code).toBe("network_error");
@@ -691,18 +647,14 @@ describe("createProxyClient", () => {
     it("resolves async getAuthToken before request", async () => {
       const fetchMock = vi
         .fn()
-        .mockResolvedValue(
-          jsonResponse(200, { login: "a", authorizedSites: [] }),
-        );
+        .mockResolvedValue(jsonResponse(200, { login: "a", authorizedSites: [] }));
       const client = createProxyClient({
         baseUrl,
         getAuthToken: () => Promise.resolve("async_token"),
         fetch: fetchMock,
       });
       await client.whoami();
-      expect(getInit(fetchMock.mock.calls[0]).headers["Authorization"]).toBe(
-        "Bearer async_token",
-      );
+      expect(getInit(fetchMock.mock.calls[0]).headers["Authorization"]).toBe("Bearer async_token");
     });
   });
 
@@ -710,18 +662,14 @@ describe("createProxyClient", () => {
     it("strips trailing slash from baseUrl", async () => {
       const fetchMock = vi
         .fn()
-        .mockResolvedValue(
-          jsonResponse(200, { login: "a", authorizedSites: [] }),
-        );
+        .mockResolvedValue(jsonResponse(200, { login: "a", authorizedSites: [] }));
       const client = createProxyClient({
         baseUrl: "https://uploads.freecode.camp/",
         getAuthToken,
         fetch: fetchMock,
       });
       await client.whoami();
-      expect(getUrl(fetchMock.mock.calls[0])).toBe(
-        "https://uploads.freecode.camp/api/whoami",
-      );
+      expect(getUrl(fetchMock.mock.calls[0])).toBe("https://uploads.freecode.camp/api/whoami");
     });
   });
 
@@ -821,9 +769,7 @@ describe("createProxyClient", () => {
         fetch: fetchMock,
       });
       const r = await client.listSites();
-      expect(getUrl(fetchMock.mock.calls[0])).toBe(
-        "https://uploads.freecode.camp/api/sites",
-      );
+      expect(getUrl(fetchMock.mock.calls[0])).toBe("https://uploads.freecode.camp/api/sites");
       expect(getInit(fetchMock.mock.calls[0]).method).toBe("GET");
       expect(r).toEqual(rows);
     });
@@ -839,9 +785,7 @@ describe("createProxyClient", () => {
         getAuthToken,
         fetch: fetchMock,
       });
-      const err = (await client
-        .listSites()
-        .catch((e: unknown) => e)) as ProxyError;
+      const err = (await client.listSites().catch((e: unknown) => e)) as ProxyError;
       expect(err.code).toBe("registry_read_failed");
       expect(err.exitCode).toBe(EXIT_STORAGE);
     });
@@ -867,9 +811,7 @@ describe("createProxyClient", () => {
         teams: ["news-editors", "platform"],
       });
       const init = getInit(fetchMock.mock.calls[0]);
-      expect(getUrl(fetchMock.mock.calls[0])).toBe(
-        "https://uploads.freecode.camp/api/site/blog",
-      );
+      expect(getUrl(fetchMock.mock.calls[0])).toBe("https://uploads.freecode.camp/api/site/blog");
       expect(init.method).toBe("PATCH");
       expect(init.headers["Content-Type"]).toBe("application/json");
       expect(JSON.parse(init.body as string)).toEqual({
@@ -894,9 +836,7 @@ describe("createProxyClient", () => {
         fetch: fetchMock,
       });
       await client.updateSite({ slug: "a b", teams: ["staff"] });
-      expect(getUrl(fetchMock.mock.calls[0])).toBe(
-        "https://uploads.freecode.camp/api/site/a%20b",
-      );
+      expect(getUrl(fetchMock.mock.calls[0])).toBe("https://uploads.freecode.camp/api/site/a%20b");
     });
 
     it("throws ProxyError on 404 not_found", async () => {
@@ -920,35 +860,27 @@ describe("createProxyClient", () => {
 
   describe("deleteSite", () => {
     it("DELETEs /api/site/{slug} and returns void on 204", async () => {
-      const fetchMock = vi
-        .fn()
-        .mockResolvedValue(new Response(null, { status: 204 }));
+      const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
       const client = createProxyClient({
         baseUrl,
         getAuthToken,
         fetch: fetchMock,
       });
       const r = await client.deleteSite({ slug: "blog" });
-      expect(getUrl(fetchMock.mock.calls[0])).toBe(
-        "https://uploads.freecode.camp/api/site/blog",
-      );
+      expect(getUrl(fetchMock.mock.calls[0])).toBe("https://uploads.freecode.camp/api/site/blog");
       expect(getInit(fetchMock.mock.calls[0]).method).toBe("DELETE");
       expect(r).toBeUndefined();
     });
 
     it("URL-encodes slug path segment", async () => {
-      const fetchMock = vi
-        .fn()
-        .mockResolvedValue(new Response(null, { status: 204 }));
+      const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
       const client = createProxyClient({
         baseUrl,
         getAuthToken,
         fetch: fetchMock,
       });
       await client.deleteSite({ slug: "a b" });
-      expect(getUrl(fetchMock.mock.calls[0])).toBe(
-        "https://uploads.freecode.camp/api/site/a%20b",
-      );
+      expect(getUrl(fetchMock.mock.calls[0])).toBe("https://uploads.freecode.camp/api/site/a%20b");
     });
 
     it("throws ProxyError on 404 not_found", async () => {
@@ -995,9 +927,7 @@ describe("createProxyClient", () => {
     it("attaches an AbortSignal to every fetchImpl call by default", async () => {
       const fetchMock = vi
         .fn()
-        .mockResolvedValue(
-          jsonResponse(200, { login: "alice", authorizedSites: [] }),
-        );
+        .mockResolvedValue(jsonResponse(200, { login: "alice", authorizedSites: [] }));
       const client = createProxyClient({
         baseUrl,
         getAuthToken,
@@ -1023,9 +953,7 @@ describe("createProxyClient", () => {
     it("omits signal when timeoutMs <= 0 (disabled)", async () => {
       const fetchMock = vi
         .fn()
-        .mockResolvedValue(
-          jsonResponse(200, { login: "alice", authorizedSites: [] }),
-        );
+        .mockResolvedValue(jsonResponse(200, { login: "alice", authorizedSites: [] }));
       const client = createProxyClient({
         baseUrl,
         getAuthToken,
@@ -1047,9 +975,7 @@ describe("createProxyClient", () => {
         fetch: fetchMock,
         timeoutMs: 10,
       });
-      const err = (await client
-        .whoami()
-        .catch((e: unknown) => e)) as ProxyError;
+      const err = (await client.whoami().catch((e: unknown) => e)) as ProxyError;
       expect(err).toBeInstanceOf(ProxyError);
       expect(err.code).toBe("timeout");
       expect(err.message).toContain("10ms");
@@ -1061,19 +987,13 @@ describe("createProxyClient", () => {
       expect(parseFetchTimeoutMs({})).toBeUndefined();
     });
     it("returns parsed integer for a positive value", () => {
-      expect(parseFetchTimeoutMs({ UNIVERSE_FETCH_TIMEOUT_MS: "5000" })).toBe(
-        5_000,
-      );
+      expect(parseFetchTimeoutMs({ UNIVERSE_FETCH_TIMEOUT_MS: "5000" })).toBe(5_000);
     });
     it("returns undefined for non-numeric values", () => {
-      expect(
-        parseFetchTimeoutMs({ UNIVERSE_FETCH_TIMEOUT_MS: "fast" }),
-      ).toBeUndefined();
+      expect(parseFetchTimeoutMs({ UNIVERSE_FETCH_TIMEOUT_MS: "fast" })).toBeUndefined();
     });
     it("returns undefined for negative values", () => {
-      expect(
-        parseFetchTimeoutMs({ UNIVERSE_FETCH_TIMEOUT_MS: "-1" }),
-      ).toBeUndefined();
+      expect(parseFetchTimeoutMs({ UNIVERSE_FETCH_TIMEOUT_MS: "-1" })).toBeUndefined();
     });
   });
 });
@@ -1091,9 +1011,7 @@ const sampleRepoRow = {
 
 describe("createProxyClient — repo requests", () => {
   it("createRepoRequest POSTs /api/repo and omits empty template", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue(jsonResponse(201, sampleRepoRow));
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(201, sampleRepoRow));
     const client = createProxyClient({
       baseUrl,
       getAuthToken,
@@ -1117,9 +1035,7 @@ describe("createProxyClient — repo requests", () => {
   });
 
   it("listRepoRequests builds status + mine query", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue(jsonResponse(200, [sampleRepoRow]));
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, [sampleRepoRow]));
     const client = createProxyClient({
       baseUrl,
       getAuthToken,
@@ -1127,9 +1043,7 @@ describe("createProxyClient — repo requests", () => {
     });
 
     const rows = await client.listRepoRequests({ status: "all", mine: true });
-    expect(getUrl(fetchMock.mock.calls[0])).toBe(
-      `${baseUrl}/api/repos?status=all&mine=1`,
-    );
+    expect(getUrl(fetchMock.mock.calls[0])).toBe(`${baseUrl}/api/repos?status=all&mine=1`);
     expect(rows).toHaveLength(1);
   });
 
@@ -1145,9 +1059,7 @@ describe("createProxyClient — repo requests", () => {
   });
 
   it("getRepoRequest GETs the id-scoped path", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue(jsonResponse(200, sampleRepoRow));
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, sampleRepoRow));
     const client = createProxyClient({
       baseUrl,
       getAuthToken,
@@ -1170,9 +1082,7 @@ describe("createProxyClient — repo requests", () => {
       fetch: fetchMock,
     });
     const res = await client.approveRepoRequest({ id: "req_001" });
-    expect(getUrl(fetchMock.mock.calls[0])).toBe(
-      `${baseUrl}/api/repo/req_001/approve`,
-    );
+    expect(getUrl(fetchMock.mock.calls[0])).toBe(`${baseUrl}/api/repo/req_001/approve`);
     expect(getInit(fetchMock.mock.calls[0]).method).toBe("POST");
     expect(res.outcome).toBe("ok");
     expect(res.request.status).toBe("active");
@@ -1192,17 +1102,16 @@ describe("createProxyClient — repo requests", () => {
       getAuthToken,
       fetch: fetchMock,
     });
-    await expect(
-      client.approveRepoRequest({ id: "req_001" }),
-    ).rejects.toMatchObject({ code: "already_resolved", exitCode: EXIT_USAGE });
+    await expect(client.approveRepoRequest({ id: "req_001" })).rejects.toMatchObject({
+      code: "already_resolved",
+      exitCode: EXIT_USAGE,
+    });
   });
 
   it("rejectRepoRequest sends the reason", async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValue(
-        jsonResponse(200, { ...sampleRepoRow, status: "rejected" }),
-      );
+      .mockResolvedValue(jsonResponse(200, { ...sampleRepoRow, status: "rejected" }));
     const client = createProxyClient({
       baseUrl,
       getAuthToken,
@@ -1210,27 +1119,21 @@ describe("createProxyClient — repo requests", () => {
     });
     await client.rejectRepoRequest({ id: "req_001", reason: "out of scope" });
     const init = getInit(fetchMock.mock.calls[0]);
-    expect(getUrl(fetchMock.mock.calls[0])).toBe(
-      `${baseUrl}/api/repo/req_001/reject`,
-    );
+    expect(getUrl(fetchMock.mock.calls[0])).toBe(`${baseUrl}/api/repo/req_001/reject`);
     expect(JSON.parse(init.body as string)).toEqual({ reason: "out of scope" });
   });
 
   it("listRepoTemplates unwraps the templates array", async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValue(
-        jsonResponse(200, { templates: ["hello-universe", "starter"] }),
-      );
+      .mockResolvedValue(jsonResponse(200, { templates: ["hello-universe", "starter"] }));
     const client = createProxyClient({
       baseUrl,
       getAuthToken,
       fetch: fetchMock,
     });
     const t = await client.listRepoTemplates();
-    expect(getUrl(fetchMock.mock.calls[0])).toBe(
-      `${baseUrl}/api/repo/templates`,
-    );
+    expect(getUrl(fetchMock.mock.calls[0])).toBe(`${baseUrl}/api/repo/templates`);
     expect(t).toEqual(["hello-universe", "starter"]);
   });
 
@@ -1245,9 +1148,9 @@ describe("createProxyClient — repo requests", () => {
       getAuthToken,
       fetch: fetchMock,
     });
-    await expect(client.createRepoRequest({ name: "x" })).rejects.toMatchObject(
-      { exitCode: EXIT_CREDENTIALS },
-    );
+    await expect(client.createRepoRequest({ name: "x" })).rejects.toMatchObject({
+      exitCode: EXIT_CREDENTIALS,
+    });
   });
 });
 
@@ -1255,11 +1158,7 @@ describe("wrapProxyError authz hint", () => {
   it("appends a read:org / SSO hint on user_unauthorized", () => {
     const { code, message } = wrapProxyError(
       "repo approve",
-      new ProxyError(
-        403,
-        "user_unauthorized",
-        "caller is not on the required team",
-      ),
+      new ProxyError(403, "user_unauthorized", "caller is not on the required team"),
     );
     expect(code).toBe(EXIT_CREDENTIALS);
     expect(message).toContain("user_unauthorized");
@@ -1306,17 +1205,13 @@ describe("repo response validation (H2)", () => {
   });
 
   it("rejects an approve result missing the request row with exit 13", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue(jsonResponse(200, { outcome: "ok" }));
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, { outcome: "ok" }));
     const client = createProxyClient({
       baseUrl,
       getAuthToken,
       fetch: fetchMock,
     });
-    await expect(
-      client.approveRepoRequest({ id: "req_1" }),
-    ).rejects.toMatchObject({
+    await expect(client.approveRepoRequest({ id: "req_1" })).rejects.toMatchObject({
       code: "malformed_response",
       exitCode: EXIT_STORAGE,
     });
@@ -1375,14 +1270,10 @@ describe("error correlation (M5/M6)", () => {
 
 describe("debug trace (L2)", () => {
   it("writes a redacted round-trip trace to stderr when debug is on", async () => {
-    const errSpy = vi
-      .spyOn(process.stderr, "write")
-      .mockImplementation(() => true);
+    const errSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
     const fetchMock = vi
       .fn()
-      .mockResolvedValue(
-        jsonResponse(200, { login: "a", authorizedSites: [] }),
-      );
+      .mockResolvedValue(jsonResponse(200, { login: "a", authorizedSites: [] }));
     const client = createProxyClient({
       baseUrl,
       getAuthToken,
@@ -1397,14 +1288,10 @@ describe("debug trace (L2)", () => {
   });
 
   it("writes nothing to stderr when debug is off", async () => {
-    const errSpy = vi
-      .spyOn(process.stderr, "write")
-      .mockImplementation(() => true);
+    const errSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
     const fetchMock = vi
       .fn()
-      .mockResolvedValue(
-        jsonResponse(200, { login: "a", authorizedSites: [] }),
-      );
+      .mockResolvedValue(jsonResponse(200, { login: "a", authorizedSites: [] }));
     const client = createProxyClient({
       baseUrl,
       getAuthToken,
@@ -1458,9 +1345,7 @@ describe("listAudit query + response (R6)", () => {
 
     await client.listAudit({});
 
-    expect(getUrl(fetchMock.mock.calls[0])).toBe(
-      "https://uploads.freecode.camp/api/audit",
-    );
+    expect(getUrl(fetchMock.mock.calls[0])).toBe("https://uploads.freecode.camp/api/audit");
   });
 
   it("parses a well-formed AuditRow array with optional fields omitted", async () => {

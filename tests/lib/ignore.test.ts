@@ -54,12 +54,7 @@ describe("createIgnoreFilter", () => {
 
   describe("multiple patterns", () => {
     it("ignores when any pattern matches", () => {
-      const ignore = createIgnoreFilter([
-        "*.map",
-        "node_modules/**",
-        ".git/**",
-        ".env*",
-      ]);
+      const ignore = createIgnoreFilter(["*.map", "node_modules/**", ".git/**", ".env*"]);
       expect(ignore("dist/main.js")).toBe(false);
       expect(ignore("dist/main.js.map")).toBe(true);
       expect(ignore("node_modules/lodash/index.js")).toBe(true);

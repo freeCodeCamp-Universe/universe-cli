@@ -39,7 +39,9 @@ class LocalProjectWriter implements ProjectWriter {
     } catch (error) {
       await this.filesystem.rm(targetDirectory, { force: true, recursive: true });
 
-      throw new UsageError(`Failed to write scaffold to "${targetDirectory}": ${(error as Error).message}`);
+      throw new UsageError(
+        `Failed to write scaffold to "${targetDirectory}": ${(error as Error).message}`,
+      );
     }
   }
 }

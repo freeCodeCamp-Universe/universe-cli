@@ -3,9 +3,7 @@ import { uploadFiles } from "../../src/lib/upload.js";
 import type { ProxyClient } from "../../src/lib/proxy-client.js";
 
 function mkClient(
-  upload: ProxyClient["deployUpload"] = vi
-    .fn()
-    .mockResolvedValue({ received: "x", key: "k" }),
+  upload: ProxyClient["deployUpload"] = vi.fn().mockResolvedValue({ received: "x", key: "k" }),
 ): { client: ProxyClient; upload: ReturnType<typeof vi.fn> } {
   const fn = upload as ReturnType<typeof vi.fn>;
   return {
@@ -27,9 +25,7 @@ describe("uploadFiles", () => {
     const { client, upload } = mkClient();
     const readFile = vi
       .fn()
-      .mockImplementation(async (path: string) =>
-        Buffer.from(`bytes-of-${path}`),
-      );
+      .mockImplementation(async (path: string) => Buffer.from(`bytes-of-${path}`));
 
     const r = await uploadFiles(
       {
@@ -118,9 +114,7 @@ describe("uploadFiles", () => {
 
   it("passes file body to upload as bytes", async () => {
     const { client, upload } = mkClient();
-    const readFile = vi
-      .fn()
-      .mockImplementation(async () => Buffer.from("hello"));
+    const readFile = vi.fn().mockImplementation(async () => Buffer.from("hello"));
 
     await uploadFiles(
       {
@@ -165,9 +159,7 @@ describe("uploadFiles", () => {
       .mockResolvedValueOnce({ received: "a", key: "k1" })
       .mockRejectedValueOnce(new Error("upload failed"))
       .mockResolvedValueOnce({ received: "c", key: "k3" });
-    const { client } = mkClient(
-      upload as unknown as ProxyClient["deployUpload"],
-    );
+    const { client } = mkClient(upload as unknown as ProxyClient["deployUpload"]);
     const readFile = vi.fn().mockResolvedValue(Buffer.from("x"));
 
     const r = await uploadFiles(
@@ -211,9 +203,7 @@ describe("uploadFiles", () => {
     );
 
     expect(onProgress).toHaveBeenCalledTimes(2);
-    expect(onProgress).toHaveBeenLastCalledWith(
-      expect.objectContaining({ uploaded: 2, total: 2 }),
-    );
+    expect(onProgress).toHaveBeenLastCalledWith(expect.objectContaining({ uploaded: 2, total: 2 }));
   });
 
   it("respects concurrency limit", async () => {

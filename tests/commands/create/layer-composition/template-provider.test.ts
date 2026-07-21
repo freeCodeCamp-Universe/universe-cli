@@ -55,11 +55,7 @@ describe("RemoteTemplateProvider", () => {
       const cacheVersionDir = join(cacheBase, defaultTemplateVersion);
       await cp(FIXTURES_DIR, cacheVersionDir, { recursive: true });
 
-      const provider = new RemoteTemplateProvider(
-        () => ({}),
-        cacheBase,
-        fakeFetchUnexpected,
-      );
+      const provider = new RemoteTemplateProvider(() => ({}), cacheBase, fakeFetchUnexpected);
 
       const { registry } = await provider.loadLayers();
       expect(registry.always).toBeDefined();
@@ -256,9 +252,7 @@ describe("RemoteTemplateProvider", () => {
         fakeFetch404,
       );
 
-      await expect(provider.loadLayers()).rejects.toThrow(
-        "Check UNIVERSE_TEMPLATES_VERSION.",
-      );
+      await expect(provider.loadLayers()).rejects.toThrow("Check UNIVERSE_TEMPLATES_VERSION.");
     });
 
     it("throws on network failure", async () => {

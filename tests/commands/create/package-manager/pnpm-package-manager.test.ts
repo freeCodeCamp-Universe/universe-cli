@@ -14,19 +14,19 @@ const PNPM_LIST_OUTPUT_NO_LODASH = JSON.stringify([
   },
 ]);
 
-const makeRunnerFactory = (overrides?: {
-  installLockfileOnly?: (cwd: string) => Promise<void>;
-  list?: (cwd: string) => Promise<string>;
-}): PnpmRunnerFactory => (_pmVersion) => ({
-  installLockfileOnly:
-    overrides?.installLockfileOnly ??
-    (async (cwd: string) => {
-      await writeFile(join(cwd, "pnpm-lock.yaml"), "", "utf8");
-    }),
-  list:
-    overrides?.list ??
-    (async (_cwd: string) => PNPM_LIST_OUTPUT_NO_LODASH),
-});
+const makeRunnerFactory =
+  (overrides?: {
+    installLockfileOnly?: (cwd: string) => Promise<void>;
+    list?: (cwd: string) => Promise<string>;
+  }): PnpmRunnerFactory =>
+  (_pmVersion) => ({
+    installLockfileOnly:
+      overrides?.installLockfileOnly ??
+      (async (cwd: string) => {
+        await writeFile(join(cwd, "pnpm-lock.yaml"), "", "utf8");
+      }),
+    list: overrides?.list ?? (async (_cwd: string) => PNPM_LIST_OUTPUT_NO_LODASH),
+  });
 
 describe(PnpmPackageManager, () => {
   let tmpDir: string;

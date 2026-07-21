@@ -41,9 +41,7 @@ function mkProxy() {
 function mkDeps(overrides: Record<string, unknown> = {}) {
   return {
     env: {} as NodeJS.ProcessEnv,
-    resolveIdentity: vi
-      .fn()
-      .mockResolvedValue({ token: "ghp_x", source: "env_GITHUB_TOKEN" }),
+    resolveIdentity: vi.fn().mockResolvedValue({ token: "ghp_x", source: "env_GITHUB_TOKEN" }),
     createProxyClient: vi.fn().mockReturnValue(mkProxy()),
     logMessage: vi.fn(),
     logError: vi.fn(),
@@ -67,12 +65,10 @@ describe("repo ls command", () => {
 
   it("emits a JSON envelope with the effective default status", async () => {
     const stdout: string[] = [];
-    const writeSpy = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation((c: unknown) => {
-        stdout.push(String(c));
-        return true;
-      });
+    const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((c: unknown) => {
+      stdout.push(String(c));
+      return true;
+    });
     const deps = mkDeps();
     await ls({ json: true }, deps);
     writeSpy.mockRestore();
@@ -95,16 +91,12 @@ describe("repo ls command", () => {
   it("renders a table for human output", async () => {
     const deps = mkDeps();
     await ls({ json: false }, deps);
-    expect(deps.logMessage).toHaveBeenCalledWith(
-      expect.stringContaining("alpha"),
-    );
+    expect(deps.logMessage).toHaveBeenCalledWith(expect.stringContaining("alpha"));
   });
 
   it("rejects an unknown --status with a usage error before any call", async () => {
     const deps = mkDeps();
-    await expect(ls({ json: false, status: "actve" }, deps)).rejects.toThrow(
-      "__exit__",
-    );
+    await expect(ls({ json: false, status: "actve" }, deps)).rejects.toThrow("__exit__");
     expect(deps.exit).toHaveBeenCalledWith(10);
     expect(deps.createProxyClient).not.toHaveBeenCalled();
   });
@@ -148,8 +140,6 @@ describe("repo ls command", () => {
     const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
     await expect(ls({ json: false }, deps)).rejects.toThrow("__exit__");
     expect(deps.exit).toHaveBeenCalledWith(12); // EXIT_CREDENTIALS
-    expect(deps.logError).toHaveBeenCalledWith(
-      expect.stringContaining("user_unauthorized"),
-    );
+    expect(deps.logError).toHaveBeenCalledWith(expect.stringContaining("user_unauthorized"));
   });
 });

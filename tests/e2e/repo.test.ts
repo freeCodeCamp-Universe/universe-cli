@@ -29,12 +29,10 @@ async function run(
   env: NodeJS.ProcessEnv,
 ): Promise<{ captured: CapturedExit; envelope: Envelope | undefined }> {
   const chunks: string[] = [];
-  const spy = vi
-    .spyOn(process.stdout, "write")
-    .mockImplementation((chunk: unknown) => {
-      chunks.push(String(chunk));
-      return true;
-    });
+  const spy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+    chunks.push(String(chunk));
+    return true;
+  });
   const captured: CapturedExit = {};
   try {
     await fn(
@@ -105,11 +103,7 @@ describe("repo E2E (real proxy-client + real identity chain)", () => {
   });
 
   it("rejects a pending request with a reason", async () => {
-    const created = await run(
-      create as never,
-      { json: true, name: "scratch" },
-      env.env,
-    );
+    const created = await run(create as never, { json: true, name: "scratch" }, env.env);
     const id = created.envelope!["id"] as string;
 
     const rejected = await run(
@@ -123,29 +117,17 @@ describe("repo E2E (real proxy-client + real identity chain)", () => {
   });
 
   it("dedupes repo names case-insensitively (EXIT_USAGE on the dup)", async () => {
-    const first = await run(
-      create as never,
-      { json: true, name: "MyRepo" },
-      env.env,
-    );
+    const first = await run(create as never, { json: true, name: "MyRepo" }, env.env);
     expect(first.captured.code).toBeUndefined();
 
-    const dup = await run(
-      create as never,
-      { json: true, name: "myrepo" },
-      env.env,
-    );
+    const dup = await run(create as never, { json: true, name: "myrepo" }, env.env);
     expect(dup.captured.code).toBe(10); // EXIT_USAGE
     const errorBlock = dup.envelope!["error"] as { message: string };
     expect(errorBlock.message).toContain("already_exists");
   });
 
   it("deletes a request, freeing the name to re-create", async () => {
-    const created = await run(
-      create as never,
-      { json: true, name: "tmp-del" },
-      env.env,
-    );
+    const created = await run(create as never, { json: true, name: "tmp-del" }, env.env);
     const id = created.envelope!["id"] as string;
 
     const removed = await run(rm as never, { json: true, id }, env.env);
@@ -153,21 +135,13 @@ describe("repo E2E (real proxy-client + real identity chain)", () => {
     expect(removed.envelope!["deleted"]).toBe(true);
     expect(server.state.repoRequests.has(id)).toBe(false);
 
-    const again = await run(
-      create as never,
-      { json: true, name: "tmp-del" },
-      env.env,
-    );
+    const again = await run(create as never, { json: true, name: "tmp-del" }, env.env);
     expect(again.captured.code).toBeUndefined();
     expect(again.envelope!["status"]).toBe("pending");
   });
 
   it("returns 409 already_resolved on a double approval (EXIT_USAGE)", async () => {
-    const created = await run(
-      create as never,
-      { json: true, name: "raced" },
-      env.env,
-    );
+    const created = await run(create as never, { json: true, name: "raced" }, env.env);
     const id = created.envelope!["id"] as string;
 
     const first = await run(approve as never, { json: true, id }, env.env);

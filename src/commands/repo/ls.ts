@@ -4,11 +4,7 @@ import { wrapProxyError } from "../../lib/proxy-client.js";
 import { buildEnvelope } from "../../output/envelope.js";
 import { exitWithCode } from "../../output/exit-codes.js";
 import { emitJson, outputError } from "../../output/format.js";
-import {
-  formatRepoTable,
-  type RepoCommandDeps,
-  setupClient,
-} from "./_shared.js";
+import { formatRepoTable, type RepoCommandDeps, setupClient } from "./_shared.js";
 import { repoStatusSchema } from "./schema.js";
 
 /** Closed set accepted by `--status`: the row statuses plus `all`. */
@@ -23,10 +19,7 @@ export interface RepoLsOptions {
   all?: boolean;
 }
 
-export async function ls(
-  options: RepoLsOptions,
-  deps: RepoCommandDeps = {},
-): Promise<void> {
+export async function ls(options: RepoLsOptions, deps: RepoCommandDeps = {}): Promise<void> {
   const command = "repo ls";
   const message = deps.logMessage ?? ((s: string) => log.message(s));
   const error = deps.logError ?? ((s: string) => log.error(s));
@@ -63,17 +56,11 @@ export async function ls(
         }),
       );
     } else {
-      const empty =
-        status === "all" ? "No repo requests." : `No ${status} repo requests.`;
+      const empty = status === "all" ? "No repo requests." : `No ${status} repo requests.`;
       message(formatRepoTable(rows, empty));
     }
   } catch (err) {
-    const {
-      code,
-      message: msg,
-      kind,
-      requestId,
-    } = wrapProxyError(command, err);
+    const { code, message: msg, kind, requestId } = wrapProxyError(command, err);
     outputError({ json: options.json, command }, code, msg, {
       logError: error,
       kind,

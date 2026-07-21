@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import type { CreateSelections, Prompt } from "../../../../src/commands/create/prompt/prompt.port.js";
+import type {
+  CreateSelections,
+  Prompt,
+} from "../../../../src/commands/create/prompt/prompt.port.js";
 import { ClackPrompt } from "../../../../src/commands/create/prompt/clack-prompt.js";
 import type { ClackPromptApi } from "../../../../src/commands/create/prompt/clack-prompt.js";
 // oxlint-disable-next-line import/no-namespace

@@ -4,10 +4,7 @@ import { log } from "@clack/prompts";
 import { ConfigError, CredentialError } from "../errors.js";
 import { DEFAULT_PROXY_URL } from "../lib/constants.js";
 import { resolveIdentity as defaultResolveIdentity } from "../lib/identity.js";
-import {
-  parsePlatformYaml,
-  type PlatformYamlV2,
-} from "../lib/platform-yaml.js";
+import { parsePlatformYaml, type PlatformYamlV2 } from "../lib/platform-yaml.js";
 import {
   createProxyClient as defaultCreateProxyClient,
   parseFetchTimeoutMs,
@@ -98,10 +95,7 @@ async function readSiteFromYaml(
   try {
     raw = await read(cwd);
   } catch (err) {
-    if (
-      err instanceof Error &&
-      (err as NodeJS.ErrnoException).code === "ENOENT"
-    ) {
+    if (err instanceof Error && (err as NodeJS.ErrnoException).code === "ENOENT") {
       return null;
     }
     throw err;
@@ -121,11 +115,8 @@ function formatTable(deploys: DeployRow[]): string {
     d.state ?? "—",
     d.actor ?? "—",
   ]);
-  const widths = header.map((h, i) =>
-    Math.max(h.length, ...rows.map((r) => (r[i] ?? "").length)),
-  );
-  const fmt = (cells: string[]): string =>
-    cells.map((c, i) => c.padEnd(widths[i] ?? 0)).join("  ");
+  const widths = header.map((h, i) => Math.max(h.length, ...rows.map((r) => (r[i] ?? "").length)));
+  const fmt = (cells: string[]): string => cells.map((c, i) => c.padEnd(widths[i] ?? 0)).join("  ");
   return [fmt(header), ...rows.map(fmt)].join("\n");
 }
 
@@ -170,9 +161,7 @@ export async function ls(options: LsOptions, deps: LsDeps = {}): Promise<void> {
     // makes the operator-visible top-of-list the OLDEST deploy. Reverse so
     // the newest deploy is at index 0 — the natural operator expectation
     // and the assumption shared by every downstream consumer.
-    const sorted = [...raw].sort((a, b) =>
-      b.deployId.localeCompare(a.deployId),
-    );
+    const sorted = [...raw].sort((a, b) => b.deployId.localeCompare(a.deployId));
     const parsed = sorted.map((d) => parseDeployId(d.deployId));
 
     let previewId: string | null = null;

@@ -10,12 +10,10 @@ interface RunResult {
 
 async function runLogoutJson(): Promise<RunResult> {
   const chunks: string[] = [];
-  const spy = vi
-    .spyOn(process.stdout, "write")
-    .mockImplementation((chunk: unknown) => {
-      chunks.push(String(chunk));
-      return true;
-    });
+  const spy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+    chunks.push(String(chunk));
+    return true;
+  });
   await logout({ json: true }, { logSuccess: vi.fn(), logInfo: vi.fn() });
   spy.mockRestore();
   const raw = chunks.join("").trim();

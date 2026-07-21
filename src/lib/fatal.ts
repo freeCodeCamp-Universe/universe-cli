@@ -11,9 +11,7 @@ function defaultOnFatal(err: unknown): never {
   process.exit(EXIT_USAGE);
 }
 
-export function installFatalHandlers(
-  onFatal: (err: unknown) => void = defaultOnFatal,
-): void {
+export function installFatalHandlers(onFatal: (err: unknown) => void = defaultOnFatal): void {
   process.on("unhandledRejection", onFatal);
   process.on("uncaughtException", onFatal);
 }

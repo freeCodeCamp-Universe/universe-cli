@@ -46,8 +46,7 @@ interface BuildBlock {
 
 const DEFAULT_OUTPUT = "dist";
 
-const defaultReadFileText = (path: string): Promise<string> =>
-  readFile(path, "utf-8");
+const defaultReadFileText = (path: string): Promise<string> => readFile(path, "utf-8");
 
 const defaultWriteFileText = (path: string, data: string): Promise<void> =>
   writeFile(path, data, { encoding: "utf-8", flag: "w" });
@@ -79,18 +78,13 @@ const defaultPromptText = async (opts: PromptTextOptions): Promise<string> => {
     message: opts.message,
     placeholder: opts.defaultValue,
     defaultValue: opts.defaultValue,
-    ...(validate
-      ? { validate: (v: string | undefined) => validate(v ?? "") }
-      : {}),
+    ...(validate ? { validate: (v: string | undefined) => validate(v ?? "") } : {}),
   });
   if (isCancel(r)) throw new ConfirmError("init cancelled");
   return r.trim().length > 0 ? r.trim() : opts.defaultValue;
 };
 
-const defaultPromptConfirm = async (
-  message: string,
-  initial: boolean,
-): Promise<boolean> => {
+const defaultPromptConfirm = async (message: string, initial: boolean): Promise<boolean> => {
   const r = await confirm({ message, initialValue: initial });
   if (isCancel(r)) throw new ConfirmError("init cancelled");
   return r === true;
@@ -187,10 +181,7 @@ function renderYaml(site: string, build: BuildBlock | null): string {
   return header + stringifyYaml(doc);
 }
 
-export async function init(
-  options: InitOptions,
-  deps: InitDeps = {},
-): Promise<void> {
+export async function init(options: InitOptions, deps: InitDeps = {}): Promise<void> {
   const cwd = deps.cwd ?? process.cwd();
   const readFileText = deps.readFileText ?? defaultReadFileText;
   const writeFileText = deps.writeFileText ?? defaultWriteFileText;
@@ -209,17 +200,11 @@ export async function init(
   try {
     const target = resolve(cwd, "platform.yaml");
     if ((await pathExists(target)) && !options.force) {
-      throw new ConfigError(
-        `platform.yaml already exists in ${cwd}. Pass --force to overwrite.`,
-      );
+      throw new ConfigError(`platform.yaml already exists in ${cwd}. Pass --force to overwrite.`);
     }
 
     const derivedSite = deriveSite(cwd, detectGitRemote(cwd));
-    const detectedCommand = await detectBuildCommand(
-      cwd,
-      readFileText,
-      pathExists,
-    );
+    const detectedCommand = await detectBuildCommand(cwd, readFileText, pathExists);
 
     let site = options.site?.trim() || derivedSite;
     let build: BuildBlock | null = null;
@@ -269,9 +254,7 @@ export async function init(
 
     const parsed = parsePlatformYaml(content);
     if (!parsed.ok) {
-      throw new ConfigError(
-        `generated platform.yaml failed validation: ${parsed.error}`,
-      );
+      throw new ConfigError(`generated platform.yaml failed validation: ${parsed.error}`);
     }
 
     await writeFileText(target, content);
@@ -281,9 +264,7 @@ export async function init(
         buildEnvelope("init", true, {
           path: target,
           site,
-          build: build
-            ? { command: build.command ?? null, output: build.output }
-            : null,
+          build: build ? { command: build.command ?? null, output: build.output } : null,
         }),
       );
       return;
@@ -292,12 +273,7 @@ export async function init(
     if (!interactive) {
       info(`Wrote platform.yaml for site '${site}'.`);
     }
-    const lines = [
-      `Created platform.yaml`,
-      ``,
-      `  Path:     ${target}`,
-      `  Site:     ${site}`,
-    ];
+    const lines = [`Created platform.yaml`, ``, `  Path:     ${target}`, `  Site:     ${site}`];
     if (build?.command) lines.push(`  Build:    ${build.command}`);
     lines.push(`  Output:   ${build?.output ?? DEFAULT_OUTPUT}`);
     lines.push(``, `Next: universe static deploy`);

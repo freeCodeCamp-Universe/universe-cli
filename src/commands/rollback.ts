@@ -4,10 +4,7 @@ import { confirm, isCancel, log } from "@clack/prompts";
 import { ConfigError, CredentialError, UsageError } from "../errors.js";
 import { DEFAULT_PROXY_URL } from "../lib/constants.js";
 import { resolveIdentity as defaultResolveIdentity } from "../lib/identity.js";
-import {
-  parsePlatformYaml,
-  type PlatformYamlV2,
-} from "../lib/platform-yaml.js";
+import { parsePlatformYaml, type PlatformYamlV2 } from "../lib/platform-yaml.js";
 import {
   AliasDriftError,
   createProxyClient as defaultCreateProxyClient,
@@ -55,13 +52,8 @@ async function readAndParseConfig(
   try {
     raw = await read(cwd);
   } catch (err) {
-    if (
-      err instanceof Error &&
-      (err as NodeJS.ErrnoException).code === "ENOENT"
-    ) {
-      throw new ConfigError(
-        `platform.yaml not found in ${cwd}. See docs/platform-yaml.md.`,
-      );
+    if (err instanceof Error && (err as NodeJS.ErrnoException).code === "ENOENT") {
+      throw new ConfigError(`platform.yaml not found in ${cwd}. See docs/platform-yaml.md.`);
     }
     throw err;
   }
@@ -70,10 +62,7 @@ async function readAndParseConfig(
   return r.value;
 }
 
-export async function rollback(
-  options: RollbackOptions,
-  deps: RollbackDeps = {},
-): Promise<void> {
+export async function rollback(options: RollbackOptions, deps: RollbackDeps = {}): Promise<void> {
   const cwd = deps.cwd ?? process.cwd();
   const env = deps.env ?? process.env;
   const readYaml = deps.readPlatformYaml ?? defaultReadPlatformYaml;
@@ -126,12 +115,8 @@ export async function rollback(
       // V4: single-shot retry on non-JSON only. JSON path falls through
       // to outer catch which renders the envelope with `current`.
       if (options.json) throw err;
-      error(
-        `drift: production moved to ${err.current}, expected ${initialExpected}`,
-      );
-      const ok = await promptConfirm(
-        `Retry rollback with expectedCurrent='${err.current}'?`,
-      );
+      error(`drift: production moved to ${err.current}, expected ${initialExpected}`);
+      const ok = await promptConfirm(`Retry rollback with expectedCurrent='${err.current}'?`);
       if (!ok) throw err;
       result = await client.siteRollback({
         site: config.site,
@@ -164,8 +149,7 @@ export async function rollback(
     const { code, message } = wrapProxyError("rollback", err);
     // V3 additive: top-level `current` so scripted callers can branch +
     // supply a fresh expectedCurrent on next attempt.
-    const extras =
-      err instanceof AliasDriftError ? { current: err.current } : undefined;
+    const extras = err instanceof AliasDriftError ? { current: err.current } : undefined;
     outputError({ json: options.json, command: "rollback" }, code, message, {
       logError: error,
       extras,

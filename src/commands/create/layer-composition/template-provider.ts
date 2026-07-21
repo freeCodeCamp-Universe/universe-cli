@@ -51,11 +51,7 @@ const readEnv = (): TemplateProviderEnv => ({
   UNIVERSE_TEMPLATES_VERSION: process.env["UNIVERSE_TEMPLATES_VERSION"],
 });
 
-const validateEntries = (
-  dir: string,
-  expected: readonly string[],
-  actual: string[],
-): void => {
+const validateEntries = (dir: string, expected: readonly string[], actual: string[]): void => {
   const expectedSet = new Set<string>(expected);
   const actualSet = new Set(actual);
 
@@ -95,18 +91,17 @@ const parseAndValidate = async (dir: string): Promise<TemplateData> => {
   const readLayer = (name: string) => readFile(join(dir, "layers", name), "utf-8");
   const readRoot = (name: string) => readFile(join(dir, name), "utf-8");
 
-  const [labels, always, database, framework, packageManager, runtime, service] =
-    await Promise.all([
+  const [labels, always, database, framework, packageManager, runtime, service] = await Promise.all(
+    [
       readRoot("labels.json").then((raw) => LabelsSchema.parse(JSON.parse(raw))),
       readLayer("always.json").then((raw) => AlwaysSchema.parse(JSON.parse(raw))),
       readLayer("database.json").then((raw) => DatabaseSchema.parse(JSON.parse(raw))),
       readLayer("framework.json").then((raw) => FrameworkSchema.parse(JSON.parse(raw))),
-      readLayer("package-manager.json").then((raw) =>
-        PackageManagerSchema.parse(JSON.parse(raw)),
-      ),
+      readLayer("package-manager.json").then((raw) => PackageManagerSchema.parse(JSON.parse(raw))),
       readLayer("runtime.json").then((raw) => RuntimeSchema.parse(JSON.parse(raw))),
       readLayer("service.json").then((raw) => ServiceSchema.parse(JSON.parse(raw))),
-    ]);
+    ],
+  );
 
   return {
     labels,
@@ -146,9 +141,7 @@ const fetchTarball = async (url: string, fetchImpl: FetchFn): Promise<Buffer> =>
   try {
     response = await fetchImpl(url);
   } catch {
-    throw new ConfigError(
-      "Templates not cached. Run `universe templates fetch` or check network.",
-    );
+    throw new ConfigError("Templates not cached. Run `universe templates fetch` or check network.");
   }
 
   if (response.status === 404) {
@@ -156,9 +149,7 @@ const fetchTarball = async (url: string, fetchImpl: FetchFn): Promise<Buffer> =>
   }
 
   if (!response.ok) {
-    throw new ConfigError(
-      `Failed to fetch templates from ${url}: HTTP ${String(response.status)}`,
-    );
+    throw new ConfigError(`Failed to fetch templates from ${url}: HTTP ${String(response.status)}`);
   }
 
   const arrayBuffer = await response.arrayBuffer();
@@ -252,5 +243,11 @@ class RemoteTemplateProvider implements TemplateProvider {
   }
 }
 
-export { EXPECTED_LAYER_FILES, EXPECTED_ROOT_ENTRIES, RemoteTemplateProvider, loadFromDir, validateStructure };
+export {
+  EXPECTED_LAYER_FILES,
+  EXPECTED_ROOT_ENTRIES,
+  RemoteTemplateProvider,
+  loadFromDir,
+  validateStructure,
+};
 export type { FetchFn, TemplateData, TemplateProvider, TemplateProviderEnv };

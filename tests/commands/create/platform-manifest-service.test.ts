@@ -72,5 +72,4 @@ describe(PlatformManifestService, () => {
 
     expect(result).not.toHaveProperty("error");
   });
-
 });

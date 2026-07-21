@@ -1,9 +1,4 @@
-import {
-  createServer,
-  type IncomingMessage,
-  type Server,
-  type ServerResponse,
-} from "node:http";
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 
 /**
@@ -187,9 +182,7 @@ async function handle(
   const method = req.method ?? "GET";
   const path = req.url ?? "";
   const authorization =
-    typeof req.headers["authorization"] === "string"
-      ? req.headers["authorization"]
-      : undefined;
+    typeof req.headers["authorization"] === "string" ? req.headers["authorization"] : undefined;
   const body = await readBody(req);
 
   const forced = state.failures.get(`${method} ${path}`);
@@ -298,10 +291,7 @@ async function handle(
       });
       return;
     }
-    const teams =
-      Array.isArray(parsed.teams) && parsed.teams.length > 0
-        ? parsed.teams
-        : ["staff"];
+    const teams = Array.isArray(parsed.teams) && parsed.teams.length > 0 ? parsed.teams : ["staff"];
     const now = "2026-05-12T00:00:00Z";
     const row: SiteRow = {
       slug,
@@ -393,16 +383,9 @@ async function handle(
     }
     const uploadFail = state.uploadFailPaths.get(filePath);
     if (uploadFail) {
-      logAndSend(
-        callLog,
-        method,
-        path,
-        authorization,
-        body,
-        res,
-        uploadFail.status,
-        { error: { code: uploadFail.code, message: uploadFail.message } },
-      );
+      logAndSend(callLog, method, path, authorization, body, res, uploadFail.status, {
+        error: { code: uploadFail.code, message: uploadFail.message },
+      });
       return;
     }
     deploy.uploadedFiles.set(filePath, body);
@@ -466,8 +449,7 @@ async function handle(
     const list = state.deploysBySite.get(deploy.site) ?? [];
     list.unshift({ deployId });
     state.deploysBySite.set(deploy.site, list);
-    const subdomain =
-      mode === "preview" ? `${deploy.site}.preview` : deploy.site;
+    const subdomain = mode === "preview" ? `${deploy.site}.preview` : deploy.site;
     logAndSend(callLog, method, path, authorization, body, res, 200, {
       url: `https://${subdomain}.freecode.camp`,
       deployId,
@@ -868,11 +850,7 @@ async function handle(
     return;
   }
 
-  if (
-    method === "POST" &&
-    repoPath.startsWith("/api/repo/") &&
-    repoPath.endsWith("/approve")
-  ) {
+  if (method === "POST" && repoPath.startsWith("/api/repo/") && repoPath.endsWith("/approve")) {
     if (!repoRecord) {
       logAndSend(callLog, method, path, authorization, body, res, 401, {
         error: { code: "unauth", message: "bad token" },
@@ -911,11 +889,7 @@ async function handle(
     return;
   }
 
-  if (
-    method === "POST" &&
-    repoPath.startsWith("/api/repo/") &&
-    repoPath.endsWith("/reject")
-  ) {
+  if (method === "POST" && repoPath.startsWith("/api/repo/") && repoPath.endsWith("/reject")) {
     if (!repoRecord) {
       logAndSend(callLog, method, path, authorization, body, res, 401, {
         error: { code: "unauth", message: "bad token" },

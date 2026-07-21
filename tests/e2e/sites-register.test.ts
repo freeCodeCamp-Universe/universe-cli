@@ -30,12 +30,10 @@ async function runRegister(
   options: { json: true; slug: string; team?: string | string[] },
 ): Promise<RunResult> {
   const chunks: string[] = [];
-  const spy = vi
-    .spyOn(process.stdout, "write")
-    .mockImplementation((chunk: unknown) => {
-      chunks.push(String(chunk));
-      return true;
-    });
+  const spy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+    chunks.push(String(chunk));
+    return true;
+  });
   const captured: CapturedExit = {};
   try {
     await register(options, {
@@ -49,8 +47,7 @@ async function runRegister(
   }
   spy.mockRestore();
   const raw = chunks.join("").trim();
-  const envelope =
-    raw.length > 0 ? (JSON.parse(raw) as Record<string, unknown>) : undefined;
+  const envelope = raw.length > 0 ? (JSON.parse(raw) as Record<string, unknown>) : undefined;
   return { captured, envelope };
 }
 
@@ -96,10 +93,7 @@ describe("sites register E2E (real proxy-client + real identity chain)", () => {
   });
 
   it("serializes single-string, array, and comma-list --team into identical body", async () => {
-    const variants: Array<string | string[]> = [
-      ["staff", "news-editors"],
-      "staff,news-editors",
-    ];
+    const variants: Array<string | string[]> = [["staff", "news-editors"], "staff,news-editors"];
     const bodies: unknown[] = [];
 
     for (const variant of variants) {
@@ -124,8 +118,7 @@ describe("sites register E2E (real proxy-client + real identity chain)", () => {
       slug: "site-1",
       teams: ["staff", "news-editors"],
     });
-    const teamsField = (b: unknown): string[] =>
-      (b as { teams: string[] }).teams;
+    const teamsField = (b: unknown): string[] => (b as { teams: string[] }).teams;
     expect(teamsField(bodies[0])).toEqual(teamsField(bodies[1]));
 
     env = await makeCliEnv({ proxyUrl: server.url, githubToken: token });
@@ -135,9 +128,7 @@ describe("sites register E2E (real proxy-client + real identity chain)", () => {
       team: "staff",
     });
     expect(single.captured.code).toBeUndefined();
-    const singleBody = JSON.parse(
-      server.callLog[server.callLog.length - 1].body,
-    );
+    const singleBody = JSON.parse(server.callLog[server.callLog.length - 1].body);
     expect(singleBody).toEqual({ slug: "site-single", teams: ["staff"] });
   });
 

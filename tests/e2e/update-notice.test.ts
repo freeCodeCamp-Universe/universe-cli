@@ -20,18 +20,12 @@ afterEach(async () => {
   }
 });
 
-async function seedCache(
-  dir: string,
-  latest: string,
-  lastCheck: number,
-): Promise<void> {
+async function seedCache(dir: string, latest: string, lastCheck: number): Promise<void> {
   const cfg = join(dir, "universe-cli");
   await mkdir(cfg, { recursive: true, mode: 0o700 });
-  await writeFile(
-    join(cfg, "update-check.json"),
-    JSON.stringify({ latest, lastCheck }),
-    { mode: 0o644 },
-  );
+  await writeFile(join(cfg, "update-check.json"), JSON.stringify({ latest, lastCheck }), {
+    mode: 0o644,
+  });
 }
 
 function baseEnv(dir: string): NodeJS.ProcessEnv {

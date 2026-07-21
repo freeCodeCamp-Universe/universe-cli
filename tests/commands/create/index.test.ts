@@ -1,10 +1,4 @@
-import {
-  existsSync,
-  mkdtempSync,
-  readdirSync,
-  readFileSync,
-  rmSync,
-} from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -14,10 +8,7 @@ import type {
   RunOptions,
 } from "../../../src/commands/create/package-manager/package-manager.service.js";
 import { CreateInputValidationService } from "../../../src/commands/create/create-input-validation-service.js";
-import type {
-  CreateSelections,
-  Prompt,
-} from "../../../src/commands/create/prompt/prompt.port.js";
+import type { CreateSelections, Prompt } from "../../../src/commands/create/prompt/prompt.port.js";
 import type { RepoInitialiser } from "../../../src/commands/create/io/repo-initialiser.port.js";
 import type { SkillInstaller } from "../../../src/commands/create/io/skill-installer.port.js";
 import { ResolvedLayerSet } from "../../../src/commands/create/layer-composition/layer-composition-service.js";
@@ -103,8 +94,8 @@ const collectGeneratedFiles = (directory: string): Record<string, string> => {
     const currentPath = stack.pop();
 
     if (currentPath !== undefined) {
-      const entries = readdirSync(currentPath, { withFileTypes: true }).sort(
-        (left, right) => left.name.localeCompare(right.name),
+      const entries = readdirSync(currentPath, { withFileTypes: true }).sort((left, right) =>
+        left.name.localeCompare(right.name),
       );
 
       for (const entry of entries) {
@@ -113,10 +104,7 @@ const collectGeneratedFiles = (directory: string): Record<string, string> => {
         if (entry.isDirectory()) {
           stack.push(entryPath);
         } else {
-          const relativePath = relative(directory, entryPath).replaceAll(
-            "\\",
-            "/",
-          );
+          const relativePath = relative(directory, entryPath).replaceAll("\\", "/");
 
           files[relativePath] = readFileSync(entryPath, "utf8");
         }
@@ -129,11 +117,7 @@ const collectGeneratedFiles = (directory: string): Record<string, string> => {
   );
 };
 
-const makeDeps = (
-  cwd: string,
-  prompt: Prompt,
-  options: MakeDepsOptions = {},
-) => {
+const makeDeps = (cwd: string, prompt: Prompt, options: MakeDepsOptions = {}) => {
   const {
     packageManager = { specifyDeps: vi.fn(() => Promise.resolve()) },
     repoInitialiser = new StubRepoInitialiser(),
@@ -150,10 +134,7 @@ const makeDeps = (
     skillInstaller,
     spinner: { message: vi.fn(), start: vi.fn(), stop: vi.fn(), error: vi.fn() },
     templateProvider: fixtureProvider,
-    validator: new CreateInputValidationService(
-      (path) => existsSync(join(cwd, path)),
-      runtimeData,
-    ),
+    validator: new CreateInputValidationService((path) => existsSync(join(cwd, path)), runtimeData),
   };
 };
 
@@ -198,9 +179,7 @@ describe("create", () => {
 
     expect(deps.exit).not.toHaveBeenCalled();
 
-    const generatedFiles = collectGeneratedFiles(
-      join(rootDirectory, selection.name),
-    );
+    const generatedFiles = collectGeneratedFiles(join(rootDirectory, selection.name));
 
     expect(generatedFiles).toMatchSnapshot();
   });
@@ -267,9 +246,7 @@ describe("create", () => {
     await create({ json: false }, deps);
 
     expect(deps.exit).not.toHaveBeenCalled();
-    expect(repoInitialiser.initialise).toHaveBeenCalledWith(
-      join(rootDirectory, name),
-    );
+    expect(repoInitialiser.initialise).toHaveBeenCalledWith(join(rootDirectory, name));
   });
 
   it("calls repoInitialiser.initialise with the target directory for Static scaffold", async () => {
@@ -286,9 +263,7 @@ describe("create", () => {
     await create({ json: false }, deps);
 
     expect(deps.exit).not.toHaveBeenCalled();
-    expect(repoInitialiser.initialise).toHaveBeenCalledWith(
-      join(rootDirectory, name),
-    );
+    expect(repoInitialiser.initialise).toHaveBeenCalledWith(join(rootDirectory, name));
   });
 
   it("installs template-declared skills with the target directory", async () => {
@@ -380,9 +355,7 @@ describe("create", () => {
 
     expect(deps.exit).not.toHaveBeenCalled();
 
-    const generatedFiles = collectGeneratedFiles(
-      join(rootDirectory, selection.name),
-    );
+    const generatedFiles = collectGeneratedFiles(join(rootDirectory, selection.name));
 
     expect(generatedFiles).toMatchSnapshot();
   });
@@ -481,9 +454,7 @@ describe("create", () => {
 
     await create({ json: false }, deps);
 
-    expect(deps.logger.error).toHaveBeenCalledWith(
-      message("/workspace/hello-universe"),
-    );
+    expect(deps.logger.error).toHaveBeenCalledWith(message("/workspace/hello-universe"));
   });
 
   describe("non-interactive mode", () => {
@@ -513,9 +484,7 @@ describe("create", () => {
       expect(promptSpy).not.toHaveBeenCalled();
       expect(deps.exit).not.toHaveBeenCalled();
       expect(existsSync(join(rootDirectory, "non-interactive-app"))).toBe(true);
-      expect(deps.logger.info).toHaveBeenCalledWith(
-        expect.stringContaining("non-interactive-app"),
-      );
+      expect(deps.logger.info).toHaveBeenCalledWith(expect.stringContaining("non-interactive-app"));
       expect(deps.logger.success).not.toHaveBeenCalled();
     });
 

@@ -54,8 +54,7 @@ import { whoami } from "../../src/commands/whoami.js";
 const REAL_E2E = process.env["UNIVERSE_E2E_REAL"] === "1";
 const REAL_TOKEN = process.env["UNIVERSE_REAL_TOKEN"];
 const REAL_SITE = process.env["UNIVERSE_REAL_SITE"];
-const REAL_PROXY_URL =
-  process.env["UNIVERSE_REAL_PROXY_URL"] ?? "https://uploads.freecode.camp";
+const REAL_PROXY_URL = process.env["UNIVERSE_REAL_PROXY_URL"] ?? "https://uploads.freecode.camp";
 
 interface CapturedExit {
   code?: number;
@@ -81,12 +80,10 @@ interface RunResult {
 
 async function captureJsonRun(fn: () => Promise<void>): Promise<RunResult> {
   const chunks: string[] = [];
-  const spy = vi
-    .spyOn(process.stdout, "write")
-    .mockImplementation((chunk: unknown) => {
-      chunks.push(String(chunk));
-      return true;
-    });
+  const spy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+    chunks.push(String(chunk));
+    return true;
+  });
   const captured: CapturedExit = {};
   try {
     await fn();
@@ -95,8 +92,7 @@ async function captureJsonRun(fn: () => Promise<void>): Promise<RunResult> {
   }
   spy.mockRestore();
   const raw = chunks.join("").trim();
-  const envelope =
-    raw.length > 0 ? (JSON.parse(raw) as Record<string, unknown>) : undefined;
+  const envelope = raw.length > 0 ? (JSON.parse(raw) as Record<string, unknown>) : undefined;
   return { captured, envelope };
 }
 
@@ -170,11 +166,7 @@ describe.skipIf(!REAL_E2E)("real-artemis smoke (opt-in)", () => {
     projectDir = await mkdtemp(join(tmpdir(), "universe-cli-smoke-prev-"));
     const distDir = join(projectDir, "dist");
     await mkdir(distDir, { recursive: true });
-    await writeFile(
-      join(projectDir, "platform.yaml"),
-      `site: ${REAL_SITE}\n`,
-      "utf-8",
-    );
+    await writeFile(join(projectDir, "platform.yaml"), `site: ${REAL_SITE}\n`, "utf-8");
     await writeFile(
       join(distDir, "index.html"),
       `<!-- preview marker: ${marker} -->\n<html><body>preview ${marker}</body></html>\n`,
@@ -223,11 +215,7 @@ describe.skipIf(!REAL_E2E)("real-artemis smoke (opt-in)", () => {
     projectDir = await mkdtemp(join(tmpdir(), "universe-cli-smoke-prod-"));
     const distDir = join(projectDir, "dist");
     await mkdir(distDir, { recursive: true });
-    await writeFile(
-      join(projectDir, "platform.yaml"),
-      `site: ${REAL_SITE}\n`,
-      "utf-8",
-    );
+    await writeFile(join(projectDir, "platform.yaml"), `site: ${REAL_SITE}\n`, "utf-8");
     const prodMarker = `prod-${marker}`;
     await writeFile(
       join(distDir, "index.html"),
@@ -274,10 +262,7 @@ describe.skipIf(!REAL_E2E)("real-artemis smoke (opt-in)", () => {
     }>;
     expect(deploys[0]?.deployId).toBe(newDeployId);
 
-    const fetched = await fetchWithRetry(
-      `${publicUrl}/?_=${prodMarker}`,
-      prodMarker,
-    );
+    const fetched = await fetchWithRetry(`${publicUrl}/?_=${prodMarker}`, prodMarker);
     expect(fetched.bodyContainsMarker).toBe(true);
     if (!fetched.bodyContainsMarker) {
       throw new Error(
@@ -293,10 +278,7 @@ interface FetchResult {
   attempts: number;
 }
 
-async function fetchWithRetry(
-  url: string,
-  marker: string,
-): Promise<FetchResult> {
+async function fetchWithRetry(url: string, marker: string): Promise<FetchResult> {
   const maxAttempts = 20;
   const delayMs = 3_000;
   let body = "";

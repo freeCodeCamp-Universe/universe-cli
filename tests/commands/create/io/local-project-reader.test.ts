@@ -33,9 +33,7 @@ describe(LocalProjectReader, () => {
     tempDirectories.push(dir);
     const reader = new LocalProjectReader();
 
-    await expect(reader.readFile(join(dir, "platform.yaml"))).rejects.toThrow(
-      UsageError,
-    );
+    await expect(reader.readFile(join(dir, "platform.yaml"))).rejects.toThrow(UsageError);
   });
 
   it("includes the attempted path in UsageError", async () => {

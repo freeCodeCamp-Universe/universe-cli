@@ -30,11 +30,7 @@ const defaultRunnerFactory: PnpmRunnerFactory = (pmVersion) => ({
   async installLockfileOnly(cwd) {
     await runCmdForFiles(
       cwd,
-      [
-        "sh",
-        "-c",
-        `corepack use pnpm@${pmVersion} && pnpm install --lockfile-only`,
-      ],
+      ["sh", "-c", `corepack use pnpm@${pmVersion} && pnpm install --lockfile-only`],
       MANIFESTS,
       [LOCKFILE, "package.json"],
     );
@@ -71,10 +67,7 @@ class PnpmPackageManager implements PackageSpecifier {
     this.createRunner = createRunner;
   }
 
-  async specifyDeps(
-    projectDirectory: string,
-    pmVersion: string,
-  ): Promise<void> {
+  async specifyDeps(projectDirectory: string, pmVersion: string): Promise<void> {
     const runner = this.createRunner(pmVersion);
     const specifier = createPackageSpecifier({
       deleteBeforeFirstInstall: false,

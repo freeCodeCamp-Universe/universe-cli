@@ -55,12 +55,10 @@ async function runDeploy(
   options: { json: true; promote: boolean },
 ): Promise<RunResult> {
   const chunks: string[] = [];
-  const spy = vi
-    .spyOn(process.stdout, "write")
-    .mockImplementation((chunk: unknown) => {
-      chunks.push(String(chunk));
-      return true;
-    });
+  const spy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+    chunks.push(String(chunk));
+    return true;
+  });
   const captured: CapturedExit = {};
   try {
     await deploy(options, {
@@ -78,8 +76,7 @@ async function runDeploy(
   }
   spy.mockRestore();
   const raw = chunks.join("").trim();
-  const envelope =
-    raw.length > 0 ? (JSON.parse(raw) as Record<string, unknown>) : undefined;
+  const envelope = raw.length > 0 ? (JSON.parse(raw) as Record<string, unknown>) : undefined;
   return { captured, envelope };
 }
 
@@ -196,8 +193,7 @@ describe("static deploy --promote E2E (alpha trip-wire for B1)", () => {
     expect(server.state.aliases.preview.has(site)).toBe(false);
 
     const finalizeCalls = server.callLog.filter(
-      (c) =>
-        c.method === "POST" && /\/api\/deploy\/[^/]+\/finalize$/.test(c.path),
+      (c) => c.method === "POST" && /\/api\/deploy\/[^/]+\/finalize$/.test(c.path),
     );
     expect(finalizeCalls).toHaveLength(1);
     const finalizeBody = JSON.parse(finalizeCalls[0].body) as {
@@ -207,9 +203,7 @@ describe("static deploy --promote E2E (alpha trip-wire for B1)", () => {
     expect(finalizeBody.mode).toBe("production");
     expect(finalizeBody.files.sort()).toEqual(["index.html", "main.js"]);
 
-    const promoteCalls = server.callLog.filter((c) =>
-      /\/api\/site\/[^/]+\/promote$/.test(c.path),
-    );
+    const promoteCalls = server.callLog.filter((c) => /\/api\/site\/[^/]+\/promote$/.test(c.path));
     expect(promoteCalls).toHaveLength(0);
   });
 
@@ -287,9 +281,7 @@ describe("static deploy --promote E2E (alpha trip-wire for B1)", () => {
       (c) => c.method === "POST" && c.path === "/api/deploy/init",
     );
     expect(initCalls).toHaveLength(1);
-    const promoteCalls = server.callLog.filter((c) =>
-      /\/api\/site\/[^/]+\/promote$/.test(c.path),
-    );
+    const promoteCalls = server.callLog.filter((c) => /\/api\/site\/[^/]+\/promote$/.test(c.path));
     expect(promoteCalls).toHaveLength(1);
   });
 
@@ -322,9 +314,7 @@ describe("static deploy --promote E2E (alpha trip-wire for B1)", () => {
 
     expect(r.captured.code).toBeUndefined();
     expect(r.envelope!["mode"]).toBe("preview");
-    expect(server.state.aliases.production.get(site)).toBe(
-      "20251010-090000-old0000",
-    );
+    expect(server.state.aliases.production.get(site)).toBe("20251010-090000-old0000");
     const newDeployId = r.envelope!["deployId"] as string;
     expect(server.state.aliases.preview.get(site)).toBe(newDeployId);
   });

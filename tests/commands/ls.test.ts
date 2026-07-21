@@ -66,18 +66,14 @@ describe("ls command", () => {
   it("calls siteDeploys with site from platform.yaml", async () => {
     const deps = mkDeps();
     await ls({ json: false }, deps);
-    const proxy = deps.createProxyClient.mock.results[0]?.value as ReturnType<
-      typeof mkProxy
-    >;
+    const proxy = deps.createProxyClient.mock.results[0]?.value as ReturnType<typeof mkProxy>;
     expect(proxy.siteDeploys).toHaveBeenCalledWith({ site: "my-site" });
   });
 
   it("--site flag overrides platform.yaml site", async () => {
     const deps = mkDeps();
     await ls({ json: false, site: "other-site" }, deps);
-    const proxy = deps.createProxyClient.mock.results[0]?.value as ReturnType<
-      typeof mkProxy
-    >;
+    const proxy = deps.createProxyClient.mock.results[0]?.value as ReturnType<typeof mkProxy>;
     expect(proxy.siteDeploys).toHaveBeenCalledWith({ site: "other-site" });
   });
 
@@ -88,20 +84,16 @@ describe("ls command", () => {
       readPlatformYaml: vi.fn().mockRejectedValue(err),
     });
     await ls({ json: false, site: "explicit-site" }, deps);
-    const proxy = deps.createProxyClient.mock.results[0]?.value as ReturnType<
-      typeof mkProxy
-    >;
+    const proxy = deps.createProxyClient.mock.results[0]?.value as ReturnType<typeof mkProxy>;
     expect(proxy.siteDeploys).toHaveBeenCalledWith({ site: "explicit-site" });
   });
 
   it("emits JSON envelope with parsed deploys", async () => {
     const stdout: string[] = [];
-    const writeSpy = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation((chunk: unknown) => {
-        stdout.push(String(chunk));
-        return true;
-      });
+    const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+      stdout.push(String(chunk));
+      return true;
+    });
 
     const deps = mkDeps();
     await ls({ json: true }, deps);
@@ -130,27 +122,24 @@ describe("ls command", () => {
 
   it("annotates STATE from preview/production aliases in JSON", async () => {
     const proxy = mkProxy();
-    proxy.getAlias.mockImplementation(
-      async (req: { mode: "preview" | "production" }) =>
-        req.mode === "preview"
-          ? {
-              url: "https://my-site.preview.freecode.camp",
-              deployId: "20260427-141522-abc1234",
-            }
-          : {
-              url: "https://my-site.freecode.camp",
-              deployId: "20260426-101005-def5678",
-            },
+    proxy.getAlias.mockImplementation(async (req: { mode: "preview" | "production" }) =>
+      req.mode === "preview"
+        ? {
+            url: "https://my-site.preview.freecode.camp",
+            deployId: "20260427-141522-abc1234",
+          }
+        : {
+            url: "https://my-site.freecode.camp",
+            deployId: "20260426-101005-def5678",
+          },
     );
     const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
 
     const stdout: string[] = [];
-    const writeSpy = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation((chunk: unknown) => {
-        stdout.push(String(chunk));
-        return true;
-      });
+    const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+      stdout.push(String(chunk));
+      return true;
+    });
     await ls({ json: true }, deps);
     writeSpy.mockRestore();
 
@@ -172,12 +161,10 @@ describe("ls command", () => {
     const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
 
     const stdout: string[] = [];
-    const writeSpy = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation((chunk: unknown) => {
-        stdout.push(String(chunk));
-        return true;
-      });
+    const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+      stdout.push(String(chunk));
+      return true;
+    });
     await ls({ json: true }, deps);
     writeSpy.mockRestore();
 
@@ -199,14 +186,13 @@ describe("ls command", () => {
 
   it("renders the STATE column value in text mode", async () => {
     const proxy = mkProxy();
-    proxy.getAlias.mockImplementation(
-      async (req: { mode: "preview" | "production" }) =>
-        req.mode === "preview"
-          ? {
-              url: "https://my-site.preview.freecode.camp",
-              deployId: "20260427-141522-abc1234",
-            }
-          : null,
+    proxy.getAlias.mockImplementation(async (req: { mode: "preview" | "production" }) =>
+      req.mode === "preview"
+        ? {
+            url: "https://my-site.preview.freecode.camp",
+            deployId: "20260427-141522-abc1234",
+          }
+        : null,
     );
     const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
     await ls({ json: false }, deps);
@@ -216,9 +202,7 @@ describe("ls command", () => {
 
   it("shows the finalizing actor in the ACTOR column", async () => {
     const proxy = mkProxy();
-    proxy.siteDeploys.mockResolvedValue([
-      { deployId: "20260427-141522-abc1234", actor: "alice" },
-    ]);
+    proxy.siteDeploys.mockResolvedValue([{ deployId: "20260427-141522-abc1234", actor: "alice" }]);
     const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
     await ls({ json: false }, deps);
     const msg = deps.logSuccess.mock.calls[0]?.[0] ?? "";
@@ -246,9 +230,7 @@ describe("ls command", () => {
     });
     await expect(ls({ json: false }, deps)).rejects.toThrow("__exit__");
     expect(deps.exit).toHaveBeenCalledWith(12);
-    expect(deps.logError).toHaveBeenCalledWith(
-      expect.stringMatching(/login|identity/i),
-    );
+    expect(deps.logError).toHaveBeenCalledWith(expect.stringMatching(/login|identity/i));
   });
 
   it("errors with EXIT_CONFIG when no platform.yaml AND no --site", async () => {
@@ -259,9 +241,7 @@ describe("ls command", () => {
     });
     await expect(ls({ json: false }, deps)).rejects.toThrow("__exit__");
     expect(deps.exit).toHaveBeenCalledWith(11);
-    expect(deps.logError).toHaveBeenCalledWith(
-      expect.stringMatching(/site|platform\.yaml/i),
-    );
+    expect(deps.logError).toHaveBeenCalledWith(expect.stringMatching(/site|platform\.yaml/i));
   });
 
   it("sorts deploys newest-first regardless of artemis-side order", async () => {
@@ -276,12 +256,10 @@ describe("ls command", () => {
     });
 
     const stdout: string[] = [];
-    const writeSpy = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation((chunk: unknown) => {
-        stdout.push(String(chunk));
-        return true;
-      });
+    const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+      stdout.push(String(chunk));
+      return true;
+    });
     await ls({ json: true }, deps);
     writeSpy.mockRestore();
 
@@ -307,12 +285,10 @@ describe("ls command", () => {
     });
 
     const stdout: string[] = [];
-    const writeSpy = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation((chunk: unknown) => {
-        stdout.push(String(chunk));
-        return true;
-      });
+    const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+      stdout.push(String(chunk));
+      return true;
+    });
     await ls({ json: true }, deps);
     writeSpy.mockRestore();
 
@@ -341,12 +317,10 @@ describe("ls command", () => {
     });
 
     const stdout: string[] = [];
-    const writeSpy = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation((chunk: unknown) => {
-        stdout.push(String(chunk));
-        return true;
-      });
+    const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+      stdout.push(String(chunk));
+      return true;
+    });
     await ls({ json: true }, deps);
     writeSpy.mockRestore();
 
