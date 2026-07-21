@@ -1,22 +1,19 @@
 import { spinner } from "@clack/prompts";
 
 interface Spinner {
+  error(msg?: string): void;
   start(msg?: string): void;
   message(msg?: string): void;
   stop(msg?: string): void;
 }
 
-const clackSpinner = (): Spinner => {
-  const s = spinner();
-  return {
-    start: (msg) => s.start(msg),
-    message: (msg) => s.message(msg),
-    stop: (msg) => s.stop(msg),
-  };
-};
+const clackSpinner = (): Spinner => 
+  spinner();
 
 const silentSpinner = (): Spinner => ({
-  start: () => {},
+  error: 
+() => {},
+   start: () => {},
   message: () => {},
   stop: () => {},
 });

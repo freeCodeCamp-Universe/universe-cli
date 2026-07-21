@@ -107,7 +107,6 @@ export const create = async (
   const skillInstaller = deps.skillInstaller ?? new NpxSkillInstaller();
   const spinner =
     deps.spinner ?? (options.json ? silentSpinner() : clackSpinner());
-  let spinnerStarted = false;
 
   try {
     const templatesDir = process.env["UNIVERSE_TEMPLATES_DIR"];
@@ -184,7 +183,6 @@ export const create = async (
     }
 
     spinner.start("Preparing your project");
-    spinnerStarted = true;
 
     const validatedInput = validator.validateCreateInput(selections);
 
@@ -228,7 +226,6 @@ export const create = async (
     await repoInitialiser.initialise(targetDirectory);
 
     spinner.stop("Project scaffolded");
-    spinnerStarted = false;
 
     if (options.json) {
       emitJson(
@@ -251,9 +248,7 @@ export const create = async (
       logger.info(`Scaffolded project '${validatedInput.name}' at ${targetDirectory}`);
     }
   } catch (err) {
-    if (spinnerStarted) {
-      spinner.stop("Create failed");
-    }
+    spinner.error("Create failed")
     const code = err instanceof CliError ? err.exitCode : EXIT_USAGE;
     const message = err instanceof Error ? err.message : String(err);
     outputError({ json: options.json, command: "create" }, code, message, {

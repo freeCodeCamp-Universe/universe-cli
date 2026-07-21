@@ -148,7 +148,7 @@ const makeDeps = (
     prompt,
     repoInitialiser,
     skillInstaller,
-    spinner: { message: vi.fn(), start: vi.fn(), stop: vi.fn() },
+    spinner: { message: vi.fn(), start: vi.fn(), stop: vi.fn(), error: vi.fn() },
     templateProvider: fixtureProvider,
     validator: new CreateInputValidationService(
       (path) => existsSync(join(cwd, path)),
