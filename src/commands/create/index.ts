@@ -213,7 +213,7 @@ export const create = async (
     }
 
     const startInstruction =
-      `Project scaffolded. cd into /${validatedInput.name} and run ` +
+      `Project scaffolded. cd into ${validatedInput.name} and run ` +
       "`docker compose up --watch` to start the project";
 
     if (interactive) {
