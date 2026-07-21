@@ -425,7 +425,7 @@ describe("create", () => {
       },
     ]);
     expect(deps.logger.success).toHaveBeenCalledWith(
-      "Project scaffolded. cd into /hello-universe and run " +
+      "Project scaffolded. cd into hello-universe and run " +
         "`docker compose up --watch` to start the project",
     );
   });
