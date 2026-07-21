@@ -18,6 +18,8 @@ import type { CreateSelections, Prompt } from "./prompt/prompt.port.js";
 import { ClackPrompt } from "./prompt/clack-prompt.js";
 import type { RepoInitialiser } from "./io/repo-initialiser.port.js";
 import { GitRepoInitialiser } from "./io/git-repo-initialiser.js";
+import type { SkillInstaller } from "./io/skill-installer.port.js";
+import { NpxSkillInstaller } from "./io/npx-skill-installer.js";
 import {
   CreateInputValidationService,
   type CreateInputValidator,
@@ -78,6 +80,7 @@ export interface CreateDeps {
   platformManifestGenerator?: PlatformManifestGenerator;
   prompt?: Prompt;
   repoInitialiser?: RepoInitialiser;
+  skillInstaller?: SkillInstaller;
   templateProvider?: TemplateProvider;
   validator?: CreateInputValidator;
 }
@@ -99,6 +102,7 @@ export const create = async (
   const platformManifestGenerator =
     deps.platformManifestGenerator ?? new PlatformManifestService();
   const repoInitialiser = deps.repoInitialiser ?? new GitRepoInitialiser();
+  const skillInstaller = deps.skillInstaller ?? new NpxSkillInstaller();
 
   try {
     const templatesDir = process.env["UNIVERSE_TEMPLATES_DIR"];
@@ -193,6 +197,18 @@ export const create = async (
         pmVersion: registry["package-managers"][manager]?.pmVersion ?? "",
         projectDirectory: targetDirectory,
       });
+    }
+
+    const skills = registry.frameworks[validatedInput.framework]?.skills;
+    if (skills && skills.length > 0) {
+      try {
+        await skillInstaller.installSkills(skills, targetDirectory);
+      } catch (err) {
+        // Non-fatal: the project is already scaffolded. Route the failure to
+        // the logger (stderr / silent in --json mode) so it never lands on
+        // stdout and corrupts emitJson's envelope.
+        logger.error(err instanceof Error ? err.message : String(err));
+      }
     }
 
     await repoInitialiser.initialise(targetDirectory);

@@ -5,6 +5,10 @@
       "src/index.ts": "console.log('hello');\n"
     },
     "port": 3000,
+    "skills": [
+      { "repo": "freeCodeCamp/skills", "skill": "express-basics" },
+      { "repo": "freeCodeCamp/skills", "skill": "testing" }
+    ],
     "watchSync": [{ "path": "./src", "target": "/app/src" }]
   },
   "html-css-js": {
