@@ -1,7 +1,7 @@
 import { stringify as stringifyYaml } from "yaml";
 import type { FrameworkLayerData, PackageManagerLayerData } from "./schemas/layers.js";
 
-const buildComposeDevYaml = (
+const buildComposeYaml = (
   framework: FrameworkLayerData,
   packageManager: PackageManagerLayerData,
 ): string => {
@@ -38,4 +38,4 @@ const buildComposeDevYaml = (
   return stringifyYaml(compose);
 };
 
-export { buildComposeDevYaml };
+export { buildComposeYaml };

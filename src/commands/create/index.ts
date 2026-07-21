@@ -243,10 +243,14 @@ export const create = async (
       return;
     }
 
+    const startInstruction =
+      `Project scaffolded. cd into ${validatedInput.name} and run ` +
+      "`docker compose up --watch` to start the project";
+
     if (interactive) {
-      logger.success(`Scaffolded project at ${targetDirectory}`);
+      logger.success(startInstruction);
     } else {
-      logger.info(`Scaffolded project '${validatedInput.name}' at ${targetDirectory}`);
+      logger.info(startInstruction);
     }
   } catch (err) {
     spinner.error("Create failed")
