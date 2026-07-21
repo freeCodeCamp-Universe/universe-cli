@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.0](https://github.com/freeCodeCamp-Universe/universe-cli/compare/universe-cli-v0.12.0...universe-cli-v0.13.0) (2026-07-21)
+
+
+### Features
+
+* add spinner to show what 'create' is doing ([#34](https://github.com/freeCodeCamp-Universe/universe-cli/issues/34)) ([9481c36](https://github.com/freeCodeCamp-Universe/universe-cli/commit/9481c362e5f3b0b6304aa07c6d8d5a7f9b8963bc))
+* change create docker config to use compose.yaml ([#35](https://github.com/freeCodeCamp-Universe/universe-cli/issues/35)) ([f7bd5bf](https://github.com/freeCodeCamp-Universe/universe-cli/commit/f7bd5bfeeceefeef959576e03741f72fe5d2f9c0))
+* install skills when 'create'ing a project ([#33](https://github.com/freeCodeCamp-Universe/universe-cli/issues/33)) ([4e5c066](https://github.com/freeCodeCamp-Universe/universe-cli/commit/4e5c066cc682cfcb0639901629a5363c6ddb30af))
+* pin package manager version ([#28](https://github.com/freeCodeCamp-Universe/universe-cli/issues/28)) ([69d624b](https://github.com/freeCodeCamp-Universe/universe-cli/commit/69d624b4639b9c1690599ed9f6e51c90b69d584c))
+* support dev containers ([#37](https://github.com/freeCodeCamp-Universe/universe-cli/issues/37)) ([f05b335](https://github.com/freeCodeCamp-Universe/universe-cli/commit/f05b33560538c6c4995599aeb5d51de44203ae86))
+* use templates v0.4.1 ([#39](https://github.com/freeCodeCamp-Universe/universe-cli/issues/39)) ([8ac0625](https://github.com/freeCodeCamp-Universe/universe-cli/commit/8ac06255c671ff33d0d6f7410921e25daae06446))
+
+
+### Bug Fixes
+
+* **cli:** keep deployId in audit TARGET + validate siteDeploys ([dd18eb4](https://github.com/freeCodeCamp-Universe/universe-cli/commit/dd18eb4eb131d6c9e4c80cf4e42f39bee7a7373f))
+
 ## [0.12.0](https://github.com/freeCodeCamp-Universe/universe-cli/compare/universe-cli-v0.11.0...universe-cli-v0.12.0) (2026-07-15)
 
 
