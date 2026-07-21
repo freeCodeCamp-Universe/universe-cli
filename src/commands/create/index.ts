@@ -35,6 +35,7 @@ import type {
   ServiceOption,
 } from "./layer-composition/schemas/layers.js";
 import { clackLogger, silentLogger, type Logger } from "../../output/logger.js";
+import { clackSpinner, silentSpinner, type Spinner } from "../../output/spinner.js";
 import { EXIT_USAGE, exitWithCode } from "../../output/exit-codes.js";
 import { CliError, ConfirmError, UsageError } from "../../errors.js";
 import { buildEnvelope } from "../../output/envelope.js";
@@ -81,6 +82,7 @@ export interface CreateDeps {
   prompt?: Prompt;
   repoInitialiser?: RepoInitialiser;
   skillInstaller?: SkillInstaller;
+  spinner?: Spinner;
   templateProvider?: TemplateProvider;
   validator?: CreateInputValidator;
 }
@@ -103,6 +105,9 @@ export const create = async (
     deps.platformManifestGenerator ?? new PlatformManifestService();
   const repoInitialiser = deps.repoInitialiser ?? new GitRepoInitialiser();
   const skillInstaller = deps.skillInstaller ?? new NpxSkillInstaller();
+  const isTTY = process.stdin.isTTY;
+  const spinner =
+    deps.spinner ?? (options.json || !isTTY ? silentSpinner() : clackSpinner());
 
   try {
     const templatesDir = process.env["UNIVERSE_TEMPLATES_DIR"];
@@ -178,7 +183,11 @@ export const create = async (
       };
     }
 
+    spinner.start("Preparing your project");
+
     const validatedInput = validator.validateCreateInput(selections);
+
+    spinner.message("Composing project layers");
     const resolvedLayers = await layerResolver.resolveLayers(validatedInput);
     const targetDirectory = `${cwd}/${validatedInput.name}`;
     const projectFiles = {
@@ -187,11 +196,13 @@ export const create = async (
         platformManifestGenerator.generatePlatformManifest(validatedInput),
     };
 
+    spinner.message("Writing project files");
     await filesystemWriter.writeProject(targetDirectory, projectFiles);
 
     const manager = validatedInput.packageManager;
 
     if (manager !== undefined) {
+      spinner.message(`Pinning dependencies with ${manager}`);
       await packageManager.specifyDeps({
         manager,
         pmVersion: registry["package-managers"][manager]?.pmVersion ?? "",
@@ -201,6 +212,7 @@ export const create = async (
 
     const skills = registry.frameworks[validatedInput.framework]?.skills;
     if (skills && skills.length > 0) {
+      spinner.message("Installing skills");
       try {
         await skillInstaller.installSkills(skills, targetDirectory);
       } catch (err) {
@@ -211,7 +223,10 @@ export const create = async (
       }
     }
 
+    spinner.message("Initialising git repository");
     await repoInitialiser.initialise(targetDirectory);
+
+    spinner.stop("Project scaffolded");
 
     if (options.json) {
       emitJson(
@@ -234,6 +249,7 @@ export const create = async (
       logger.info(`Scaffolded project '${validatedInput.name}' at ${targetDirectory}`);
     }
   } catch (err) {
+    spinner.error("Create failed")
     const code = err instanceof CliError ? err.exitCode : EXIT_USAGE;
     const message = err instanceof Error ? err.message : String(err);
     outputError({ json: options.json, command: "create" }, code, message, {
