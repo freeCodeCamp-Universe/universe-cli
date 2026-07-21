@@ -161,10 +161,12 @@ describe("create", () => {
   let rootDirectory: string;
 
   beforeEach(() => {
+    vi.stubEnv("UNIVERSE_NO_UPDATE_CHECK", "1");
     rootDirectory = mkdtempSync(join(tmpdir(), "universe-create-"));
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     rmSync(rootDirectory, { force: true, recursive: true });
   });
 

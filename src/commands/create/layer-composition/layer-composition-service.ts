@@ -1,5 +1,5 @@
 import type { CreateSelections } from "../prompt/prompt.port.js";
-import { buildComposeYaml } from "./build-compose-yaml.js";
+import { buildComposeYaml, buildDevcontainerComposeYaml, buildDevcontainerJson } from "./build-compose-yaml.js";
 import { composeLayerFiles } from "./compose-layer-files.js";
 import { LayerTemplateRenderer } from "./layer-template-renderer.js";
 import type { TemplateContext } from "./layer-template-renderer.js";
@@ -115,6 +115,8 @@ const resolveWithLayers = (
       buildComposeYaml(frameworkData, pmData),
       context,
     );
+      renderedFiles[".devcontainer/docker-compose.yml"] = buildDevcontainerComposeYaml();
+      renderedFiles[".devcontainer/devcontainer.json"] = buildDevcontainerJson();
   }
 
   return {
