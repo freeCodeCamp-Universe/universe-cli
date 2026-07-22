@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import type { ProjectWriter } from "./io/project-writer.port.js";
 import {
@@ -69,8 +70,18 @@ export interface CreateOptions {
   packageManager?: string;
 }
 
+const defaultDockerCheck = (): boolean => {
+  try {
+    execFileSync("docker", ["info"], { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 export interface CreateDeps {
   cwd?: string;
+  dockerCheck?: () => boolean;
   donationConfigWriter?: DonationConfigWriter;
   exit?: (code: number) => void;
   filesystemWriter?: ProjectWriter;
@@ -89,6 +100,7 @@ export interface CreateDeps {
 
 export const create = async (options: CreateOptions, deps: CreateDeps = {}): Promise<void> => {
   const cwd = deps.cwd ?? process.cwd();
+  const dockerCheck = deps.dockerCheck ?? defaultDockerCheck;
   const exit = deps.exit ?? exitWithCode;
   const filesystemWriter = deps.filesystemWriter ?? defaultFilesystemWriter;
   const logger = deps.logger ?? (options.json ? silentLogger : clackLogger);
@@ -106,6 +118,12 @@ export const create = async (options: CreateOptions, deps: CreateDeps = {}): Pro
   const spinner = deps.spinner ?? (options.json || !isTTY ? silentSpinner() : clackSpinner());
 
   try {
+    if (!dockerCheck()) {
+      throw new UsageError(
+        "Docker daemon is not running. Start Docker and try again.",
+      );
+    }
+
     const templatesDir = process.env["UNIVERSE_TEMPLATES_DIR"];
     if (!(templatesDir && templatesDir.length > 0)) {
       const envVersion = process.env["UNIVERSE_TEMPLATES_VERSION"];

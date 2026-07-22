@@ -139,6 +139,7 @@ const makeDeps = (cwd: string, prompt: Prompt, options: MakeDepsOptions = {}) =>
   } = options;
   return {
     cwd,
+    dockerCheck: () => true,
     donationConfigWriter: new StubDonationConfigWriter(),
     exit: vi.fn(),
     isTTY: true,
@@ -759,5 +760,19 @@ describe("create", () => {
         expect.stringContaining("No recommended package managers"),
       );
     });
+  });
+
+  it("exits with an error when Docker daemon is not running", async () => {
+    const deps = {
+      ...makeDeps(rootDirectory, createPromptPort(createPromptResult)),
+      dockerCheck: () => false,
+    };
+
+    await create({ json: false }, deps);
+
+    expect(deps.exit).toHaveBeenCalled();
+    expect(deps.logger.error).toHaveBeenCalledWith(
+      expect.stringContaining("Docker daemon is not running"),
+    );
   });
 });
