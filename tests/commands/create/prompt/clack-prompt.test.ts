@@ -30,9 +30,6 @@ const createMockApi = (
   const multiselectQueue = [...multiselectResponses];
 
   return {
-    confirm() {
-      return Promise.resolve(true);
-    },
     isCancel(value: unknown): value is symbol {
       return value === CANCELLED;
     },
@@ -54,10 +51,6 @@ describe(ClackPrompt, () => {
     const selectQueue = ["node", "typescript", "pnpm"];
     const mockApi: ClackPromptApi = {
       ...createMockApi(["node", "typescript", "pnpm"], [["none"], ["none"]]),
-      confirm() {
-        events.push("confirmation");
-        return Promise.resolve(true);
-      },
       multiselect(options) {
         events.push(options.message);
         return Promise.resolve(["none"]);
@@ -82,9 +75,8 @@ describe(ClackPrompt, () => {
       "Select runtime",
       "Select framework",
       "Select package manager",
-      "Select databases (space to select, enter to continue)",
-      "Select platform services (space to select, enter to continue)",
-      "confirmation",
+      "Select 0 or more databases (space to select, enter to continue)",
+      "Select 0 or more platform services (space to select, enter to continue)",
     ]);
   });
 
@@ -93,10 +85,6 @@ describe(ClackPrompt, () => {
     const selectQueue = ["static_web", "html-css-js", "pnpm"];
     const mockApi: ClackPromptApi = {
       ...createMockApi(["static_web", "html-css-js", "pnpm"], [["none"], ["none"]]),
-      confirm() {
-        events.push("confirmation");
-        return Promise.resolve(true);
-      },
       multiselect(options) {
         events.push(options.message);
         return Promise.resolve(["none"]);
@@ -121,8 +109,7 @@ describe(ClackPrompt, () => {
       "Select runtime",
       "Select framework",
       "Select package manager",
-      "Select platform services (space to select, enter to continue)",
-      "confirmation",
+      "Select 0 or more platform services (space to select, enter to continue)",
     ]);
   });
 
@@ -165,7 +152,7 @@ describe(ClackPrompt, () => {
 
   it("returns selected values including package manager for Node runtime", async () => {
     const expected: CreateSelections = {
-      confirmed: true,
+
       databases: ["postgresql", "redis"],
       framework: "express",
       name: "hello-universe",
@@ -191,7 +178,7 @@ describe(ClackPrompt, () => {
 
   it("returns selected values with package manager for Static runtime", async () => {
     const expected: CreateSelections = {
-      confirmed: true,
+
       databases: [],
       framework: "html-css-js",
       name: "hello-universe",
@@ -230,24 +217,6 @@ describe(ClackPrompt, () => {
 
     expect(result?.packageManager).toBe("pnpm");
     expect(events).not.toContain("Select package manager");
-  });
-
-  it("includes package manager in confirmation message for Node runtime", async () => {
-    let confirmMessage = "";
-    const mockApi: ClackPromptApi = {
-      ...createMockApi(["node", "express", "pnpm"], [["none"], ["none"]]),
-      confirm(options) {
-        confirmMessage = options.message;
-        return Promise.resolve(true);
-      },
-    };
-
-    const adapter = new ClackPrompt(runtimeData, labelsData, frameworkData, packageManagerData, mockApi);
-
-    await adapter.promptForCreateInputs();
-
-    expect(confirmMessage).toContain("Package manager");
-    expect(confirmMessage).toContain("pnpm");
   });
 
   it("auto-selects runtime when exactly 1 is recommended", async () => {

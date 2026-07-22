@@ -70,7 +70,7 @@ const resolvedLayerFiles = {
 };
 
 const createPromptResult: CreateSelections = {
-  confirmed: true,
+
   databases: ["postgresql"],
   framework: "express",
   name: "hello-universe",
@@ -85,7 +85,7 @@ const createNodeSelection = (selection: {
   name: string;
   platformServices: CreateSelections["platformServices"];
 }): CreateSelections => ({
-  confirmed: true,
+
   databases: selection.databases,
   framework: selection.framework,
   name: selection.name,
@@ -95,7 +95,7 @@ const createNodeSelection = (selection: {
 });
 
 const createStaticSelection = (name: string): CreateSelections => ({
-  confirmed: true,
+
   databases: [],
   framework: "html-css-js",
   name,
@@ -379,7 +379,7 @@ describe("create", () => {
     expect(generatedFiles).toMatchSnapshot();
   });
 
-  it("writes the resolved scaffold artifacts to disk when inputs are confirmed", async () => {
+  it("writes the resolved scaffold artifacts to disk", async () => {
     const writerCalls: {
       files: Record<string, string>;
       targetDirectory: string;
@@ -426,7 +426,7 @@ describe("create", () => {
     const deps = makeDeps("/workspace", createPromptPort(null));
 
     await create({ json: false }, deps);
-    expect(deps.exit).toHaveBeenCalledWith(18);
+    expect(deps.exit).toHaveBeenCalledWith(10);
   });
 
   it("returns actionable feedback for invalid input", async () => {

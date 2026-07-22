@@ -1,4 +1,4 @@
-import { confirm, isCancel, multiselect, select, text } from "@clack/prompts";
+import { isCancel, multiselect, select, text } from "@clack/prompts";
 import type {
   CreateSelections,
   DatabaseOption,
@@ -20,7 +20,6 @@ import type { LabelCategory } from "../layer-composition/labels.js";
 import { UsageError } from "../../../errors.js";
 
 interface ClackPromptApi {
-  confirm(options: { message: string }): Promise<boolean | symbol>;
   isCancel(value: unknown): value is symbol;
   multiselect(options: {
     message: string;
@@ -41,7 +40,6 @@ interface ClackPromptApi {
 const PROJECT_NAME_PATTERN = /^[a-z][a-z0-9-]{2,49}$/;
 
 const defaultClackApi: ClackPromptApi = {
-  confirm,
   isCancel,
   multiselect,
   select,
@@ -77,10 +75,6 @@ class ClackPrompt implements Prompt {
       label: getLabel(this.labels, category, value),
       value,
     }));
-  }
-
-  private toLabelList<T extends string>(values: T[], category: LabelCategory): string {
-    return values.map((value) => getLabel(this.labels, category, value)).join(", ");
   }
 
   async promptForCreateInputs(): Promise<CreateSelections | null> {
@@ -175,7 +169,7 @@ class ClackPrompt implements Prompt {
     let databases: string[] | symbol = [];
     if (availableDatabases.length > 0) {
       databases = await this.api.multiselect({
-        message: "Select databases (space to select, enter to continue)",
+        message: "Select 0 or more databases (space to select, enter to continue)",
         options: this.toPromptOptions(availableDatabases, "database"),
         required: false,
       });
@@ -186,7 +180,7 @@ class ClackPrompt implements Prompt {
     }
 
     const platformServices = await this.api.multiselect({
-      message: "Select platform services (space to select, enter to continue)",
+      message: "Select 0 or more platform services (space to select, enter to continue)",
       options: this.toPromptOptions(serviceOptions(this.runtimeData, runtime), "service"),
       required: false,
     });
@@ -195,34 +189,7 @@ class ClackPrompt implements Prompt {
       return null;
     }
 
-    const confirmLines = [
-      "Confirm create configuration:",
-      `- Name: ${name}`,
-      `- Runtime: ${getLabel(this.labels, "runtime", runtime)}`,
-      `- Framework: ${getLabel(this.labels, "framework", framework)}`,
-    ];
-
-    if (packageManager !== undefined) {
-      confirmLines.push(
-        `- Package manager: ${getLabel(this.labels, "packageManager", packageManager as PackageManagerOption)}`,
-      );
-    }
-
-    confirmLines.push(
-      `- Databases: ${this.toLabelList(databases as DatabaseOption[], "database")}`,
-      `- Platform services: ${this.toLabelList(platformServices as ServiceOption[], "service")}`,
-    );
-
-    const isConfirmed = await this.api.confirm({
-      message: confirmLines.join("\n"),
-    });
-
-    if (this.api.isCancel(isConfirmed)) {
-      return null;
-    }
-
     return {
-      confirmed: isConfirmed,
       databases: databases as DatabaseOption[],
       framework,
       name,
