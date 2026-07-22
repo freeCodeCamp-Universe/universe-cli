@@ -15,7 +15,6 @@ describe(LayerCompositionService, () => {
   const service = new LayerCompositionService(fixtureProvider);
 
   const nodeExpressSelection: CreateSelections = {
-
     databases: [],
     framework: "express",
     name: "test",
@@ -25,7 +24,6 @@ describe(LayerCompositionService, () => {
   };
 
   const staticSelection: CreateSelections = {
-
     databases: [],
     framework: "html-css-js",
     name: "test",

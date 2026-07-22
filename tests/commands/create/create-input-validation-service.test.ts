@@ -11,7 +11,6 @@ import runtimeFixture from "../../fixtures/templates/layers/runtime.json";
 const runtimeData = RuntimeSchema.parse(runtimeFixture);
 
 const validNodeSelection: CreateSelections = {
-
   databases: ["postgresql"],
   framework: "express",
   name: "hello-universe",
@@ -44,7 +43,6 @@ describe(CreateInputValidationService, () => {
     const service = new CreateInputValidationService(() => false, runtimeData);
 
     const result = service.validateCreateInput({
-    
       databases: [],
       framework: "html-css-js",
       name: "site-app",
@@ -126,7 +124,6 @@ describe(CreateInputValidationService, () => {
 
     const act = () =>
       service.validateCreateInput({
-      
         databases: [],
         framework: "html-css-js",
         name: "site-app",
@@ -142,7 +139,6 @@ describe(CreateInputValidationService, () => {
 
     const act = () =>
       service.validateCreateInput({
-      
         databases: ["postgresql"],
         framework: "html-css-js",
         name: "site-app",
@@ -159,7 +155,6 @@ describe(CreateInputValidationService, () => {
 
     const act = () =>
       service.validateCreateInput({
-      
         databases: [],
         framework: "html-css-js",
         name: "site-app",

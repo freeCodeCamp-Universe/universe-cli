@@ -152,7 +152,6 @@ describe(ClackPrompt, () => {
 
   it("returns selected values including package manager for Node runtime", async () => {
     const expected: CreateSelections = {
-
       databases: ["postgresql", "redis"],
       framework: "express",
       name: "hello-universe",
@@ -178,7 +177,6 @@ describe(ClackPrompt, () => {
 
   it("returns selected values with package manager for Static runtime", async () => {
     const expected: CreateSelections = {
-
       databases: [],
       framework: "html-css-js",
       name: "hello-universe",

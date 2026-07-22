@@ -70,7 +70,6 @@ const resolvedLayerFiles = {
 };
 
 const createPromptResult: CreateSelections = {
-
   databases: ["postgresql"],
   framework: "express",
   name: "hello-universe",
@@ -85,7 +84,6 @@ const createNodeSelection = (selection: {
   name: string;
   platformServices: CreateSelections["platformServices"];
 }): CreateSelections => ({
-
   databases: selection.databases,
   framework: selection.framework,
   name: selection.name,
@@ -95,7 +93,6 @@ const createNodeSelection = (selection: {
 });
 
 const createStaticSelection = (name: string): CreateSelections => ({
-
   databases: [],
   framework: "html-css-js",
   name,

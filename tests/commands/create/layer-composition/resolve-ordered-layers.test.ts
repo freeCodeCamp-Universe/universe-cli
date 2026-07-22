@@ -111,7 +111,6 @@ describe(resolveOrderedLayers, () => {
   it("resolves node layers in stage order preserving input order for services", () => {
     const result = resolveOrderedLayers(
       {
-
         databases: ["redis", "postgresql"],
         framework: "express",
         name: "hello-universe",
@@ -137,7 +136,6 @@ describe(resolveOrderedLayers, () => {
   it("resolves bun as the package manager layer", () => {
     const result = resolveOrderedLayers(
       {
-
         databases: [],
         framework: "express",
         name: "test",
@@ -159,7 +157,6 @@ describe(resolveOrderedLayers, () => {
   it("resolves static_web runtime to always, runtime/static_web, package-managers/pnpm, and frameworks/html-css-js", () => {
     const result = resolveOrderedLayers(
       {
-
         databases: [],
         framework: "html-css-js",
         name: "test",
@@ -183,7 +180,6 @@ describe(resolveOrderedLayers, () => {
     ({ framework, packageManager, databases, platformServices }) => {
       const result = resolveOrderedLayers(
         {
-  
           databases,
           framework,
           name: "test",
