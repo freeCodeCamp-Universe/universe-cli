@@ -161,7 +161,6 @@ export const create = async (options: CreateOptions, deps: CreateDeps = {}): Pro
       const promptResult = await prompt.promptForCreateInputs();
 
       if (promptResult === null || !promptResult.confirmed) {
-        logger.warn("Create cancelled before writing files.");
         throw new ConfirmError("Create cancelled before writing files.");
       }
 
