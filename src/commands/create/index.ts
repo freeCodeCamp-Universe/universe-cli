@@ -25,9 +25,9 @@ import {
   type CreateInputValidator,
 } from "./create-input-validation-service.js";
 import {
-  runtimeOptions,
-  frameworkOptions,
-  packageManagerOptions,
+  recommendedFrameworkOptions,
+  recommendedPackageManagerOptions,
+  recommendedRuntimeOptions,
 } from "./layer-composition/allowed-configuration.js";
 import type {
   DatabaseOption,
@@ -125,7 +125,9 @@ export const create = async (options: CreateOptions, deps: CreateDeps = {}): Pro
     const isTTY = deps.isTTY ?? Boolean(process.stdin.isTTY);
     const interactive = isTTY && !options.yes && !options.json;
 
-    const prompt = deps.prompt ?? new ClackPrompt(registry.runtime, labels);
+    const prompt =
+      deps.prompt ??
+      new ClackPrompt(registry.runtime, labels, registry.frameworks, registry["package-managers"]);
     const layerResolver = deps.layerResolver ?? new LayerCompositionService(templateProvider);
     const validator =
       deps.validator ??
@@ -147,17 +149,42 @@ export const create = async (options: CreateOptions, deps: CreateDeps = {}): Pro
         throw new UsageError("--name is required in non-interactive mode");
       }
 
-      const runtimes = runtimeOptions(registry.runtime);
-      const runtime = options.runtime ?? runtimes[0];
-      const frameworks = frameworkOptions(registry.runtime, runtime);
-      const framework = options.framework ?? frameworks[0];
-      const pkgManagers = packageManagerOptions(registry.runtime, runtime);
+      const recRuntimes = recommendedRuntimeOptions(registry.runtime);
+      const runtime = options.runtime ?? recRuntimes[0];
+      if (runtime === undefined) {
+        throw new UsageError(
+          "No recommended runtimes — specify --runtime explicitly or update templates.",
+        );
+      }
+
+      const recFrameworks = recommendedFrameworkOptions(
+        registry.runtime,
+        runtime,
+        registry.frameworks,
+      );
+      const framework = options.framework ?? recFrameworks[0];
+      if (framework === undefined) {
+        throw new UsageError(
+          `No recommended frameworks for runtime "${runtime}" — specify --framework explicitly or update templates.`,
+        );
+      }
+
+      const recPMs = recommendedPackageManagerOptions(
+        registry.runtime,
+        runtime,
+        registry["package-managers"],
+      );
       const pm =
         options.packageManager !== undefined
           ? (options.packageManager as PackageManagerOption)
-          : pkgManagers.length === 1
-            ? (pkgManagers[0] as PackageManagerOption)
+          : recPMs.length > 0
+            ? (recPMs[0] as PackageManagerOption)
             : undefined;
+      if (pm === undefined) {
+        throw new UsageError(
+          `No recommended package managers for runtime "${runtime}" — specify --packageManager explicitly or update templates.`,
+        );
+      }
 
       selections = {
         name: options.name,

@@ -23,6 +23,7 @@ const RuntimeSchema = z.record(
     files: z.record(z.string(), z.string()),
     frameworks: z.array(z.string()),
     packageManagers: z.array(z.string()),
+    recommended: z.boolean().optional(),
     services: z.array(z.string()),
   }),
 );
@@ -45,6 +46,7 @@ const PackageManagerSchema = z.record(
         "pmVersion must be a semver version (major.minor.patch), e.g. 1.2.3",
       ),
     preinstall: z.string().optional(),
+    recommended: z.boolean().optional(),
   }),
 );
 type PackageManager = z.infer<typeof PackageManagerSchema>;
@@ -63,6 +65,7 @@ const FrameworkSchema = z.record(
     devCopySource: z.string(),
     files: z.record(z.string(), z.string()),
     port: z.number(),
+    recommended: z.boolean().optional(),
     skills: z.array(z.strictObject({ repo: z.string(), skill: z.string() })).optional(),
     watchSync: z.array(z.strictObject({ path: z.string(), target: z.string() })),
   }),

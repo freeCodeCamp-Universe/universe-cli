@@ -8,6 +8,7 @@
     },
     "frameworks": ["express", "react-vite", "tanstack-shadcn", "typescript"],
     "packageManagers": ["pnpm", "bun"],
+    "recommended": true,
     "services": ["analytics", "auth", "email"]
   },
   "static_web": {
@@ -19,6 +20,7 @@
     },
     "frameworks": ["html-css-js", "react-vite", "tanstack-shadcn"],
     "packageManagers": ["pnpm", "bun"],
+    "recommended": true,
     "services": ["analytics", "auth", "email"]
   }
 }

@@ -14,8 +14,15 @@ import type { SkillInstaller } from "../../../src/commands/create/io/skill-insta
 import { ResolvedLayerSet } from "../../../src/commands/create/layer-composition/layer-composition-service.js";
 import { UsageError } from "../../../src/errors.js";
 import { RemoteTemplateProvider } from "../../../src/commands/create/layer-composition/template-provider.js";
-import { RuntimeSchema } from "../../../src/commands/create/layer-composition/schemas/layers.js";
+import {
+  FrameworkSchema,
+  PackageManagerSchema,
+  RuntimeSchema,
+} from "../../../src/commands/create/layer-composition/schemas/layers.js";
+import type { TemplateProvider } from "../../../src/commands/create/layer-composition/template-provider.js";
 import runtimeFixture from "../../fixtures/templates/layers/runtime.json";
+import frameworkFixture from "../../fixtures/templates/layers/framework.json";
+import packageManagerFixture from "../../fixtures/templates/layers/package-manager.json";
 
 const FIXTURES_DIR = resolve("tests/fixtures/templates");
 const runtimeData = RuntimeSchema.parse(runtimeFixture);
@@ -536,6 +543,211 @@ describe("create", () => {
       });
       expect(envelope.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T/);
       expect(envelope.path).toMatch(/json-app$/);
+    });
+
+    it("defaults to the first recommended runtime when --runtime is omitted", async () => {
+      const deps = {
+        ...makeDeps(rootDirectory, createPromptPort(null)),
+        isTTY: false,
+      };
+      const validateSpy = vi.spyOn(deps.validator, "validateCreateInput");
+
+      await create(
+        {
+          json: false,
+          yes: true,
+          name: "rec-default-app",
+          framework: "express",
+          packageManager: "pnpm",
+        },
+        deps,
+      );
+
+      expect(deps.exit).not.toHaveBeenCalled();
+      expect(validateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ runtime: "node" }),
+      );
+    });
+
+    it("defaults to the first recommended framework when --framework is omitted", async () => {
+      const deps = {
+        ...makeDeps(rootDirectory, createPromptPort(null)),
+        isTTY: false,
+      };
+      const validateSpy = vi.spyOn(deps.validator, "validateCreateInput");
+
+      await create(
+        {
+          json: false,
+          yes: true,
+          name: "rec-fw-default",
+          runtime: "node",
+          packageManager: "pnpm",
+        },
+        deps,
+      );
+
+      expect(deps.exit).not.toHaveBeenCalled();
+      expect(validateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ framework: "express" }),
+      );
+    });
+
+    it("defaults to the first recommended PM when --packageManager is omitted", async () => {
+      const deps = {
+        ...makeDeps(rootDirectory, createPromptPort(null)),
+        isTTY: false,
+      };
+      const validateSpy = vi.spyOn(deps.validator, "validateCreateInput");
+
+      await create(
+        {
+          json: false,
+          yes: true,
+          name: "rec-pm-default",
+          runtime: "node",
+          framework: "express",
+        },
+        deps,
+      );
+
+      expect(deps.exit).not.toHaveBeenCalled();
+      expect(validateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ packageManager: "pnpm" }),
+      );
+    });
+
+    it("honours an explicit non-recommended flag value", async () => {
+      const partialPm = PackageManagerSchema.parse({
+        pnpm: { ...packageManagerFixture["pnpm"], recommended: true },
+        bun: { ...packageManagerFixture["bun"], recommended: false },
+      });
+      const modifiedProvider: TemplateProvider = {
+        async loadLayers() {
+          const base = await fixtureProvider.loadLayers();
+          return {
+            ...base,
+            registry: { ...base.registry, "package-managers": partialPm },
+          };
+        },
+      };
+      const deps = {
+        ...makeDeps(rootDirectory, createPromptPort(null)),
+        isTTY: false,
+        templateProvider: modifiedProvider,
+      };
+
+      await create(
+        {
+          json: false,
+          yes: true,
+          name: "explicit-bun-app",
+          runtime: "node",
+          framework: "express",
+          packageManager: "bun",
+        },
+        deps,
+      );
+
+      expect(deps.exit).not.toHaveBeenCalled();
+      expect(existsSync(join(rootDirectory, "explicit-bun-app"))).toBe(true);
+    });
+
+    it("errors when no recommended runtimes and --runtime is omitted", async () => {
+      const noRecRuntime = RuntimeSchema.parse({
+        node: { ...runtimeFixture["node"], recommended: false },
+        static_web: { ...runtimeFixture["static_web"], recommended: false },
+      });
+      const modifiedProvider: TemplateProvider = {
+        async loadLayers() {
+          const base = await fixtureProvider.loadLayers();
+          return {
+            ...base,
+            registry: { ...base.registry, runtime: noRecRuntime },
+          };
+        },
+      };
+      const deps = {
+        ...makeDeps(rootDirectory, createPromptPort(null)),
+        isTTY: false,
+        templateProvider: modifiedProvider,
+      };
+
+      await create(
+        { json: false, yes: true, name: "no-rec-runtime" },
+        deps,
+      );
+
+      expect(deps.exit).toHaveBeenCalled();
+      expect(deps.logger.error).toHaveBeenCalledWith(
+        expect.stringContaining("No recommended runtimes"),
+      );
+    });
+
+    it("errors when no recommended frameworks and --framework is omitted", async () => {
+      const noRecFramework = FrameworkSchema.parse({
+        ...frameworkFixture,
+        express: { ...frameworkFixture["express"], recommended: false },
+        "html-css-js": { ...frameworkFixture["html-css-js"], recommended: false },
+        "react-vite": { ...frameworkFixture["react-vite"], recommended: false },
+        "tanstack-shadcn": { ...frameworkFixture["tanstack-shadcn"], recommended: false },
+        typescript: { ...frameworkFixture["typescript"], recommended: false },
+      });
+      const modifiedProvider: TemplateProvider = {
+        async loadLayers() {
+          const base = await fixtureProvider.loadLayers();
+          return {
+            ...base,
+            registry: { ...base.registry, frameworks: noRecFramework },
+          };
+        },
+      };
+      const deps = {
+        ...makeDeps(rootDirectory, createPromptPort(null)),
+        isTTY: false,
+        templateProvider: modifiedProvider,
+      };
+
+      await create(
+        { json: false, yes: true, name: "no-rec-fw", runtime: "node" },
+        deps,
+      );
+
+      expect(deps.exit).toHaveBeenCalled();
+      expect(deps.logger.error).toHaveBeenCalledWith(
+        expect.stringContaining("No recommended frameworks"),
+      );
+    });
+
+    it("errors when no recommended PMs and --packageManager is omitted", async () => {
+      const noRecPm = PackageManagerSchema.parse({
+        pnpm: { ...packageManagerFixture["pnpm"], recommended: false },
+        bun: { ...packageManagerFixture["bun"], recommended: false },
+      });
+      const modifiedProvider: TemplateProvider = {
+        async loadLayers() {
+          const base = await fixtureProvider.loadLayers();
+          return {
+            ...base,
+            registry: { ...base.registry, "package-managers": noRecPm },
+          };
+        },
+      };
+      const deps = {
+        ...makeDeps(rootDirectory, createPromptPort(null)),
+        isTTY: false,
+        templateProvider: modifiedProvider,
+      };
+
+      await create(
+        { json: false, yes: true, name: "no-rec-pm", runtime: "node", framework: "express" },
+        deps,
+      );
+
+      expect(deps.exit).toHaveBeenCalled();
+      expect(deps.logger.error).toHaveBeenCalledWith(
+        expect.stringContaining("No recommended package managers"),
+      );
     });
   });
 });
