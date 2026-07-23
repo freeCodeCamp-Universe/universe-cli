@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 import { createPackageSpecifier } from "./package-json-specifier.js";
 import type { PackageSpecifier } from "./package-specifier.port.js";
+import { isDockerAvailable } from "../docker-check.js";
 import { runCmdForFiles, runCmdForStdout } from "./docker-runner.js";
 
 const execFileAsync = promisify(execFile);
@@ -31,15 +32,6 @@ interface ListedPackage {
 }
 
 type PnpmRunnerFactory = (pmVersion: string) => PnpmRunner;
-
-const isDockerAvailable = async (): Promise<boolean> => {
-  try {
-    await execFileAsync("docker", ["info"]);
-    return true;
-  } catch {
-    return false;
-  }
-};
 
 const dockerRunnerFactory: PnpmRunnerFactory = (pmVersion) => ({
   async installLockfileOnly(cwd) {
@@ -90,9 +82,9 @@ const hostRunnerFactory: PnpmRunnerFactory = (pmVersion) => ({
 const defaultRunnerFactory: PnpmRunnerFactory = (pmVersion) => {
   let resolvedRunner: PnpmRunner | undefined;
 
-  const resolve = async (): Promise<PnpmRunner> => {
+  const resolve = (): PnpmRunner => {
     if (resolvedRunner === undefined) {
-      const useDocker = await isDockerAvailable();
+      const useDocker = isDockerAvailable();
       resolvedRunner = useDocker
         ? dockerRunnerFactory(pmVersion)
         : hostRunnerFactory(pmVersion);
@@ -102,11 +94,11 @@ const defaultRunnerFactory: PnpmRunnerFactory = (pmVersion) => {
 
   return {
     async installLockfileOnly(cwd) {
-      const runner = await resolve();
+      const runner = resolve();
       await runner.installLockfileOnly(cwd);
     },
     async list(cwd) {
-      const runner = await resolve();
+      const runner = resolve();
       return runner.list(cwd);
     },
   };

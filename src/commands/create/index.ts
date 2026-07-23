@@ -49,6 +49,7 @@ import {
 } from "./layer-composition/template-provider.js";
 import { defaultTemplateVersion } from "./layer-composition/assets.js";
 import { checkTemplateVersion, formatTemplateNotice } from "../../lib/template-version-check.js";
+import { isDockerAvailable } from "./docker-check.js";
 
 export interface HandlerResult {
   exitCode: number;
@@ -247,6 +248,16 @@ export const create = async (options: CreateOptions, deps: CreateDeps = {}): Pro
 
     spinner.stop("Project scaffolded");
 
+    if (!isDockerAvailable()) {
+      logger.warn(
+        "docker daemon unavailable. Either restart the daemon or, if you aren't using docker, check the new project for a dev script",
+      );
+      logger.info("Once the daemon is available, `docker compose up --watch` will start the project. Otherwise check the project for a dev script.")
+    } else {
+      logger.success(`cd into ${validatedInput.name} and run ` +
+      "`docker compose up --watch` to start the project")
+    }
+
     if (options.json) {
       emitJson(
         buildEnvelope("create", true, {
@@ -260,16 +271,6 @@ export const create = async (options: CreateOptions, deps: CreateDeps = {}): Pro
         }),
       );
       return;
-    }
-
-    const startInstruction =
-      `Project scaffolded. cd into ${validatedInput.name} and run ` +
-      "`docker compose up --watch` to start the project";
-
-    if (interactive) {
-      logger.success(startInstruction);
-    } else {
-      logger.info(startInstruction);
     }
   } catch (err) {
     spinner.error("Create failed");
