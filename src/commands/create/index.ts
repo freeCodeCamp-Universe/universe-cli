@@ -1,4 +1,3 @@
-import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import type { ProjectWriter } from "./io/project-writer.port.js";
 import {
@@ -50,6 +49,7 @@ import {
 } from "./layer-composition/template-provider.js";
 import { defaultTemplateVersion } from "./layer-composition/assets.js";
 import { checkTemplateVersion, formatTemplateNotice } from "../../lib/template-version-check.js";
+import { isDockerAvailable } from "./docker-check.js";
 
 export interface HandlerResult {
   exitCode: number;
@@ -70,18 +70,8 @@ export interface CreateOptions {
   packageManager?: string;
 }
 
-const defaultDockerCheck = (): boolean => {
-  try {
-    execFileSync("docker", ["info"], { stdio: "ignore" });
-    return true;
-  } catch {
-    return false;
-  }
-};
-
 export interface CreateDeps {
   cwd?: string;
-  dockerCheck?: () => boolean;
   donationConfigWriter?: DonationConfigWriter;
   exit?: (code: number) => void;
   filesystemWriter?: ProjectWriter;
@@ -100,7 +90,6 @@ export interface CreateDeps {
 
 export const create = async (options: CreateOptions, deps: CreateDeps = {}): Promise<void> => {
   const cwd = deps.cwd ?? process.cwd();
-  const dockerCheck = deps.dockerCheck ?? defaultDockerCheck;
   const exit = deps.exit ?? exitWithCode;
   const filesystemWriter = deps.filesystemWriter ?? defaultFilesystemWriter;
   const logger = deps.logger ?? (options.json ? silentLogger : clackLogger);
@@ -118,12 +107,6 @@ export const create = async (options: CreateOptions, deps: CreateDeps = {}): Pro
   const spinner = deps.spinner ?? (options.json || !isTTY ? silentSpinner() : clackSpinner());
 
   try {
-    if (!dockerCheck()) {
-      throw new UsageError(
-        "Docker daemon is not running. Start Docker and try again.",
-      );
-    }
-
     const templatesDir = process.env["UNIVERSE_TEMPLATES_DIR"];
     if (!(templatesDir && templatesDir.length > 0)) {
       const envVersion = process.env["UNIVERSE_TEMPLATES_VERSION"];
@@ -265,6 +248,16 @@ export const create = async (options: CreateOptions, deps: CreateDeps = {}): Pro
 
     spinner.stop("Project scaffolded");
 
+    if (!isDockerAvailable()) {
+      logger.warn(
+        "docker daemon unavailable. Either restart the daemon or, if you aren't using docker, check the new project for a dev script",
+      );
+      logger.info("Once the daemon is available, `docker compose up --watch` will start the project. Otherwise check the project for a dev script.")
+    } else {
+      logger.success(`cd into ${validatedInput.name} and run ` +
+      "`docker compose up --watch` to start the project")
+    }
+
     if (options.json) {
       emitJson(
         buildEnvelope("create", true, {
@@ -278,16 +271,6 @@ export const create = async (options: CreateOptions, deps: CreateDeps = {}): Pro
         }),
       );
       return;
-    }
-
-    const startInstruction =
-      `Project scaffolded. cd into ${validatedInput.name} and run ` +
-      "`docker compose up --watch` to start the project";
-
-    if (interactive) {
-      logger.success(startInstruction);
-    } else {
-      logger.info(startInstruction);
     }
   } catch (err) {
     spinner.error("Create failed");

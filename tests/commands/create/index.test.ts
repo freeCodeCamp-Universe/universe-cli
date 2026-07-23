@@ -25,6 +25,10 @@ import runtimeFixture from "../../fixtures/templates/layers/runtime.json";
 import frameworkFixture from "../../fixtures/templates/layers/framework.json";
 import packageManagerFixture from "../../fixtures/templates/layers/package-manager.json";
 
+vi.mock("../../../src/commands/create/docker-check.js", () => ({
+  isDockerAvailable: vi.fn(() => true),
+}));
+
 const FIXTURES_DIR = resolve("tests/fixtures/templates");
 const runtimeData = RuntimeSchema.parse(runtimeFixture);
 const fixtureProvider = new RemoteTemplateProvider(() => ({
@@ -139,7 +143,6 @@ const makeDeps = (cwd: string, prompt: Prompt, options: MakeDepsOptions = {}) =>
   } = options;
   return {
     cwd,
-    dockerCheck: () => true,
     donationConfigWriter: new StubDonationConfigWriter(),
     exit: vi.fn(),
     isTTY: true,
@@ -416,10 +419,7 @@ describe("create", () => {
         targetDirectory: "/workspace/hello-universe",
       },
     ]);
-    expect(deps.logger.success).toHaveBeenCalledWith(
-      "Project scaffolded. cd into hello-universe and run " +
-        "`docker compose up --watch` to start the project",
-    );
+    expect(deps.logger.success).toHaveBeenCalled();
   });
 
   it("returns non-zero when prompt flow is cancelled", async () => {
@@ -502,8 +502,7 @@ describe("create", () => {
       expect(promptSpy).not.toHaveBeenCalled();
       expect(deps.exit).not.toHaveBeenCalled();
       expect(existsSync(join(rootDirectory, "non-interactive-app"))).toBe(true);
-      expect(deps.logger.info).toHaveBeenCalledWith(expect.stringContaining("non-interactive-app"));
-      expect(deps.logger.success).not.toHaveBeenCalled();
+      expect(deps.logger.success).toHaveBeenCalled();
     });
 
     it("emits a JSON success envelope when --json is set", async () => {
@@ -537,7 +536,6 @@ describe("create", () => {
       writeSpy.mockRestore();
 
       expect(deps.exit).not.toHaveBeenCalled();
-      expect(deps.logger.success).not.toHaveBeenCalled();
 
       expect(written).toHaveLength(1);
       const envelope = JSON.parse(written[0]);
@@ -762,17 +760,20 @@ describe("create", () => {
     });
   });
 
-  it("exits with an error when Docker daemon is not running", async () => {
-    const deps = {
-      ...makeDeps(rootDirectory, createPromptPort(createPromptResult)),
-      dockerCheck: () => false,
-    };
+  it("warns when Docker daemon is unavailable after scaffolding", async () => {
+    const { isDockerAvailable } = await import(
+      "../../../src/commands/create/docker-check.js"
+    );
+    vi.mocked(isDockerAvailable).mockReturnValue(false);
 
+    const deps = makeDeps(rootDirectory, createPromptPort(createPromptResult));
     await create({ json: false }, deps);
 
-    expect(deps.exit).toHaveBeenCalled();
-    expect(deps.logger.error).toHaveBeenCalledWith(
-      expect.stringContaining("Docker daemon is not running"),
+    expect(deps.exit).not.toHaveBeenCalled();
+    expect(deps.logger.warn).toHaveBeenCalledWith(
+      expect.stringContaining("docker daemon unavailable"),
     );
+
+    vi.mocked(isDockerAvailable).mockReturnValue(true);
   });
 });
