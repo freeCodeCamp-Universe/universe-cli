@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.0](https://github.com/freeCodeCamp-Universe/universe-cli/compare/universe-cli-v0.13.0...universe-cli-v0.14.0) (2026-07-23)
+
+
+### Features
+
+* create donation-config.json during 'create' ([#41](https://github.com/freeCodeCamp-Universe/universe-cli/issues/41)) ([df86048](https://github.com/freeCodeCamp-Universe/universe-cli/commit/df8604804e208dc2757e319573224822ea8b3914))
+* fallback to host installation if docker daemon cannot be reached ([#46](https://github.com/freeCodeCamp-Universe/universe-cli/issues/46)) ([3d20cd0](https://github.com/freeCodeCamp-Universe/universe-cli/commit/3d20cd01d73bf16b6a37a3461eea808b40d0c33c))
+* filter out non-recommended layers in 'create' calls ([#42](https://github.com/freeCodeCamp-Universe/universe-cli/issues/42)) ([668dc56](https://github.com/freeCodeCamp-Universe/universe-cli/commit/668dc566c7d02b55ab9391a73a4295a0fcfc99d9))
+* simplify create prompts + stop requiring confirmation ([#45](https://github.com/freeCodeCamp-Universe/universe-cli/issues/45)) ([0fb58b0](https://github.com/freeCodeCamp-Universe/universe-cli/commit/0fb58b06a98ce23ad58408318d414fb52eb27de1))
+* warn after scaffolding project if docker is unavailable ([#43](https://github.com/freeCodeCamp-Universe/universe-cli/issues/43)) ([614f376](https://github.com/freeCodeCamp-Universe/universe-cli/commit/614f376746224d1e28926f69d71374fedfd3b50c))
+
+
+### Bug Fixes
+
+* remove redundant warning ([#44](https://github.com/freeCodeCamp-Universe/universe-cli/issues/44)) ([20aece2](https://github.com/freeCodeCamp-Universe/universe-cli/commit/20aece2df60d96018baac7faa606ac53029a4d30))
+
 ## [0.13.0](https://github.com/freeCodeCamp-Universe/universe-cli/compare/universe-cli-v0.12.0...universe-cli-v0.13.0) (2026-07-21)
 
 
