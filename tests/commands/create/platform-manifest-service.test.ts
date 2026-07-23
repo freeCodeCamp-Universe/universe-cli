@@ -4,7 +4,6 @@ import { parsePlatformYaml } from "../../../src/lib/platform-yaml.js";
 import { describe, expect, it } from "vitest";
 
 const nodeSelection: CreateSelections = {
-  confirmed: true,
   databases: ["redis", "postgresql"],
   framework: "express",
   name: "hello-universe",
@@ -14,7 +13,6 @@ const nodeSelection: CreateSelections = {
 };
 
 const staticSelection: CreateSelections = {
-  confirmed: true,
   databases: [],
   framework: "html-css-js",
   name: "marketing-site",

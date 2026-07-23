@@ -36,10 +36,11 @@ import type {
   PackageManagerOption,
   ServiceOption,
 } from "./layer-composition/schemas/layers.js";
+import { getLabel } from "./layer-composition/labels.js";
 import { clackLogger, silentLogger, type Logger } from "../../output/logger.js";
 import { clackSpinner, silentSpinner, type Spinner } from "../../output/spinner.js";
 import { EXIT_USAGE, exitWithCode } from "../../output/exit-codes.js";
-import { CliError, ConfirmError, UsageError } from "../../errors.js";
+import { CliError, UsageError } from "../../errors.js";
 import { buildEnvelope } from "../../output/envelope.js";
 import { emitJson, outputError } from "../../output/format.js";
 import { LocalProjectWriter } from "./io/local-project-writer.js";
@@ -143,9 +144,36 @@ export const create = async (options: CreateOptions, deps: CreateDeps = {}): Pro
     if (interactive) {
       const promptResult = await prompt.promptForCreateInputs();
 
-      if (promptResult === null || !promptResult.confirmed) {
-        throw new ConfirmError("Create cancelled before writing files.");
+      if (promptResult === null) {
+        throw new UsageError("Create cancelled.");
       }
+
+      const summaryLines = [
+        `Creating project with:`,
+        `- Name: ${promptResult.name}`,
+        `- Runtime: ${getLabel(labels, "runtime", promptResult.runtime)}`,
+        `- Framework: ${getLabel(labels, "framework", promptResult.framework)}`,
+      ];
+
+      if (promptResult.packageManager !== undefined) {
+        summaryLines.push(
+          `- Package manager: ${getLabel(labels, "packageManager", promptResult.packageManager)}`,
+        );
+      }
+
+      if (promptResult.databases.length > 0) {
+        summaryLines.push(
+          `- Databases: ${promptResult.databases.map((d) => getLabel(labels, "database", d)).join(", ")}`,
+        );
+      }
+
+      if (promptResult.platformServices.length > 0) {
+        summaryLines.push(
+          `- Platform services: ${promptResult.platformServices.map((s) => getLabel(labels, "service", s)).join(", ")}`,
+        );
+      }
+
+      logger.info(summaryLines.join("\n"));
 
       selections = promptResult;
     } else {
@@ -196,7 +224,6 @@ export const create = async (options: CreateOptions, deps: CreateDeps = {}): Pro
         framework,
         databases: (options.databases ?? []) as DatabaseOption[],
         platformServices: (options.services ?? []) as ServiceOption[],
-        confirmed: true,
         ...(pm !== undefined ? { packageManager: pm } : {}),
       };
     }

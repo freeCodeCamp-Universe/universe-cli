@@ -10,7 +10,6 @@ interface CreateSelections {
   framework: string;
   databases: DatabaseOption[];
   platformServices: ServiceOption[];
-  confirmed: boolean;
   packageManager?: PackageManagerOption;
 }
 
