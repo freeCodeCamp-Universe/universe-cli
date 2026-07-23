@@ -5,7 +5,8 @@
     "lockfile": "bun.lockb",
     "manifests": ["package.json"],
     "pmInstall": "RUN npm i -g bun@{{pmVersion}}",
-    "pmVersion": "1.0.0"
+    "pmVersion": "1.0.0",
+    "recommended": true
   },
   "pnpm": {
     "devCmd": ["pnpm"],
@@ -13,6 +14,7 @@
     "lockfile": "pnpm-lock.yaml",
     "manifests": ["package.json"],
     "pmInstall": "RUN corepack enable pnpm && corepack install -g pnpm@{{pmVersion}}",
-    "pmVersion": "9.0.0"
+    "pmVersion": "9.0.0",
+    "recommended": true
   }
 }

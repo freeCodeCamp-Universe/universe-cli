@@ -8,15 +8,16 @@ import type {
 } from "./prompt.port.js";
 import {
   databaseOptions,
-  frameworkOptions,
-  packageManagerOptions,
-  runtimeOptions,
+  recommendedFrameworkOptions,
+  recommendedPackageManagerOptions,
+  recommendedRuntimeOptions,
   serviceOptions,
 } from "../layer-composition/allowed-configuration.js";
 import type { Labels } from "../layer-composition/schemas/labels.js";
-import type { Runtime } from "../layer-composition/schemas/layers.js";
+import type { Framework, PackageManager as PackageManagerRegistry, Runtime } from "../layer-composition/schemas/layers.js";
 import { getLabel } from "../layer-composition/labels.js";
 import type { LabelCategory } from "../layer-composition/labels.js";
+import { UsageError } from "../../../errors.js";
 
 interface ClackPromptApi {
   confirm(options: { message: string }): Promise<boolean | symbol>;
@@ -49,12 +50,22 @@ const defaultClackApi: ClackPromptApi = {
 
 class ClackPrompt implements Prompt {
   private readonly api: ClackPromptApi;
+  private readonly frameworks: Framework;
   private readonly labels: Labels;
+  private readonly packageManagers: PackageManagerRegistry;
   private readonly runtimeData: Runtime;
 
-  constructor(runtimeData: Runtime, labels: Labels, api: ClackPromptApi = defaultClackApi) {
+  constructor(
+    runtimeData: Runtime,
+    labels: Labels,
+    frameworks: Framework,
+    packageManagers: PackageManagerRegistry,
+    api: ClackPromptApi = defaultClackApi,
+  ) {
     this.runtimeData = runtimeData;
     this.labels = labels;
+    this.frameworks = frameworks;
+    this.packageManagers = packageManagers;
     this.api = api;
   }
 
@@ -89,35 +100,69 @@ class ClackPrompt implements Prompt {
       return null;
     }
 
-    const runtime = await this.api.select({
-      message: "Select runtime",
-      options: this.toPromptOptions(runtimeOptions(this.runtimeData), "runtime"),
-    });
-
-    if (this.api.isCancel(runtime)) {
-      return null;
+    const runtimes = recommendedRuntimeOptions(this.runtimeData);
+    if (runtimes.length === 0) {
+      throw new UsageError("No recommended runtimes available — update your templates.");
     }
 
-    const framework = await this.api.select({
-      message: "Select framework",
-      options: this.toPromptOptions(frameworkOptions(this.runtimeData, runtime), "framework"),
-    });
+    let runtime: string;
+    if (runtimes.length === 1) {
+      runtime = runtimes[0];
+    } else {
+      const runtimeResult = await this.api.select({
+        message: "Select runtime",
+        options: this.toPromptOptions(runtimes, "runtime"),
+      });
 
-    if (this.api.isCancel(framework)) {
-      return null;
+      if (this.api.isCancel(runtimeResult)) {
+        return null;
+      }
+      runtime = runtimeResult;
+    }
+
+    const frameworks = recommendedFrameworkOptions(this.runtimeData, runtime, this.frameworks);
+    if (frameworks.length === 0) {
+      throw new UsageError(
+        `No recommended frameworks for runtime "${runtime}" — update your templates.`,
+      );
+    }
+
+    let framework: string;
+    if (frameworks.length === 1) {
+      framework = frameworks[0];
+    } else {
+      const frameworkResult = await this.api.select({
+        message: "Select framework",
+        options: this.toPromptOptions(frameworks, "framework"),
+      });
+
+      if (this.api.isCancel(frameworkResult)) {
+        return null;
+      }
+      framework = frameworkResult;
+    }
+
+    const recPackageManagers = recommendedPackageManagerOptions(
+      this.runtimeData,
+      runtime,
+      this.packageManagers,
+    );
+    if (recPackageManagers.length === 0) {
+      throw new UsageError(
+        `No recommended package managers for runtime "${runtime}" — update your templates.`,
+      );
     }
 
     let packageManager: string | symbol | undefined;
-    const packageManagers = packageManagerOptions(this.runtimeData, runtime);
-    if (packageManagers.length === 1) {
-      const [autoSelected] = packageManagers;
-      if (autoSelected !== undefined) {
-        packageManager = autoSelected;
-      }
-    } else if (packageManagers.length > 1) {
+    if (recPackageManagers.length === 1) {
+      packageManager = recPackageManagers[0];
+    } else {
       packageManager = await this.api.select({
         message: "Select package manager",
-        options: this.toPromptOptions(packageManagers as PackageManagerOption[], "packageManager"),
+        options: this.toPromptOptions(
+          recPackageManagers as PackageManagerOption[],
+          "packageManager",
+        ),
       });
 
       if (this.api.isCancel(packageManager)) {

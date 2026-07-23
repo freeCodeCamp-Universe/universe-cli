@@ -1,4 +1,4 @@
 {
-  "templateVersion": "0.4.1",
+  "templateVersion": "0.5.0",
   "templateUrl": "https://github.com/freeCodeCamp-Universe/templates/releases/download/app-templates-v{{version}}/app-templates-{{version}}.tar.gz"
 }

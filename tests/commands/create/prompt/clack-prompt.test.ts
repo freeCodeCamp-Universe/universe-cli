@@ -1,18 +1,24 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import type {
   CreateSelections,
   Prompt,
 } from "../../../../src/commands/create/prompt/prompt.port.js";
 import { ClackPrompt } from "../../../../src/commands/create/prompt/clack-prompt.js";
 import type { ClackPromptApi } from "../../../../src/commands/create/prompt/clack-prompt.js";
-// oxlint-disable-next-line import/no-namespace
-import * as allowedConfig from "../../../../src/commands/create/layer-composition/allowed-configuration.js";
-import { RuntimeSchema } from "../../../../src/commands/create/layer-composition/schemas/layers.js";
+import {
+  FrameworkSchema,
+  PackageManagerSchema,
+  RuntimeSchema,
+} from "../../../../src/commands/create/layer-composition/schemas/layers.js";
 import { LabelsSchema } from "../../../../src/commands/create/layer-composition/schemas/labels.js";
 import runtimeFixture from "../../../fixtures/templates/layers/runtime.json";
+import frameworkFixture from "../../../fixtures/templates/layers/framework.json";
+import packageManagerFixture from "../../../fixtures/templates/layers/package-manager.json";
 import labelsFixture from "../../../fixtures/templates/labels.json";
 
 const runtimeData = RuntimeSchema.parse(runtimeFixture);
+const frameworkData = FrameworkSchema.parse(frameworkFixture);
+const packageManagerData = PackageManagerSchema.parse(packageManagerFixture);
 const labelsData = LabelsSchema.parse(labelsFixture);
 const CANCELLED = Symbol("cancelled");
 
@@ -67,7 +73,7 @@ describe(ClackPrompt, () => {
       },
     };
 
-    const adapter = new ClackPrompt(runtimeData, labelsData, mockApi);
+    const adapter = new ClackPrompt(runtimeData, labelsData, frameworkData, packageManagerData, mockApi);
 
     await adapter.promptForCreateInputs();
 
@@ -106,7 +112,7 @@ describe(ClackPrompt, () => {
       },
     };
 
-    const adapter = new ClackPrompt(runtimeData, labelsData, mockApi);
+    const adapter = new ClackPrompt(runtimeData, labelsData, frameworkData, packageManagerData, mockApi);
 
     await adapter.promptForCreateInputs();
 
@@ -128,7 +134,7 @@ describe(ClackPrompt, () => {
       },
     };
 
-    const adapter = new ClackPrompt(runtimeData, labelsData, mockApi);
+    const adapter = new ClackPrompt(runtimeData, labelsData, frameworkData, packageManagerData, mockApi);
 
     const result = await adapter.promptForCreateInputs();
 
@@ -148,7 +154,7 @@ describe(ClackPrompt, () => {
       },
     };
 
-    const adapter = new ClackPrompt(runtimeData, labelsData, mockApi);
+    const adapter = new ClackPrompt(runtimeData, labelsData, frameworkData, packageManagerData, mockApi);
 
     await adapter.promptForCreateInputs();
 
@@ -176,7 +182,7 @@ describe(ClackPrompt, () => {
       ],
     );
 
-    const adapter: Prompt = new ClackPrompt(runtimeData, labelsData, mockApi);
+    const adapter: Prompt = new ClackPrompt(runtimeData, labelsData, frameworkData, packageManagerData, mockApi);
 
     const result = await adapter.promptForCreateInputs();
 
@@ -196,7 +202,7 @@ describe(ClackPrompt, () => {
 
     const mockApi = createMockApi(["static_web", "html-css-js", "pnpm"], [[], []]);
 
-    const adapter: Prompt = new ClackPrompt(runtimeData, labelsData, mockApi);
+    const adapter: Prompt = new ClackPrompt(runtimeData, labelsData, frameworkData, packageManagerData, mockApi);
 
     const result = await adapter.promptForCreateInputs();
 
@@ -204,11 +210,14 @@ describe(ClackPrompt, () => {
   });
 
   it("auto-selects the sole package manager without showing the prompt", async () => {
-    vi.spyOn(allowedConfig, "packageManagerOptions").mockReturnValue(["pnpm"]);
+    const singlePm = PackageManagerSchema.parse({
+      pnpm: { ...packageManagerFixture["pnpm"], recommended: true },
+      bun: { ...packageManagerFixture["bun"], recommended: false },
+    });
     const events: string[] = [];
-    const selectQueue = ["node", "express", "pnpm"];
+    const selectQueue = ["node", "express"];
     const mockApi: ClackPromptApi = {
-      ...createMockApi(["node", "express", "pnpm"], [[], []]),
+      ...createMockApi(["node", "express"], [[], []]),
       select(options) {
         events.push(options.message);
         const nextSelection = selectQueue.shift() as string;
@@ -216,7 +225,7 @@ describe(ClackPrompt, () => {
       },
     };
 
-    const adapter = new ClackPrompt(runtimeData, labelsData, mockApi);
+    const adapter = new ClackPrompt(runtimeData, labelsData, frameworkData, singlePm, mockApi);
     const result = await adapter.promptForCreateInputs();
 
     expect(result?.packageManager).toBe("pnpm");
@@ -233,11 +242,125 @@ describe(ClackPrompt, () => {
       },
     };
 
-    const adapter = new ClackPrompt(runtimeData, labelsData, mockApi);
+    const adapter = new ClackPrompt(runtimeData, labelsData, frameworkData, packageManagerData, mockApi);
 
     await adapter.promptForCreateInputs();
 
     expect(confirmMessage).toContain("Package manager");
     expect(confirmMessage).toContain("pnpm");
+  });
+
+  it("auto-selects runtime when exactly 1 is recommended", async () => {
+    const singleRuntime = RuntimeSchema.parse({
+      node: { ...runtimeFixture["node"], recommended: true },
+      static_web: { ...runtimeFixture["static_web"], recommended: false },
+    });
+    const events: string[] = [];
+    const selectQueue = ["express", "pnpm"];
+    const mockApi: ClackPromptApi = {
+      ...createMockApi(["express", "pnpm"], [[], []]),
+      select(options) {
+        events.push(options.message);
+        const nextSelection = selectQueue.shift() as string;
+        return Promise.resolve(nextSelection);
+      },
+    };
+
+    const adapter = new ClackPrompt(singleRuntime, labelsData, frameworkData, packageManagerData, mockApi);
+    const result = await adapter.promptForCreateInputs();
+
+    expect(result?.runtime).toBe("node");
+    expect(events).not.toContain("Select runtime");
+  });
+
+  it("throws UsageError when 0 runtimes are recommended", async () => {
+    const noRuntime = RuntimeSchema.parse({
+      node: { ...runtimeFixture["node"], recommended: false },
+      static_web: { ...runtimeFixture["static_web"], recommended: false },
+    });
+
+    const adapter = new ClackPrompt(noRuntime, labelsData, frameworkData, packageManagerData, createMockApi());
+
+    await expect(adapter.promptForCreateInputs()).rejects.toThrow("No recommended runtimes");
+  });
+
+  it("auto-selects framework when exactly 1 is recommended", async () => {
+    const singleFramework = FrameworkSchema.parse({
+      ...frameworkFixture,
+      express: { ...frameworkFixture["express"], recommended: true },
+      "react-vite": { ...frameworkFixture["react-vite"], recommended: false },
+      "tanstack-shadcn": { ...frameworkFixture["tanstack-shadcn"], recommended: false },
+      typescript: { ...frameworkFixture["typescript"], recommended: false },
+    });
+    const events: string[] = [];
+    const selectQueue = ["node", "pnpm"];
+    const mockApi: ClackPromptApi = {
+      ...createMockApi(["node", "pnpm"], [[], []]),
+      select(options) {
+        events.push(options.message);
+        const nextSelection = selectQueue.shift() as string;
+        return Promise.resolve(nextSelection);
+      },
+    };
+
+    const adapter = new ClackPrompt(runtimeData, labelsData, singleFramework, packageManagerData, mockApi);
+    const result = await adapter.promptForCreateInputs();
+
+    expect(result?.framework).toBe("express");
+    expect(events).not.toContain("Select framework");
+  });
+
+  it("throws UsageError when 0 frameworks are recommended", async () => {
+    const noFramework = FrameworkSchema.parse({
+      ...frameworkFixture,
+      express: { ...frameworkFixture["express"], recommended: false },
+      "html-css-js": { ...frameworkFixture["html-css-js"], recommended: false },
+      "react-vite": { ...frameworkFixture["react-vite"], recommended: false },
+      "tanstack-shadcn": { ...frameworkFixture["tanstack-shadcn"], recommended: false },
+      typescript: { ...frameworkFixture["typescript"], recommended: false },
+    });
+
+    const adapter = new ClackPrompt(runtimeData, labelsData, noFramework, packageManagerData, createMockApi(["node"]));
+
+    await expect(adapter.promptForCreateInputs()).rejects.toThrow("No recommended frameworks");
+  });
+
+  it("throws UsageError when 0 package managers are recommended", async () => {
+    const noPm = PackageManagerSchema.parse({
+      pnpm: { ...packageManagerFixture["pnpm"], recommended: false },
+      bun: { ...packageManagerFixture["bun"], recommended: false },
+    });
+
+    const adapter = new ClackPrompt(runtimeData, labelsData, frameworkData, noPm, createMockApi(["node", "express"]));
+
+    await expect(adapter.promptForCreateInputs()).rejects.toThrow("No recommended package managers");
+  });
+
+  it("shows only recommended options when >1 are recommended", async () => {
+    const partialFrameworks = FrameworkSchema.parse({
+      ...frameworkFixture,
+      express: { ...frameworkFixture["express"], recommended: true },
+      typescript: { ...frameworkFixture["typescript"], recommended: true },
+      "react-vite": { ...frameworkFixture["react-vite"], recommended: false },
+      "tanstack-shadcn": { ...frameworkFixture["tanstack-shadcn"], recommended: false },
+    });
+    let frameworkOptions: { label: string; value: string }[] = [];
+    const selectQueue = ["node", "express", "pnpm"];
+    const mockApi: ClackPromptApi = {
+      ...createMockApi(["node", "express", "pnpm"], [[], []]),
+      select(options) {
+        if (options.message === "Select framework") {
+          frameworkOptions = options.options;
+        }
+        const nextSelection = selectQueue.shift() as string;
+        return Promise.resolve(nextSelection);
+      },
+    };
+
+    const adapter = new ClackPrompt(runtimeData, labelsData, partialFrameworks, packageManagerData, mockApi);
+    await adapter.promptForCreateInputs();
+
+    const values = frameworkOptions.map((o) => o.value);
+    expect(values).toStrictEqual(["express", "typescript"]);
   });
 });
