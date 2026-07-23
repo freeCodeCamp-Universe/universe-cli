@@ -9,6 +9,7 @@ import type {
 } from "../../../src/commands/create/package-manager/package-manager.service.js";
 import { CreateInputValidationService } from "../../../src/commands/create/create-input-validation-service.js";
 import type { CreateSelections, Prompt } from "../../../src/commands/create/prompt/prompt.port.js";
+import type { DonationConfigWriter } from "../../../src/commands/create/io/donation-config-writer.port.js";
 import type { RepoInitialiser } from "../../../src/commands/create/io/repo-initialiser.port.js";
 import type { SkillInstaller } from "../../../src/commands/create/io/skill-installer.port.js";
 import { ResolvedLayerSet } from "../../../src/commands/create/layer-composition/layer-composition-service.js";
@@ -22,6 +23,12 @@ const runtimeData = RuntimeSchema.parse(runtimeFixture);
 const fixtureProvider = new RemoteTemplateProvider(() => ({
   UNIVERSE_TEMPLATES_DIR: FIXTURES_DIR,
 }));
+
+class StubDonationConfigWriter implements DonationConfigWriter {
+  async write(_projectDirectory: string): Promise<void> {
+    // No-op
+  }
+}
 
 interface MakeDepsOptions {
   packageManager?: PackageManager;
@@ -125,6 +132,7 @@ const makeDeps = (cwd: string, prompt: Prompt, options: MakeDepsOptions = {}) =>
   } = options;
   return {
     cwd,
+    donationConfigWriter: new StubDonationConfigWriter(),
     exit: vi.fn(),
     isTTY: true,
     logger: { error: vi.fn(), info: vi.fn(), success: vi.fn(), warn: vi.fn() },
@@ -367,6 +375,7 @@ describe("create", () => {
     }[] = [];
     const deps = {
       ...makeDeps("/workspace", createPromptPort(createPromptResult)),
+      donationConfigWriter: new StubDonationConfigWriter(),
       filesystemWriter: {
         writeProject(targetDirectory: string, files: Record<string, string>) {
           writerCalls.push({ files, targetDirectory });
@@ -432,6 +441,7 @@ describe("create", () => {
     const message = (target: string) => `Failed to write files to ${target}`;
     const deps = {
       ...makeDeps("/workspace", createPromptPort(createPromptResult)),
+      donationConfigWriter: new StubDonationConfigWriter(),
       filesystemWriter: {
         writeProject(targetDirectory: string) {
           return Promise.reject(new Error(message(targetDirectory)));
