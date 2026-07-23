@@ -1,6 +1,12 @@
+import { execFile } from "node:child_process";
+import { readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { promisify } from "node:util";
 import { createPackageSpecifier } from "./package-json-specifier.js";
 import type { PackageSpecifier } from "./package-specifier.port.js";
 import { runCmdForFiles, runCmdForStdout } from "./docker-runner.js";
+
+const execFileAsync = promisify(execFile);
 
 /**
  * These values are intrinsic to pnpm. If they change, also update
@@ -26,7 +32,16 @@ interface ListedPackage {
 
 type PnpmRunnerFactory = (pmVersion: string) => PnpmRunner;
 
-const defaultRunnerFactory: PnpmRunnerFactory = (pmVersion) => ({
+const isDockerAvailable = async (): Promise<boolean> => {
+  try {
+    await execFileAsync("docker", ["info"]);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const dockerRunnerFactory: PnpmRunnerFactory = (pmVersion) => ({
   async installLockfileOnly(cwd) {
     await runCmdForFiles(
       cwd,
@@ -43,6 +58,59 @@ const defaultRunnerFactory: PnpmRunnerFactory = (pmVersion) => ({
     );
   },
 });
+
+const setPackageManagerHint = async (cwd: string): Promise<void> => {
+  const path = join(cwd, "package.json");
+  const pkg = JSON.parse(await readFile(path, "utf8")) as Record<string, unknown>;
+  if (!pkg["packageManager"]) {
+    pkg["packageManager"] = "pnpm";
+    await writeFile(path, JSON.stringify(pkg, null, 2), "utf8");
+  }
+};
+
+const hostRunnerFactory: PnpmRunnerFactory = (pmVersion) => ({
+  async installLockfileOnly(cwd) {
+    await setPackageManagerHint(cwd);
+    await execFileAsync(
+      "sh",
+      ["-c", `corepack use pnpm@${pmVersion} && pnpm install --lockfile-only`],
+      { cwd, encoding: "utf8" },
+    );
+  },
+  async list(cwd) {
+    const { stdout } = await execFileAsync(
+      "pnpm",
+      ["list", "--json", "--depth=0", "--lockfile-only"],
+      { cwd, encoding: "utf8" },
+    );
+    return stdout;
+  },
+});
+
+const defaultRunnerFactory: PnpmRunnerFactory = (pmVersion) => {
+  let resolvedRunner: PnpmRunner | undefined;
+
+  const resolve = async (): Promise<PnpmRunner> => {
+    if (resolvedRunner === undefined) {
+      const useDocker = await isDockerAvailable();
+      resolvedRunner = useDocker
+        ? dockerRunnerFactory(pmVersion)
+        : hostRunnerFactory(pmVersion);
+    }
+    return resolvedRunner;
+  };
+
+  return {
+    async installLockfileOnly(cwd) {
+      const runner = await resolve();
+      await runner.installLockfileOnly(cwd);
+    },
+    async list(cwd) {
+      const runner = await resolve();
+      return runner.list(cwd);
+    },
+  };
+};
 
 const extractVersions = (listOutput: string): Record<string, string> => {
   const packages = JSON.parse(listOutput) as ListedPackage[];
@@ -79,5 +147,5 @@ class PnpmPackageManager implements PackageSpecifier {
   }
 }
 
-export { PnpmPackageManager };
+export { dockerRunnerFactory, hostRunnerFactory, PnpmPackageManager };
 export type { PnpmRunnerFactory };
