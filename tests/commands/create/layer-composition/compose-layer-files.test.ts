@@ -29,6 +29,9 @@ describe(composeLayerFiles, () => {
       ];
 
       expect(() => composeLayerFiles(layers)).toThrow(UsageError);
+      expect(() => composeLayerFiles(layers)).toThrow(
+        'conflict detected in the services layers between "services/auth" and "services/email"',
+      );
     });
   });
 
