@@ -41,7 +41,7 @@ const runCmdForFiles = async (
       ),
     );
 
-    await execFileAsync("docker", ["start", "-a", id], { encoding: "utf8" });
+    await execFileAsync("docker", ["start", "--attach", id], { encoding: "utf8" });
 
     await Promise.all(
       outputs.map((file) =>

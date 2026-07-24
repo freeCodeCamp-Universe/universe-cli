@@ -14,7 +14,7 @@ interface FileOwner {
 }
 
 const CONFIG_EXTENSIONS = new Set([".json", ".yaml", ".yml"]);
-const CONCAT_FILENAMES = new Set([".dockerignore"]);
+const CONCAT_FILENAMES = new Set([".dockerignore",".gitignore"]);
 
 const isConfigFile = (filePath: string): boolean =>
   [...CONFIG_EXTENSIONS].some((ext) => filePath.endsWith(ext));
@@ -105,7 +105,7 @@ const composeLayerFiles = (
         owners.set(filePath, { layerName: layer.name, layerType: layer.layerType });
       } else if (currentOwner.layerType === layer.layerType) {
         throw new UsageError(
-          `layer conflict on "${filePath}": "${currentOwner.layerName}" and "${layer.name}"`,
+          `conflict detected in the ${layer.layerType} layers between "${currentOwner.layerName}" and "${layer.name}"`,
         );
       } else if (isMergeableFile(filePath)) {
         composedFiles[filePath] = mergeFiles(filePath, composedFiles[filePath]!, content);
