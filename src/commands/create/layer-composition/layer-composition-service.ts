@@ -29,10 +29,7 @@ interface ResolvedLayerSet {
 }
 
 interface LayerComposer {
-  resolveLayers(
-    input: CreateSelections,
-    options?: { forceFetch?: boolean },
-  ): Promise<ResolvedLayerSet>;
+  resolveLayers(input: CreateSelections, dir: string): Promise<ResolvedLayerSet>;
 }
 
 interface DockerfileData {
@@ -132,11 +129,8 @@ class LayerCompositionService implements LayerComposer {
     this.provider = provider;
   }
 
-  async resolveLayers(
-    input: CreateSelections,
-    options?: { forceFetch?: boolean },
-  ): Promise<ResolvedLayerSet> {
-    const { labels, registry } = await this.provider.loadLayers(options);
+  async resolveLayers(input: CreateSelections, dir: string): Promise<ResolvedLayerSet> {
+    const { labels, registry } = await this.provider.loadLayers(dir);
     return resolveWithLayers(input, registry, labels);
   }
 }

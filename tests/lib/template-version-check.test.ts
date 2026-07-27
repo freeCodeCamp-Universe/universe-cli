@@ -3,12 +3,21 @@ import { mkdtemp, readFile, rm, writeFile, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import {
-  checkTemplateVersion,
-  fetchLatestTemplateVersion,
+  resolveTemplateVersions,
   formatTemplateNotice,
 } from "../../src/lib/template-version-check.js";
 
 let tmp: string;
+
+const RANGE = "0.x";
+
+function release(version: string, opts?: { draft?: boolean; prerelease?: boolean }) {
+  return {
+    tag_name: `app-templates-v${version}`,
+    draft: opts?.draft ?? false,
+    prerelease: opts?.prerelease ?? false,
+  };
+}
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -21,10 +30,14 @@ function cachePath(): string {
   return join(tmp, "universe-cli", "templates", "template-version-check.json");
 }
 
-async function seedCache(latest: string, lastCheck: number): Promise<void> {
+async function seedCache(
+  latest: string,
+  latestCompatible: string,
+  lastCheck: number,
+): Promise<void> {
   const path = cachePath();
   await mkdir(dirname(path), { recursive: true, mode: 0o700 });
-  await writeFile(path, JSON.stringify({ latest, lastCheck }), {
+  await writeFile(path, JSON.stringify({ latest, latestCompatible, lastCheck }), {
     mode: 0o644,
   });
 }
@@ -42,160 +55,202 @@ afterEach(async () => {
   await rm(tmp, { recursive: true, force: true });
 });
 
-describe("fetchLatestTemplateVersion", () => {
-  it("returns version from tag_name on 200", async () => {
+describe("resolveTemplateVersions", () => {
+  it("returns both latest and latestCompatible", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValueOnce(jsonResponse(200, { tag_name: "app-templates-v0.3.0" })),
-    );
-    expect(await fetchLatestTemplateVersion()).toBe("0.3.0");
-  });
-
-  it("returns null on non-2xx", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(jsonResponse(404, {})));
-    expect(await fetchLatestTemplateVersion()).toBeNull();
-  });
-
-  it("returns null on network error", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockRejectedValueOnce(new Error("ECONNREFUSED")));
-    expect(await fetchLatestTemplateVersion()).toBeNull();
-  });
-
-  it("returns null when tag_name missing", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(jsonResponse(200, { name: "foo" })));
-    expect(await fetchLatestTemplateVersion()).toBeNull();
-  });
-
-  it("returns null when tag_name has wrong prefix", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValueOnce(jsonResponse(200, { tag_name: "v1.0.0" })),
-    );
-    expect(await fetchLatestTemplateVersion()).toBeNull();
-  });
-
-  it("sends accept header for GitHub API", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(jsonResponse(200, { tag_name: "app-templates-v0.3.0" }));
-    vi.stubGlobal("fetch", fetchMock);
-    await fetchLatestTemplateVersion();
-    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect((init.headers as Record<string, string>)["accept"]).toBe("application/vnd.github+json");
-  });
-});
-
-describe("checkTemplateVersion", () => {
-  it("returns null when disabled", async () => {
-    vi.stubEnv("UNIVERSE_NO_UPDATE_CHECK", "1");
-    const fetchMock = vi.fn();
-    vi.stubGlobal("fetch", fetchMock);
-    expect(await checkTemplateVersion("0.2.0")).toBeNull();
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it("returns notice when current < latest (fresh fetch)", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValueOnce(jsonResponse(200, { tag_name: "app-templates-v0.3.0" })),
+      vi
+        .fn()
+        .mockResolvedValueOnce(
+          jsonResponse(200, [release("0.1.0"), release("0.3.0"), release("1.0.0")]),
+        ),
     );
     const now = 1_000_000_000_000;
-    const notice = await checkTemplateVersion("0.2.0", now);
-    expect(notice).toEqual({ current: "0.2.0", latest: "0.3.0" });
+    const result = await resolveTemplateVersions(RANGE, now);
+    expect(result).toEqual({ latest: "1.0.0", latestCompatible: "0.3.0" });
   });
 
-  it("returns null when current >= latest", async () => {
+  it("returns equal latest and latestCompatible when all versions match range", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValueOnce(jsonResponse(200, { tag_name: "app-templates-v0.2.0" })),
+      vi.fn().mockResolvedValueOnce(jsonResponse(200, [release("0.1.0"), release("0.3.0")])),
     );
-    expect(await checkTemplateVersion("0.2.0")).toBeNull();
+    const now = 1_000_000_000_000;
+    const result = await resolveTemplateVersions(RANGE, now);
+    expect(result).toEqual({ latest: "0.3.0", latestCompatible: "0.3.0" });
   });
 
-  it("returns null when fetch fails", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockRejectedValueOnce(new Error("network")));
-    expect(await checkTemplateVersion("0.2.0")).toBeNull();
+  it("throws on network error", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValueOnce(new Error("ECONNREFUSED")));
+    await expect(resolveTemplateVersions(RANGE)).rejects.toThrow("Check network");
+  });
+
+  it("throws on non-2xx", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(jsonResponse(404, {})));
+    await expect(resolveTemplateVersions(RANGE)).rejects.toThrow("HTTP 404");
+  });
+
+  it("throws when no valid releases exist", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(jsonResponse(200, [])));
+    await expect(resolveTemplateVersions(RANGE)).rejects.toThrow("No template releases found");
+  });
+
+  it("throws when no releases match range", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValueOnce(jsonResponse(200, [release("1.0.0"), release("2.0.0")])),
+    );
+    await expect(resolveTemplateVersions(RANGE)).rejects.toThrow("No template releases match");
+  });
+
+  it("excludes draft releases", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(
+          jsonResponse(200, [release("0.2.0"), release("0.3.0", { draft: true })]),
+        ),
+    );
+    const result = await resolveTemplateVersions(RANGE);
+    expect(result).toEqual({ latest: "0.2.0", latestCompatible: "0.2.0" });
+  });
+
+  it("excludes prerelease releases", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(
+          jsonResponse(200, [release("0.2.0"), release("0.3.0", { prerelease: true })]),
+        ),
+    );
+    const result = await resolveTemplateVersions(RANGE);
+    expect(result).toEqual({ latest: "0.2.0", latestCompatible: "0.2.0" });
+  });
+
+  it("ignores releases with wrong tag prefix", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(
+          jsonResponse(200, [
+            release("0.2.0"),
+            { tag_name: "v0.5.0", draft: false, prerelease: false },
+          ]),
+        ),
+    );
+    const result = await resolveTemplateVersions(RANGE);
+    expect(result).toEqual({ latest: "0.2.0", latestCompatible: "0.2.0" });
+  });
+
+  it("does not match a release whose tag lacks the expected prefix", async () => {
+    // "wrong-templates" is 15 chars (same as "app-templates-v"),
+    // so .slice(15) yields valid semver "0.9.0" — the prefix check
+    // must reject this before slicing.
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(
+          jsonResponse(200, [
+            { tag_name: "wrong-templates0.9.0", draft: false, prerelease: false },
+          ]),
+        ),
+    );
+    await expect(resolveTemplateVersions(RANGE)).rejects.toThrow("No template releases found");
   });
 
   it("writes cache after successful fetch", async () => {
     const now = 1_000_000_000_000;
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValueOnce(jsonResponse(200, { tag_name: "app-templates-v0.3.0" })),
+      vi.fn().mockResolvedValueOnce(jsonResponse(200, [release("0.3.0"), release("1.0.0")])),
     );
-    await checkTemplateVersion("0.2.0", now);
+    await resolveTemplateVersions(RANGE, now);
     const raw = await readFile(cachePath(), "utf-8");
-    expect(JSON.parse(raw)).toEqual({ latest: "0.3.0", lastCheck: now });
+    expect(JSON.parse(raw)).toEqual({
+      latest: "1.0.0",
+      latestCompatible: "0.3.0",
+      lastCheck: now,
+    });
   });
 
   it("does not write cache when fetch fails", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValueOnce(new Error("network")));
-    await checkTemplateVersion("0.2.0");
+    await expect(resolveTemplateVersions(RANGE)).rejects.toThrow();
     await expect(readFile(cachePath(), "utf-8")).rejects.toThrow();
   });
 
-  it("skips fetch when cache is fresh (< TTL)", async () => {
+  it("serves from cache when fresh (< TTL)", async () => {
     const now = 1_000_000_000_000;
-    await seedCache("0.3.0", now - 60_000);
+    await seedCache("1.0.0", "0.3.0", now - 60_000);
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
-    const notice = await checkTemplateVersion("0.2.0", now);
+    const result = await resolveTemplateVersions(RANGE, now);
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(notice).toEqual({ current: "0.2.0", latest: "0.3.0" });
+    expect(result).toEqual({ latest: "1.0.0", latestCompatible: "0.3.0" });
   });
 
-  it("returns null from fresh cache when current >= cached latest", async () => {
-    const now = 1_000_000_000_000;
-    await seedCache("0.2.0", now - 60_000);
-    const fetchMock = vi.fn();
-    vi.stubGlobal("fetch", fetchMock);
-    expect(await checkTemplateVersion("0.2.0", now)).toBeNull();
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it("fetches when cache is stale (> TTL)", async () => {
+  it("re-fetches when cache is stale (> TTL)", async () => {
     const now = 1_000_000_000_000;
     const day = 24 * 60 * 60 * 1000;
-    await seedCache("0.2.0", now - day - 1);
+    await seedCache("0.2.0", "0.2.0", now - day - 1);
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValueOnce(jsonResponse(200, { tag_name: "app-templates-v0.4.0" })),
+      vi
+        .fn()
+        .mockResolvedValueOnce(
+          jsonResponse(200, [release("0.2.0"), release("0.4.0"), release("1.0.0")]),
+        ),
     );
-    const notice = await checkTemplateVersion("0.2.0", now);
-    expect(notice).toEqual({ current: "0.2.0", latest: "0.4.0" });
+    const result = await resolveTemplateVersions(RANGE, now);
+    expect(result).toEqual({ latest: "1.0.0", latestCompatible: "0.4.0" });
     const raw = await readFile(cachePath(), "utf-8");
-    expect(JSON.parse(raw)).toEqual({ latest: "0.4.0", lastCheck: now });
+    expect(JSON.parse(raw)).toEqual({
+      latest: "1.0.0",
+      latestCompatible: "0.4.0",
+      lastCheck: now,
+    });
   });
 
   it("respects UNIVERSE_UPDATE_TTL_MS override", async () => {
     const now = 1_000_000_000_000;
     vi.stubEnv("UNIVERSE_UPDATE_TTL_MS", String(10 * 60 * 1000));
-    await seedCache("0.3.0", now - 5 * 60 * 1000);
+    await seedCache("1.0.0", "0.3.0", now - 5 * 60 * 1000);
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
-    await checkTemplateVersion("0.2.0", now);
+    await resolveTemplateVersions(RANGE, now);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("sends accept header for GitHub API", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse(200, [release("0.3.0")]));
+    vi.stubGlobal("fetch", fetchMock);
+    await resolveTemplateVersions(RANGE);
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect((init.headers as Record<string, string>)["accept"]).toBe("application/vnd.github+json");
   });
 });
 
 describe("formatTemplateNotice", () => {
   it("renders clack-style frame with versions (plain)", () => {
-    expect(formatTemplateNotice({ current: "0.2.0", latest: "0.3.0" }, false)).toBe(
-      [
-        "",
-        "│",
-        "▲  Newer templates available: 0.2.0 → 0.3.0",
-        "│  Set UNIVERSE_TEMPLATES_VERSION=0.3.0 to use them.",
-        "└",
-        "",
-      ].join("\n"),
+    const output = formatTemplateNotice({ current: "0.3.0", latest: "1.0.0" }, false);
+    expect(output).toBe(
+      ["", "│", "▲  Newer templates available: 0.3.0 → 1.0.0", "└", ""].join("\n"),
     );
   });
 
+  it("does not mention UNIVERSE_TEMPLATES_VERSION", () => {
+    const output = formatTemplateNotice({ current: "0.3.0", latest: "1.0.0" }, false);
+    expect(output).not.toContain("UNIVERSE_TEMPLATES_VERSION");
+  });
+
   it("emits ANSI escape sequences when color enabled", () => {
-    const out = formatTemplateNotice({ current: "0.2.0", latest: "0.3.0" }, true);
+    const out = formatTemplateNotice({ current: "0.3.0", latest: "1.0.0" }, true);
     expect(out).toContain("\x1b[");
-    expect(out).toContain("0.2.0");
     expect(out).toContain("0.3.0");
+    expect(out).toContain("1.0.0");
   });
 });

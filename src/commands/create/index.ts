@@ -44,12 +44,11 @@ import { CliError, UsageError } from "../../errors.js";
 import { buildEnvelope } from "../../output/envelope.js";
 import { emitJson, outputError } from "../../output/format.js";
 import { LocalProjectWriter } from "./io/local-project-writer.js";
-import {
-  RemoteTemplateProvider,
-  type TemplateProvider,
-} from "./layer-composition/template-provider.js";
-import { defaultTemplateVersion } from "./layer-composition/assets.js";
-import { checkTemplateVersion, formatTemplateNotice } from "../../lib/template-version-check.js";
+import { loadFromDir } from "./layer-composition/template-provider.js";
+import { templateVersionRange } from "./layer-composition/assets.js";
+import { ensureTemplateDir } from "./layer-composition/template-fetcher.js";
+import { resolveTemplateVersions, formatTemplateNotice } from "../../lib/template-version-check.js";
+import { isDisabled } from "../../lib/version-utils.js";
 import { isDockerAvailable } from "./docker-check.js";
 
 export interface HandlerResult {
@@ -85,7 +84,9 @@ export interface CreateDeps {
   repoInitialiser?: RepoInitialiser;
   skillInstaller?: SkillInstaller;
   spinner?: Spinner;
-  templateProvider?: TemplateProvider;
+  loadLayersFn?: (
+    dir: string,
+  ) => Promise<import("./layer-composition/template-provider.js").TemplateData>;
   validator?: CreateInputValidator;
 }
 
@@ -107,34 +108,46 @@ export const create = async (options: CreateOptions, deps: CreateDeps = {}): Pro
   const isTTY = process.stdin.isTTY;
   const spinner = deps.spinner ?? (options.json || !isTTY ? silentSpinner() : clackSpinner());
 
-  try {
-    const templatesDir = process.env["UNIVERSE_TEMPLATES_DIR"];
-    if (!(templatesDir && templatesDir.length > 0)) {
-      const envVersion = process.env["UNIVERSE_TEMPLATES_VERSION"];
-      const effectiveVersion =
-        envVersion && envVersion.length > 0 ? envVersion : defaultTemplateVersion;
-      try {
-        const notice = await checkTemplateVersion(effectiveVersion);
-        if (notice) {
-          process.stderr.write(formatTemplateNotice(notice));
-        }
-      } catch {
-        // Non-fatal: never block scaffolding.
-      }
+  async function findTemplateVersion(range: string) {
+    const { latest, latestCompatible } = await resolveTemplateVersions(range);
+
+    if (!isDisabled() && latestCompatible !== latest) {
+      process.stderr.write(
+        formatTemplateNotice({
+          current: latestCompatible,
+          latest,
+        }),
+      );
     }
 
-    const templateProvider = deps.templateProvider ?? new RemoteTemplateProvider();
-    const { labels, registry } = await templateProvider.loadLayers({
-      forceFetch: options.forceFetch,
-    });
+    return latest;
+  }
+
+  async function findTemplateDir(envVersion?: string) {
+    const version =
+      envVersion && envVersion.length > 0
+        ? envVersion
+        : await findTemplateVersion(templateVersionRange);
+    return await ensureTemplateDir(version, { forceFetch: options.forceFetch });
+  }
+
+  try {
+    const envDir = process.env["UNIVERSE_TEMPLATES_DIR"];
+    const envVersion = process.env["UNIVERSE_TEMPLATES_VERSION"];
+
+    const templateDir = envDir && envDir.length > 0 ? envDir : await findTemplateDir(envVersion);
+
+    const loadLayersFn = deps.loadLayersFn ?? loadFromDir;
+    const { labels, registry } = await loadLayersFn(templateDir);
 
     const isTTY = deps.isTTY ?? Boolean(process.stdin.isTTY);
     const interactive = isTTY && !options.yes && !options.json;
 
+    const provider = { loadLayers: loadLayersFn };
     const prompt =
       deps.prompt ??
       new ClackPrompt(registry.runtime, labels, registry.frameworks, registry["package-managers"]);
-    const layerResolver = deps.layerResolver ?? new LayerCompositionService(templateProvider);
+    const layerResolver = deps.layerResolver ?? new LayerCompositionService(provider);
     const validator =
       deps.validator ??
       new CreateInputValidationService((path) => existsSync(path), registry.runtime);
@@ -233,7 +246,7 @@ export const create = async (options: CreateOptions, deps: CreateDeps = {}): Pro
     const validatedInput = validator.validateCreateInput(selections);
 
     spinner.message("Composing project layers");
-    const resolvedLayers = await layerResolver.resolveLayers(validatedInput);
+    const resolvedLayers = await layerResolver.resolveLayers(validatedInput, templateDir);
     const targetDirectory = `${cwd}/${validatedInput.name}`;
     const projectFiles = {
       ...resolvedLayers.files,
@@ -279,10 +292,14 @@ export const create = async (options: CreateOptions, deps: CreateDeps = {}): Pro
       logger.warn(
         "docker daemon unavailable. Either restart the daemon or, if you aren't using docker, check the new project for a dev script",
       );
-      logger.info("Once the daemon is available, `docker compose up --watch` will start the project. Otherwise check the project for a dev script.")
+      logger.info(
+        "Once the daemon is available, `docker compose up --watch` will start the project. Otherwise check the project for a dev script.",
+      );
     } else {
-      logger.success(`cd into ${validatedInput.name} and run ` +
-      "`docker compose up --watch` to start the project")
+      logger.success(
+        `cd into ${validatedInput.name} and run ` +
+          "`docker compose up --watch` to start the project",
+      );
     }
 
     if (options.json) {

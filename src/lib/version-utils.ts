@@ -1,3 +1,5 @@
+import semver from "semver";
+
 const DEFAULT_TTL_MS = 60 * 60 * 1000;
 
 export function ttlMs(): number {
@@ -11,6 +13,12 @@ export function ttlMs(): number {
 
 export interface CacheShape {
   readonly latest: string;
+  readonly lastCheck: number;
+}
+
+export interface TemplateCacheShape {
+  readonly latest: string;
+  readonly latestCompatible: string;
   readonly lastCheck: number;
 }
 
@@ -49,6 +57,37 @@ export function parseCache(raw: string): CacheShape | null {
   return { latest, lastCheck };
 }
 
+export function parseTemplateCache(raw: string): TemplateCacheShape | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (
+    typeof parsed !== "object" ||
+    parsed === null ||
+    !("latest" in parsed) ||
+    !("latestCompatible" in parsed) ||
+    !("lastCheck" in parsed)
+  ) {
+    return null;
+  }
+  const { latest, latestCompatible, lastCheck } = parsed as {
+    latest: unknown;
+    latestCompatible: unknown;
+    lastCheck: unknown;
+  };
+  if (
+    typeof latest !== "string" ||
+    typeof latestCompatible !== "string" ||
+    typeof lastCheck !== "number"
+  ) {
+    return null;
+  }
+  return { latest, latestCompatible, lastCheck };
+}
+
 // Prerelease ignored ("0.7.0-rc.1" == "0.7.0") so prerelease users
 // aren't nagged toward the matching release. Parse failure returns 0.
 export function compareVersions(a: string, b: string): -1 | 0 | 1 {
@@ -62,6 +101,14 @@ export function compareVersions(a: string, b: string): -1 | 0 | 1 {
     if (ai > bi) return 1;
   }
   return 0;
+}
+
+export function satisfies(version: string, range: string): boolean {
+  return semver.satisfies(version, range);
+}
+
+export function maxSatisfying(versions: string[], range: string): string | null {
+  return semver.maxSatisfying(versions, range);
 }
 
 function parseVersion(s: string): readonly [number, number, number] | null {

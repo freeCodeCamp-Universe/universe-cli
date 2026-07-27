@@ -1,92 +1,117 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
-import { cacheBase } from "../commands/create/layer-composition/template-cache.js";
+import { templatesCache } from "../commands/create/layer-composition/template-cache.js";
+import { ConfigError } from "../errors.js";
 import {
-  type CacheShape,
+  type TemplateCacheShape,
   type UpdateNotice,
   compareVersions,
-  isDisabled,
   paint,
-  parseCache,
+  parseTemplateCache,
   ttlMs,
   useColor,
+  maxSatisfying,
 } from "./version-utils.js";
 
-const APP_DIR = "universe-cli";
-const TEMPLATES_DIR = "templates";
 const CACHE_FILE = "template-version-check.json";
-const GITHUB_LATEST_URL =
-  "https://api.github.com/repos/freeCodeCamp-Universe/templates/releases/latest";
+const GITHUB_RELEASES_URL =
+  "https://api.github.com/repos/freeCodeCamp-Universe/templates/releases?per_page=100";
 const FETCH_TIMEOUT_MS = 3_000;
 const TAG_PREFIX = "app-templates-v";
 
 function templateCheckCachePath(): string {
-  return join(cacheBase(), APP_DIR, TEMPLATES_DIR, CACHE_FILE);
+  return join(templatesCache(), CACHE_FILE);
 }
 
-async function readTemplateCache(): Promise<CacheShape | null> {
+interface GitHubRelease {
+  tag_name?: unknown;
+  draft?: unknown;
+  prerelease?: unknown;
+}
+
+interface Tagged {
+  tag_name: string;
+}
+
+function validRelease(r: GitHubRelease): r is Tagged {
+  if (r.draft === true || r.prerelease === true) return false;
+  if (typeof r.tag_name !== "string") return false;
+
+  return r.tag_name.startsWith(TAG_PREFIX);
+}
+
+function extractVersions(releases: GitHubRelease[]): string[] {
+  return releases.filter(validRelease).map((r) => r.tag_name.slice(TAG_PREFIX.length));
+}
+
+export interface TemplateVersions {
+  latest: string;
+  latestCompatible: string;
+}
+
+async function readTemplateCacheFile(): Promise<TemplateCacheShape | null> {
   try {
     const raw = await readFile(templateCheckCachePath(), "utf-8");
-    return parseCache(raw);
+    return parseTemplateCache(raw);
   } catch {
     return null;
   }
 }
 
-async function writeTemplateCache(c: CacheShape): Promise<void> {
+async function writeTemplateCacheFile(c: TemplateCacheShape): Promise<void> {
   const path = templateCheckCachePath();
   await mkdir(dirname(path), { recursive: true, mode: 0o700 });
   await writeFile(path, JSON.stringify(c), { mode: 0o644 });
 }
 
-export async function fetchLatestTemplateVersion(): Promise<string | null> {
+export async function resolveTemplateVersions(
+  range: string,
+  now: number = Date.now(),
+): Promise<TemplateVersions> {
+  const cache = await readTemplateCacheFile();
+  if (cache !== null && now - cache.lastCheck < ttlMs()) {
+    return { latest: cache.latest, latestCompatible: cache.latestCompatible };
+  }
+
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), FETCH_TIMEOUT_MS);
+  let versions: string[];
   try {
-    const res = await fetch(GITHUB_LATEST_URL, {
+    const res = await fetch(GITHUB_RELEASES_URL, {
       signal: ctl.signal,
       headers: { accept: "application/vnd.github+json" },
     });
-    if (!res.ok) return null;
-    const body = (await res.json()) as { tag_name?: unknown };
-    if (typeof body.tag_name !== "string") return null;
-    if (!body.tag_name.startsWith(TAG_PREFIX)) return null;
-    return body.tag_name.slice(TAG_PREFIX.length);
-  } catch {
-    return null;
+    if (!res.ok) {
+      throw new ConfigError(`Failed to fetch template releases: HTTP ${String(res.status)}`);
+    }
+    const releases = (await res.json()) as GitHubRelease[];
+    versions = extractVersions(releases);
+  } catch (err) {
+    if (err instanceof ConfigError) throw err;
+    throw new ConfigError("Failed to fetch template releases. Check network connectivity.");
   } finally {
     clearTimeout(timer);
   }
-}
 
-export async function checkTemplateVersion(
-  currentVersion: string,
-  now: number = Date.now(),
-): Promise<UpdateNotice | null> {
-  if (isDisabled()) return null;
-
-  const cache = await readTemplateCache();
-  if (cache !== null && now - cache.lastCheck < ttlMs()) {
-    if (compareVersions(currentVersion, cache.latest) < 0) {
-      return { current: currentVersion, latest: cache.latest };
-    }
-    return null;
+  if (versions.length === 0) {
+    throw new ConfigError("No template releases found.");
   }
 
-  const latest = await fetchLatestTemplateVersion();
-  if (latest === null) return null;
+  const latestCompatible = maxSatisfying(versions, range);
+  if (latestCompatible === null) {
+    throw new ConfigError(`No template releases match range "${range}".`);
+  }
+
+  const latest = versions.reduce((a, b) => (compareVersions(a, b) < 0 ? b : a));
 
   try {
-    await writeTemplateCache({ latest, lastCheck: now });
+    await writeTemplateCacheFile({ latest, latestCompatible, lastCheck: now });
   } catch {
     // Non-fatal: next run retries.
   }
 
-  if (compareVersions(currentVersion, latest) < 0) {
-    return { current: currentVersion, latest };
-  }
-  return null;
+  return { latest, latestCompatible };
 }
 
 export function formatTemplateNotice(n: UpdateNotice, color: boolean = useColor()): string {
@@ -98,7 +123,6 @@ export function formatTemplateNotice(n: UpdateNotice, color: boolean = useColor(
     "",
     bar,
     `${yellow("▲")}  Newer templates available: ${dim(n.current)} → ${cyan(n.latest)}`,
-    `${bar}  Set ${cyan(`UNIVERSE_TEMPLATES_VERSION=${n.latest}`)} to use them.`,
     dim("└"),
     "",
   ];

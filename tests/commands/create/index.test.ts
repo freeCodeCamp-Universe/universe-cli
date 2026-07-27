@@ -14,13 +14,12 @@ import type { RepoInitialiser } from "../../../src/commands/create/io/repo-initi
 import type { SkillInstaller } from "../../../src/commands/create/io/skill-installer.port.js";
 import { ResolvedLayerSet } from "../../../src/commands/create/layer-composition/layer-composition-service.js";
 import { UsageError } from "../../../src/errors.js";
-import { RemoteTemplateProvider } from "../../../src/commands/create/layer-composition/template-provider.js";
+import { loadFromDir } from "../../../src/commands/create/layer-composition/template-provider.js";
 import {
   FrameworkSchema,
   PackageManagerSchema,
   RuntimeSchema,
 } from "../../../src/commands/create/layer-composition/schemas/layers.js";
-import type { TemplateProvider } from "../../../src/commands/create/layer-composition/template-provider.js";
 import runtimeFixture from "../../fixtures/templates/layers/runtime.json";
 import frameworkFixture from "../../fixtures/templates/layers/framework.json";
 import packageManagerFixture from "../../fixtures/templates/layers/package-manager.json";
@@ -31,9 +30,6 @@ vi.mock("../../../src/commands/create/docker-check.js", () => ({
 
 const FIXTURES_DIR = resolve("tests/fixtures/templates");
 const runtimeData = RuntimeSchema.parse(runtimeFixture);
-const fixtureProvider = new RemoteTemplateProvider(() => ({
-  UNIVERSE_TEMPLATES_DIR: FIXTURES_DIR,
-}));
 
 class StubDonationConfigWriter implements DonationConfigWriter {
   async write(_projectDirectory: string): Promise<void> {
@@ -149,7 +145,6 @@ const makeDeps = (cwd: string, prompt: Prompt, options: MakeDepsOptions = {}) =>
     repoInitialiser,
     skillInstaller,
     spinner: { message: vi.fn(), start: vi.fn(), stop: vi.fn(), error: vi.fn() },
-    templateProvider: fixtureProvider,
     validator: new CreateInputValidationService((path) => existsSync(join(cwd, path)), runtimeData),
   };
 };
@@ -158,7 +153,7 @@ describe("create", () => {
   let rootDirectory: string;
 
   beforeEach(() => {
-    vi.stubEnv("UNIVERSE_NO_UPDATE_CHECK", "1");
+    vi.stubEnv("UNIVERSE_TEMPLATES_DIR", FIXTURES_DIR);
     rootDirectory = mkdtempSync(join(tmpdir(), "universe-create-"));
   });
 
@@ -570,9 +565,7 @@ describe("create", () => {
       );
 
       expect(deps.exit).not.toHaveBeenCalled();
-      expect(validateSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ runtime: "node" }),
-      );
+      expect(validateSpy).toHaveBeenCalledWith(expect.objectContaining({ runtime: "node" }));
     });
 
     it("defaults to the first recommended framework when --framework is omitted", async () => {
@@ -594,9 +587,7 @@ describe("create", () => {
       );
 
       expect(deps.exit).not.toHaveBeenCalled();
-      expect(validateSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ framework: "express" }),
-      );
+      expect(validateSpy).toHaveBeenCalledWith(expect.objectContaining({ framework: "express" }));
     });
 
     it("defaults to the first recommended PM when --packageManager is omitted", async () => {
@@ -618,9 +609,7 @@ describe("create", () => {
       );
 
       expect(deps.exit).not.toHaveBeenCalled();
-      expect(validateSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ packageManager: "pnpm" }),
-      );
+      expect(validateSpy).toHaveBeenCalledWith(expect.objectContaining({ packageManager: "pnpm" }));
     });
 
     it("honours an explicit non-recommended flag value", async () => {
@@ -628,19 +617,14 @@ describe("create", () => {
         pnpm: { ...packageManagerFixture["pnpm"], recommended: true },
         bun: { ...packageManagerFixture["bun"], recommended: false },
       });
-      const modifiedProvider: TemplateProvider = {
-        async loadLayers() {
-          const base = await fixtureProvider.loadLayers();
-          return {
-            ...base,
-            registry: { ...base.registry, "package-managers": partialPm },
-          };
-        },
+      const modifiedLoader = async (dir: string) => {
+        const base = await loadFromDir(dir);
+        return { ...base, registry: { ...base.registry, "package-managers": partialPm } };
       };
       const deps = {
         ...makeDeps(rootDirectory, createPromptPort(null)),
         isTTY: false,
-        templateProvider: modifiedProvider,
+        loadLayersFn: modifiedLoader,
       };
 
       await create(
@@ -664,25 +648,17 @@ describe("create", () => {
         node: { ...runtimeFixture["node"], recommended: false },
         static_web: { ...runtimeFixture["static_web"], recommended: false },
       });
-      const modifiedProvider: TemplateProvider = {
-        async loadLayers() {
-          const base = await fixtureProvider.loadLayers();
-          return {
-            ...base,
-            registry: { ...base.registry, runtime: noRecRuntime },
-          };
-        },
+      const modifiedLoader = async (dir: string) => {
+        const base = await loadFromDir(dir);
+        return { ...base, registry: { ...base.registry, runtime: noRecRuntime } };
       };
       const deps = {
         ...makeDeps(rootDirectory, createPromptPort(null)),
         isTTY: false,
-        templateProvider: modifiedProvider,
+        loadLayersFn: modifiedLoader,
       };
 
-      await create(
-        { json: false, yes: true, name: "no-rec-runtime" },
-        deps,
-      );
+      await create({ json: false, yes: true, name: "no-rec-runtime" }, deps);
 
       expect(deps.exit).toHaveBeenCalled();
       expect(deps.logger.error).toHaveBeenCalledWith(
@@ -699,25 +675,17 @@ describe("create", () => {
         "tanstack-shadcn": { ...frameworkFixture["tanstack-shadcn"], recommended: false },
         typescript: { ...frameworkFixture["typescript"], recommended: false },
       });
-      const modifiedProvider: TemplateProvider = {
-        async loadLayers() {
-          const base = await fixtureProvider.loadLayers();
-          return {
-            ...base,
-            registry: { ...base.registry, frameworks: noRecFramework },
-          };
-        },
+      const modifiedLoader = async (dir: string) => {
+        const base = await loadFromDir(dir);
+        return { ...base, registry: { ...base.registry, frameworks: noRecFramework } };
       };
       const deps = {
         ...makeDeps(rootDirectory, createPromptPort(null)),
         isTTY: false,
-        templateProvider: modifiedProvider,
+        loadLayersFn: modifiedLoader,
       };
 
-      await create(
-        { json: false, yes: true, name: "no-rec-fw", runtime: "node" },
-        deps,
-      );
+      await create({ json: false, yes: true, name: "no-rec-fw", runtime: "node" }, deps);
 
       expect(deps.exit).toHaveBeenCalled();
       expect(deps.logger.error).toHaveBeenCalledWith(
@@ -730,19 +698,14 @@ describe("create", () => {
         pnpm: { ...packageManagerFixture["pnpm"], recommended: false },
         bun: { ...packageManagerFixture["bun"], recommended: false },
       });
-      const modifiedProvider: TemplateProvider = {
-        async loadLayers() {
-          const base = await fixtureProvider.loadLayers();
-          return {
-            ...base,
-            registry: { ...base.registry, "package-managers": noRecPm },
-          };
-        },
+      const modifiedLoader = async (dir: string) => {
+        const base = await loadFromDir(dir);
+        return { ...base, registry: { ...base.registry, "package-managers": noRecPm } };
       };
       const deps = {
         ...makeDeps(rootDirectory, createPromptPort(null)),
         isTTY: false,
-        templateProvider: modifiedProvider,
+        loadLayersFn: modifiedLoader,
       };
 
       await create(
@@ -758,9 +721,7 @@ describe("create", () => {
   });
 
   it("warns when Docker daemon is unavailable after scaffolding", async () => {
-    const { isDockerAvailable } = await import(
-      "../../../src/commands/create/docker-check.js"
-    );
+    const { isDockerAvailable } = await import("../../../src/commands/create/docker-check.js");
     vi.mocked(isDockerAvailable).mockReturnValue(false);
 
     const deps = makeDeps(rootDirectory, createPromptPort(createPromptResult));
