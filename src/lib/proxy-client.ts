@@ -1,5 +1,9 @@
 import { CliError } from "../errors.js";
-import { EXIT_CREDENTIALS, EXIT_STORAGE, EXIT_USAGE } from "../output/exit-codes.js";
+import {
+  EXIT_CREDENTIALS,
+  EXIT_STORAGE,
+  EXIT_USAGE,
+} from "../output/exit-codes.js";
 import { auditRowArraySchema } from "../commands/audit/schema.js";
 import { deploySummaryArraySchema } from "../commands/sites/schema.js";
 import {
@@ -159,7 +163,8 @@ export interface DeleteSiteRequest {
 }
 
 export type RepoVisibility = "public" | "private";
-export type RepoRequestStatus = "pending" | "approved" | "active" | "rejected" | "failed";
+export type RepoRequestStatus =
+  "pending" | "approved" | "active" | "rejected" | "failed";
 
 /**
  * Canonical repo-request row returned by every `/api/repo*` endpoint.
@@ -237,13 +242,20 @@ export interface ProxyClient {
   deployUpload(req: DeployUploadRequest): Promise<DeployUploadResponse>;
   deployFinalize(req: DeployFinalizeRequest): Promise<DeployFinalizeResponse>;
   siteDeploys(req: { site: string }): Promise<DeploySummary[]>;
-  getAlias(req: { site: string; mode: DeployMode }): Promise<AliasResponse | null>;
+  getAlias(req: {
+    site: string;
+    mode: DeployMode;
+  }): Promise<AliasResponse | null>;
   sitePromote(req: {
     site: string;
     deployId?: string;
     expectedCurrent?: string;
   }): Promise<AliasResponse>;
-  siteRollback(req: { site: string; to: string; expectedCurrent?: string }): Promise<AliasResponse>;
+  siteRollback(req: {
+    site: string;
+    to: string;
+    expectedCurrent?: string;
+  }): Promise<AliasResponse>;
   registerSite(req: RegisterSiteRequest): Promise<SiteRow>;
   listSites(): Promise<SiteRow[]>;
   updateSite(req: UpdateSiteRequest): Promise<SiteRow>;
@@ -269,13 +281,21 @@ export class ProxyError extends CliError {
   readonly status: number;
   readonly code: string;
   readonly requestId?: string;
+  readonly hint?: string;
 
-  constructor(status: number, code: string, message: string, requestId?: string) {
+  constructor(
+    status: number,
+    code: string,
+    message: string,
+    requestId?: string,
+    hint?: string,
+  ) {
     super(message);
     this.status = status;
     this.code = code;
     this.exitCode = mapExitCode(status);
     this.requestId = requestId;
+    this.hint = hint;
   }
 }
 
@@ -299,7 +319,8 @@ export class AliasDriftError extends ProxyError {
 
 function mapExitCode(status: number): number {
   if (status === 401 || status === 403) return EXIT_CREDENTIALS;
-  if (status === 429 || status === 422 || status === 0 || status >= 500) return EXIT_STORAGE;
+  if (status === 429 || status === 422 || status === 0 || status >= 500)
+    return EXIT_STORAGE;
   return EXIT_USAGE;
 }
 
@@ -332,6 +353,8 @@ export function wrapProxyError(
         "\n  hint: the active GitHub token may lack the read:org scope or SSO authorization for the org. " +
         "$GITHUB_TOKEN / $GH_TOKEN override `gh auth token` — run `universe whoami` to check the active identity source, " +
         "then unset them or re-authorize the token (Configure SSO).";
+    } else if (err.hint) {
+      message += `\n  hint: ${err.hint}`;
     }
     return {
       code: err.exitCode,
@@ -353,6 +376,7 @@ interface ProxyErrorEnvelope {
   error?: {
     code?: string;
     message?: string;
+    hint?: string;
   };
   current?: unknown;
 }
@@ -370,9 +394,12 @@ interface ErrorEnvelopeFields {
   code: string;
   message: string;
   current?: string;
+  hint?: string;
 }
 
-async function readErrorEnvelope(response: Response): Promise<ErrorEnvelopeFields> {
+async function readErrorEnvelope(
+  response: Response,
+): Promise<ErrorEnvelopeFields> {
   const status = response.status;
   let raw: unknown;
   try {
@@ -385,10 +412,13 @@ async function readErrorEnvelope(response: Response): Promise<ErrorEnvelopeField
   }
   if (isProxyErrorEnvelope(raw) && raw.error) {
     const current = typeof raw.current === "string" ? raw.current : undefined;
+    const hint =
+      typeof raw.error.hint === "string" ? raw.error.hint : undefined;
     return {
       code: raw.error.code ?? `http_${status}`,
       message: raw.error.message ?? response.statusText ?? "request failed",
       ...(current === undefined ? {} : { current }),
+      ...(hint === undefined ? {} : { hint }),
     };
   }
   return {
@@ -397,11 +427,15 @@ async function readErrorEnvelope(response: Response): Promise<ErrorEnvelopeField
   };
 }
 
-function throwProxyError(status: number, env: ErrorEnvelopeFields, requestId?: string): never {
+function throwProxyError(
+  status: number,
+  env: ErrorEnvelopeFields,
+  requestId?: string,
+): never {
   if (status === 409 && env.code === "alias_drift") {
     throw new AliasDriftError(env.message, env.current ?? "");
   }
-  throw new ProxyError(status, env.code, env.message, requestId);
+  throw new ProxyError(status, env.code, env.message, requestId, env.hint);
 }
 
 function stripTrailingSlash(url: string): string {
@@ -427,16 +461,29 @@ export function createProxyClient(cfg: ProxyClientConfig): ProxyClient {
     // in package.json (>=24); dropping that floor would silently break
     // this merge path — caller signal would no longer compose with the
     // timeout signal and one of the two cancellations would be lost.
-    const merged = init.signal ? AbortSignal.any([init.signal, timeoutSignal]) : timeoutSignal;
+    const merged = init.signal
+      ? AbortSignal.any([init.signal, timeoutSignal])
+      : timeoutSignal;
     return { ...init, signal: merged };
   }
 
   function translateFetchError(err: unknown): never {
-    if (err instanceof DOMException && (err.name === "TimeoutError" || err.name === "AbortError")) {
-      throw new ProxyError(0, "timeout", `proxy timed out after ${timeoutMs}ms (${base})`);
+    if (
+      err instanceof DOMException &&
+      (err.name === "TimeoutError" || err.name === "AbortError")
+    ) {
+      throw new ProxyError(
+        0,
+        "timeout",
+        `proxy timed out after ${timeoutMs}ms (${base})`,
+      );
     }
     const message = err instanceof Error ? err.message : String(err);
-    throw new ProxyError(0, "network_error", `proxy unreachable at ${base}: ${message}`);
+    throw new ProxyError(
+      0,
+      "network_error",
+      `proxy unreachable at ${base}: ${message}`,
+    );
   }
 
   async function userBearer(): Promise<string> {
@@ -474,7 +521,11 @@ export function createProxyClient(cfg: ProxyClientConfig): ProxyClient {
     try {
       raw = await response.json();
     } catch {
-      throw new ProxyError(0, "malformed_response", "proxy returned a non-JSON response body");
+      throw new ProxyError(
+        0,
+        "malformed_response",
+        "proxy returned a non-JSON response body",
+      );
     }
     if (validate) {
       try {
@@ -592,7 +643,8 @@ export function createProxyClient(cfg: ProxyClientConfig): ProxyClient {
       };
       const body: Record<string, string> = {};
       if (req.deployId !== undefined) body.deployId = req.deployId;
-      if (req.expectedCurrent !== undefined) body.expectedCurrent = req.expectedCurrent;
+      if (req.expectedCurrent !== undefined)
+        body.expectedCurrent = req.expectedCurrent;
       const hasBody = Object.keys(body).length > 0;
       if (hasBody) headers["Content-Type"] = "application/json";
       return call<AliasResponse>(url, {
@@ -605,7 +657,8 @@ export function createProxyClient(cfg: ProxyClientConfig): ProxyClient {
     async siteRollback(req) {
       const url = `${base}/api/site/${encodeURIComponent(req.site)}/rollback`;
       const body: Record<string, string> = { to: req.to };
-      if (req.expectedCurrent !== undefined) body.expectedCurrent = req.expectedCurrent;
+      if (req.expectedCurrent !== undefined)
+        body.expectedCurrent = req.expectedCurrent;
       return call<AliasResponse>(url, {
         method: "POST",
         headers: {
