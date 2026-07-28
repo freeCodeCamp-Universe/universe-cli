@@ -94,7 +94,7 @@ const extractTarball = async (tarball: Buffer, destDir: string): Promise<void> =
   await writeFile(tarballPath, tarball);
 
   try {
-    await execFileAsync("tar", ["xzf", tarballPath, "-C", destDir, "--strip-components=0"]);
+    await execFileAsync("tar", ["xzf", tarballPath, "-C", destDir]);
   } finally {
     await rm(tarballPath, { force: true });
   }
