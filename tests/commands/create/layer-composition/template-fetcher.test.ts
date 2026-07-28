@@ -128,14 +128,10 @@ describe("ensureTemplateDir", () => {
     ).rejects.toThrow();
 
     // No leftover tmp dirs
-    try {
-      const cacheParent = join(cacheBase, "universe-cli", "templates");
-      const entries = await readdir(cacheParent);
-      const tmpDirs = entries.filter((e) => e.startsWith(".tmp-"));
-      expect(tmpDirs).toEqual([]);
-    } catch {
-      // cacheBase doesn't exist at all — fine
-    }
+    const cacheParent = join(cacheBase, "universe-cli", "templates");
+    const entries = await readdir(cacheParent);
+    const tmpDirs = entries.filter((e) => e.startsWith(".tmp-"));
+    expect(tmpDirs).toEqual([]);
   });
 
   it("throws when extracted tarball has missing files", async () => {
