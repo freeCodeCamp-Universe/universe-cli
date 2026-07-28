@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdir, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { promisify } from "node:util";
 
@@ -60,8 +60,8 @@ const validateStructure = async (dir: string): Promise<void> => {
 
 const cacheHit = async (cacheDir: string): Promise<boolean> => {
   try {
-    await stat(join(cacheDir, "labels.json"));
-    return true;
+    const entries = await readdir(cacheDir);
+    return entries.length > 0;
   } catch {
     return false;
   }
