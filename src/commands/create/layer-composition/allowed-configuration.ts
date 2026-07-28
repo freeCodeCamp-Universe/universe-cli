@@ -16,8 +16,7 @@ const recommendedFrameworkOptions = (
   runtimeData: Runtime,
   runtime: string,
   frameworks: Framework,
-): string[] =>
-  runtimeData[runtime].frameworks.filter((f) => frameworks[f]?.recommended !== false);
+): string[] => runtimeData[runtime].frameworks.filter((f) => frameworks[f]?.recommended !== false);
 
 const recommendedPackageManagerOptions = (
   runtimeData: Runtime,

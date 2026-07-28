@@ -66,7 +66,13 @@ describe(ClackPrompt, () => {
       },
     };
 
-    const adapter = new ClackPrompt(runtimeData, labelsData, frameworkData, packageManagerData, mockApi);
+    const adapter = new ClackPrompt(
+      runtimeData,
+      labelsData,
+      frameworkData,
+      packageManagerData,
+      mockApi,
+    );
 
     await adapter.promptForCreateInputs();
 
@@ -100,7 +106,13 @@ describe(ClackPrompt, () => {
       },
     };
 
-    const adapter = new ClackPrompt(runtimeData, labelsData, frameworkData, packageManagerData, mockApi);
+    const adapter = new ClackPrompt(
+      runtimeData,
+      labelsData,
+      frameworkData,
+      packageManagerData,
+      mockApi,
+    );
 
     await adapter.promptForCreateInputs();
 
@@ -121,7 +133,13 @@ describe(ClackPrompt, () => {
       },
     };
 
-    const adapter = new ClackPrompt(runtimeData, labelsData, frameworkData, packageManagerData, mockApi);
+    const adapter = new ClackPrompt(
+      runtimeData,
+      labelsData,
+      frameworkData,
+      packageManagerData,
+      mockApi,
+    );
 
     const result = await adapter.promptForCreateInputs();
 
@@ -141,7 +159,13 @@ describe(ClackPrompt, () => {
       },
     };
 
-    const adapter = new ClackPrompt(runtimeData, labelsData, frameworkData, packageManagerData, mockApi);
+    const adapter = new ClackPrompt(
+      runtimeData,
+      labelsData,
+      frameworkData,
+      packageManagerData,
+      mockApi,
+    );
 
     await adapter.promptForCreateInputs();
 
@@ -168,7 +192,13 @@ describe(ClackPrompt, () => {
       ],
     );
 
-    const adapter: Prompt = new ClackPrompt(runtimeData, labelsData, frameworkData, packageManagerData, mockApi);
+    const adapter: Prompt = new ClackPrompt(
+      runtimeData,
+      labelsData,
+      frameworkData,
+      packageManagerData,
+      mockApi,
+    );
 
     const result = await adapter.promptForCreateInputs();
 
@@ -187,7 +217,13 @@ describe(ClackPrompt, () => {
 
     const mockApi = createMockApi(["static_web", "html-css-js", "pnpm"], [[], []]);
 
-    const adapter: Prompt = new ClackPrompt(runtimeData, labelsData, frameworkData, packageManagerData, mockApi);
+    const adapter: Prompt = new ClackPrompt(
+      runtimeData,
+      labelsData,
+      frameworkData,
+      packageManagerData,
+      mockApi,
+    );
 
     const result = await adapter.promptForCreateInputs();
 
@@ -233,7 +269,13 @@ describe(ClackPrompt, () => {
       },
     };
 
-    const adapter = new ClackPrompt(singleRuntime, labelsData, frameworkData, packageManagerData, mockApi);
+    const adapter = new ClackPrompt(
+      singleRuntime,
+      labelsData,
+      frameworkData,
+      packageManagerData,
+      mockApi,
+    );
     const result = await adapter.promptForCreateInputs();
 
     expect(result?.runtime).toBe("node");
@@ -246,7 +288,13 @@ describe(ClackPrompt, () => {
       static_web: { ...runtimeFixture["static_web"], recommended: false },
     });
 
-    const adapter = new ClackPrompt(noRuntime, labelsData, frameworkData, packageManagerData, createMockApi());
+    const adapter = new ClackPrompt(
+      noRuntime,
+      labelsData,
+      frameworkData,
+      packageManagerData,
+      createMockApi(),
+    );
 
     await expect(adapter.promptForCreateInputs()).rejects.toThrow("No recommended runtimes");
   });
@@ -270,7 +318,13 @@ describe(ClackPrompt, () => {
       },
     };
 
-    const adapter = new ClackPrompt(runtimeData, labelsData, singleFramework, packageManagerData, mockApi);
+    const adapter = new ClackPrompt(
+      runtimeData,
+      labelsData,
+      singleFramework,
+      packageManagerData,
+      mockApi,
+    );
     const result = await adapter.promptForCreateInputs();
 
     expect(result?.framework).toBe("express");
@@ -287,7 +341,13 @@ describe(ClackPrompt, () => {
       typescript: { ...frameworkFixture["typescript"], recommended: false },
     });
 
-    const adapter = new ClackPrompt(runtimeData, labelsData, noFramework, packageManagerData, createMockApi(["node"]));
+    const adapter = new ClackPrompt(
+      runtimeData,
+      labelsData,
+      noFramework,
+      packageManagerData,
+      createMockApi(["node"]),
+    );
 
     await expect(adapter.promptForCreateInputs()).rejects.toThrow("No recommended frameworks");
   });
@@ -298,9 +358,17 @@ describe(ClackPrompt, () => {
       bun: { ...packageManagerFixture["bun"], recommended: false },
     });
 
-    const adapter = new ClackPrompt(runtimeData, labelsData, frameworkData, noPm, createMockApi(["node", "express"]));
+    const adapter = new ClackPrompt(
+      runtimeData,
+      labelsData,
+      frameworkData,
+      noPm,
+      createMockApi(["node", "express"]),
+    );
 
-    await expect(adapter.promptForCreateInputs()).rejects.toThrow("No recommended package managers");
+    await expect(adapter.promptForCreateInputs()).rejects.toThrow(
+      "No recommended package managers",
+    );
   });
 
   it("shows only recommended options when >1 are recommended", async () => {
@@ -324,7 +392,13 @@ describe(ClackPrompt, () => {
       },
     };
 
-    const adapter = new ClackPrompt(runtimeData, labelsData, partialFrameworks, packageManagerData, mockApi);
+    const adapter = new ClackPrompt(
+      runtimeData,
+      labelsData,
+      partialFrameworks,
+      packageManagerData,
+      mockApi,
+    );
     await adapter.promptForCreateInputs();
 
     const values = frameworkOptions.map((o) => o.value);

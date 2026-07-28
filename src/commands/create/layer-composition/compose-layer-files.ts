@@ -14,7 +14,7 @@ interface FileOwner {
 }
 
 const CONFIG_EXTENSIONS = new Set([".json", ".yaml", ".yml"]);
-const CONCAT_FILENAMES = new Set([".dockerignore",".gitignore"]);
+const CONCAT_FILENAMES = new Set([".dockerignore", ".gitignore"]);
 
 const isConfigFile = (filePath: string): boolean =>
   [...CONFIG_EXTENSIONS].some((ext) => filePath.endsWith(ext));

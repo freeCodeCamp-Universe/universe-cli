@@ -14,7 +14,11 @@ import {
   serviceOptions,
 } from "../layer-composition/allowed-configuration.js";
 import type { Labels } from "../layer-composition/schemas/labels.js";
-import type { Framework, PackageManager as PackageManagerRegistry, Runtime } from "../layer-composition/schemas/layers.js";
+import type {
+  Framework,
+  PackageManager as PackageManagerRegistry,
+  Runtime,
+} from "../layer-composition/schemas/layers.js";
 import { getLabel } from "../layer-composition/labels.js";
 import type { LabelCategory } from "../layer-composition/labels.js";
 import { UsageError } from "../../../errors.js";

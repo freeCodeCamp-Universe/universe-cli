@@ -85,9 +85,7 @@ const defaultRunnerFactory: PnpmRunnerFactory = (pmVersion) => {
   const resolve = (): PnpmRunner => {
     if (resolvedRunner === undefined) {
       const useDocker = isDockerAvailable();
-      resolvedRunner = useDocker
-        ? dockerRunnerFactory(pmVersion)
-        : hostRunnerFactory(pmVersion);
+      resolvedRunner = useDocker ? dockerRunnerFactory(pmVersion) : hostRunnerFactory(pmVersion);
     }
     return resolvedRunner;
   };

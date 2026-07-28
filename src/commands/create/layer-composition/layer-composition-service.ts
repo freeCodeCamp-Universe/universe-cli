@@ -21,18 +21,13 @@ import type {
   PackageManagerLayerData,
   RuntimeLayerData,
 } from "./schemas/layers.js";
-import type { TemplateProvider } from "./template-provider.js";
-
 interface ResolvedLayerSet {
   files: Record<string, string>;
   layers: ResolvedLayer[];
 }
 
 interface LayerComposer {
-  resolveLayers(
-    input: CreateSelections,
-    options?: { forceFetch?: boolean },
-  ): Promise<ResolvedLayerSet>;
+  resolveLayers(input: CreateSelections): ResolvedLayerSet;
 }
 
 interface DockerfileData {
@@ -126,28 +121,18 @@ const resolveWithLayers = (
 };
 
 class LayerCompositionService implements LayerComposer {
-  private readonly provider: TemplateProvider;
+  private readonly labels: Labels;
+  private readonly registry: LayerRegistry;
 
-  constructor(provider: TemplateProvider) {
-    this.provider = provider;
+  constructor(labels: Labels, registry: LayerRegistry) {
+    this.labels = labels;
+    this.registry = registry;
   }
 
-  async resolveLayers(
-    input: CreateSelections,
-    options?: { forceFetch?: boolean },
-  ): Promise<ResolvedLayerSet> {
-    const { labels, registry } = await this.provider.loadLayers(options);
-    return resolveWithLayers(input, registry, labels);
+  resolveLayers(input: CreateSelections): ResolvedLayerSet {
+    return resolveWithLayers(input, this.registry, this.labels);
   }
 }
 
 export { LayerCompositionService };
-export type {
-  LayerComposer,
-  LayerData,
-  LayerRegistry,
-  LayerType,
-  ResolvedLayer,
-  ResolvedLayerSet,
-  TemplateContext,
-};
+export type { LayerComposer, LayerData, LayerRegistry, LayerType, ResolvedLayer, ResolvedLayerSet };

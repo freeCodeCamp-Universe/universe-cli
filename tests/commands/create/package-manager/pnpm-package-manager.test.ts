@@ -15,13 +15,10 @@ vi.mock("node:child_process", () => ({
   execFile: vi.fn(),
 }));
 
-vi.mock(
-  "../../../../src/commands/create/package-manager/docker-runner.js",
-  () => ({
-    runCmdForFiles: vi.fn(),
-    runCmdForStdout: vi.fn(),
-  }),
-);
+vi.mock("../../../../src/commands/create/package-manager/docker-runner.js", () => ({
+  runCmdForFiles: vi.fn(),
+  runCmdForStdout: vi.fn(),
+}));
 
 const PNPM_LIST_OUTPUT_NO_LODASH = JSON.stringify([
   {
@@ -113,12 +110,10 @@ describe(hostRunnerFactory, () => {
       JSON.stringify({ name: "test-project", dependencies: { express: "^5" } }),
       "utf8",
     );
-    vi.mocked(execFile).mockImplementation(
-      ((...rawArgs: unknown[]) => {
-        const callback = rawArgs[rawArgs.length - 1] as MockCallback;
-        callback(null, { stderr: "", stdout: "" });
-      }) as never,
-    );
+    vi.mocked(execFile).mockImplementation(((...rawArgs: unknown[]) => {
+      const callback = rawArgs[rawArgs.length - 1] as MockCallback;
+      callback(null, { stderr: "", stdout: "" });
+    }) as never);
   });
 
   afterEach(async () => {
@@ -148,9 +143,8 @@ describe(hostRunnerFactory, () => {
 
 describe(dockerRunnerFactory, () => {
   it("installLockfileOnly delegates to runCmdForFiles", async () => {
-    const { runCmdForFiles: mockRunCmdForFiles } = await import(
-      "../../../../src/commands/create/package-manager/docker-runner.js"
-    );
+    const { runCmdForFiles: mockRunCmdForFiles } =
+      await import("../../../../src/commands/create/package-manager/docker-runner.js");
 
     const runner = dockerRunnerFactory("10.0.0");
     await runner.installLockfileOnly("/project");
@@ -164,9 +158,8 @@ describe(dockerRunnerFactory, () => {
   });
 
   it("list delegates to runCmdForStdout", async () => {
-    const { runCmdForStdout: mockRunCmdForStdout } = await import(
-      "../../../../src/commands/create/package-manager/docker-runner.js"
-    );
+    const { runCmdForStdout: mockRunCmdForStdout } =
+      await import("../../../../src/commands/create/package-manager/docker-runner.js");
 
     const runner = dockerRunnerFactory("10.0.0");
     await runner.list("/project");
