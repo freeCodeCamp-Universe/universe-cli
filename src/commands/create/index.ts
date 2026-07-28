@@ -44,7 +44,7 @@ import { CliError, UsageError } from "../../errors.js";
 import { buildEnvelope } from "../../output/envelope.js";
 import { emitJson, outputError } from "../../output/format.js";
 import { LocalProjectWriter } from "./io/local-project-writer.js";
-import { loadFromDir } from "./layer-composition/template-provider.js";
+import { loadFromDir, type TemplateData } from "./layer-composition/template-provider.js";
 import { templateVersionRange } from "./layer-composition/assets.js";
 import { ensureTemplateDir } from "./layer-composition/template-fetcher.js";
 import { resolveTemplateVersions, formatTemplateNotice } from "../../lib/template-version-check.js";
@@ -84,9 +84,7 @@ export interface CreateDeps {
   repoInitialiser?: RepoInitialiser;
   skillInstaller?: SkillInstaller;
   spinner?: Spinner;
-  loadLayersFn?: (
-    dir: string,
-  ) => Promise<import("./layer-composition/template-provider.js").TemplateData>;
+  loadLayersFn?: (dir: string) => Promise<TemplateData>;
   validator?: CreateInputValidator;
 }
 
@@ -143,11 +141,10 @@ export const create = async (options: CreateOptions, deps: CreateDeps = {}): Pro
     const isTTY = deps.isTTY ?? Boolean(process.stdin.isTTY);
     const interactive = isTTY && !options.yes && !options.json;
 
-    const provider = { loadLayers: loadLayersFn };
     const prompt =
       deps.prompt ??
       new ClackPrompt(registry.runtime, labels, registry.frameworks, registry["package-managers"]);
-    const layerResolver = deps.layerResolver ?? new LayerCompositionService(provider);
+    const layerResolver = deps.layerResolver ?? new LayerCompositionService(labels, registry);
     const validator =
       deps.validator ??
       new CreateInputValidationService((path) => existsSync(path), registry.runtime);
@@ -246,7 +243,7 @@ export const create = async (options: CreateOptions, deps: CreateDeps = {}): Pro
     const validatedInput = validator.validateCreateInput(selections);
 
     spinner.message("Composing project layers");
-    const resolvedLayers = await layerResolver.resolveLayers(validatedInput, templateDir);
+    const resolvedLayers = layerResolver.resolveLayers(validatedInput);
     const targetDirectory = `${cwd}/${validatedInput.name}`;
     const projectFiles = {
       ...resolvedLayers.files,

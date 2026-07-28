@@ -400,8 +400,8 @@ describe("create", () => {
         },
       },
       layerResolver: {
-        resolveLayers(_input: CreateSelections): Promise<ResolvedLayerSet> {
-          return Promise.resolve({ files: resolvedLayerFiles, layers: [] });
+        resolveLayers(_input: CreateSelections): ResolvedLayerSet {
+          return { files: resolvedLayerFiles, layers: [] };
         },
       },
       platformManifestGenerator: {
@@ -462,8 +462,8 @@ describe("create", () => {
         },
       },
       layerResolver: {
-        resolveLayers(_input: CreateSelections): Promise<ResolvedLayerSet> {
-          return Promise.resolve({ files: resolvedLayerFiles, layers: [] });
+        resolveLayers(_input: CreateSelections): ResolvedLayerSet {
+          return { files: resolvedLayerFiles, layers: [] };
         },
       },
       platformManifestGenerator: {

@@ -29,10 +29,6 @@ interface TemplateData {
   registry: LayerRegistry;
 }
 
-interface TemplateProvider {
-  loadLayers(dir: string): Promise<TemplateData>;
-}
-
 const validateEntries = (expected: readonly string[], actual: string[]): void => {
   const expectedSet = new Set<string>(expected);
   const actualSet = new Set(actual);
@@ -107,4 +103,4 @@ const loadFromDir = async (dir: string): Promise<TemplateData> => {
 };
 
 export { EXPECTED_LAYER_FILES, EXPECTED_ROOT_ENTRIES, loadFromDir, validateStructure };
-export type { TemplateData, TemplateProvider };
+export type { TemplateData };
