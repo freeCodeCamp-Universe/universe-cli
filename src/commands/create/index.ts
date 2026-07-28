@@ -120,7 +120,7 @@ export const create = async (options: CreateOptions, deps: CreateDeps = {}): Pro
       );
     }
 
-    return latest;
+    return latestCompatible;
   }
 
   async function findTemplateDir(envVersion?: string) {

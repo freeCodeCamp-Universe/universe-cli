@@ -20,6 +20,8 @@ import {
   PackageManagerSchema,
   RuntimeSchema,
 } from "../../../src/commands/create/layer-composition/schemas/layers.js";
+import { resolveTemplateVersions } from "../../../src/lib/template-version-check.js";
+import { ensureTemplateDir } from "../../../src/commands/create/layer-composition/template-fetcher.js";
 import runtimeFixture from "../../fixtures/templates/layers/runtime.json";
 import frameworkFixture from "../../fixtures/templates/layers/framework.json";
 import packageManagerFixture from "../../fixtures/templates/layers/package-manager.json";
@@ -27,6 +29,18 @@ import packageManagerFixture from "../../fixtures/templates/layers/package-manag
 vi.mock("../../../src/commands/create/docker-check.js", () => ({
   isDockerAvailable: vi.fn(() => true),
 }));
+
+vi.mock("../../../src/lib/template-version-check.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../src/lib/template-version-check.js")>();
+  return { ...actual, resolveTemplateVersions: vi.fn() };
+});
+
+vi.mock("../../../src/commands/create/layer-composition/template-fetcher.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../src/commands/create/layer-composition/template-fetcher.js")>();
+  return { ...actual, ensureTemplateDir: vi.fn() };
+});
 
 const FIXTURES_DIR = resolve("tests/fixtures/templates");
 const runtimeData = RuntimeSchema.parse(runtimeFixture);
@@ -733,5 +747,25 @@ describe("create", () => {
     );
 
     vi.mocked(isDockerAvailable).mockReturnValue(true);
+  });
+
+  it("fetches the latestCompatible version, not the latest", async () => {
+    vi.stubEnv("UNIVERSE_TEMPLATES_DIR", "");
+    vi.stubEnv("UNIVERSE_TEMPLATES_VERSION", "");
+
+    vi.mocked(resolveTemplateVersions).mockResolvedValue({
+      latest: "2.0.0",
+      latestCompatible: "1.5.0",
+    });
+    vi.mocked(ensureTemplateDir).mockResolvedValue(FIXTURES_DIR);
+
+    const deps = {
+      ...makeDeps(rootDirectory, createPromptPort(createPromptResult)),
+      isTTY: false,
+    };
+
+    await create({ json: false, yes: true, name: "compat-version-app" }, deps);
+
+    expect(ensureTemplateDir).toHaveBeenCalledWith("1.5.0", expect.anything());
   });
 });
