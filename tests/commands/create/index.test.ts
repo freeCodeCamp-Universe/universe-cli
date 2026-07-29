@@ -418,10 +418,15 @@ describe("create", () => {
 
     expect(writerCalls).toStrictEqual([
       {
-        files: {
-          ...resolvedLayerFiles,
-          "platform.yaml": "name: hello-universe\n",
-        },
+        files: resolvedLayerFiles,
+        targetDirectory: "/workspace/hello-universe",
+      },
+      {
+        files: { "platform.yaml": "name: hello-universe\n" },
+        targetDirectory: "/workspace/hello-universe",
+      },
+      {
+        files: { LICENSE: expect.stringContaining("BSD 3-Clause License") },
         targetDirectory: "/workspace/hello-universe",
       },
     ]);
