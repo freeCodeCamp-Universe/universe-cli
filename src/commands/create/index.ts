@@ -257,7 +257,7 @@ export const create = async (options: CreateOptions, deps: CreateDeps = {}): Pro
 
     spinner.message("Adding LICENSE");
     await filesystemWriter.writeProject(targetDirectory, {
-      LICENSE: bsd3ClauseLicense(new Date().getFullYear()),
+      LICENSE: bsd3ClauseLicense,
     });
 
     const manager = validatedInput.packageManager;

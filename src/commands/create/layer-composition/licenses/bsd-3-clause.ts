@@ -1,7 +1,7 @@
-export const bsd3ClauseLicense = (year: number): string =>
+export const bsd3ClauseLicense =
   `BSD 3-Clause License
 
-Copyright (c) ${year}, freeCodeCamp.
+Copyright (c) 2014, freeCodeCamp.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
