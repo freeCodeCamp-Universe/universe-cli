@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.1](https://github.com/freeCodeCamp-Universe/universe-cli/compare/universe-cli-v0.15.0...universe-cli-v0.15.1) (2026-07-29)
+
+
+### Bug Fixes
+
+* handle runtimes with 0 services ([#54](https://github.com/freeCodeCamp-Universe/universe-cli/issues/54)) ([9b66ef0](https://github.com/freeCodeCamp-Universe/universe-cli/commit/9b66ef04fb78938b08cdbabe30e2fe75e3c78ec2))
+
 ## [0.15.0](https://github.com/freeCodeCamp-Universe/universe-cli/compare/universe-cli-v0.14.1...universe-cli-v0.15.0) (2026-07-28)
 
 
