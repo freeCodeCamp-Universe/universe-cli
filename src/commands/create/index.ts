@@ -45,6 +45,7 @@ import { buildEnvelope } from "../../output/envelope.js";
 import { emitJson, outputError } from "../../output/format.js";
 import { LocalProjectWriter } from "./io/local-project-writer.js";
 import { loadFromDir, type TemplateData } from "./layer-composition/template-provider.js";
+import { bsd3ClauseLicense } from "./layer-composition/licenses/bsd-3-clause.js";
 import { templateVersionRange } from "./layer-composition/assets.js";
 import { ensureTemplateDir } from "./layer-composition/template-fetcher.js";
 import { resolveTemplateVersions, formatTemplateNotice } from "../../lib/template-version-check.js";
@@ -245,13 +246,19 @@ export const create = async (options: CreateOptions, deps: CreateDeps = {}): Pro
     spinner.message("Composing project layers");
     const resolvedLayers = layerResolver.resolveLayers(validatedInput);
     const targetDirectory = `${cwd}/${validatedInput.name}`;
-    const projectFiles = {
-      ...resolvedLayers.files,
-      "platform.yaml": platformManifestGenerator.generatePlatformManifest(validatedInput),
-    };
 
     spinner.message("Writing project files");
-    await filesystemWriter.writeProject(targetDirectory, projectFiles);
+    await filesystemWriter.writeProject(targetDirectory, resolvedLayers.files);
+
+    spinner.message("Writing platform manifest");
+    await filesystemWriter.writeProject(targetDirectory, {
+      "platform.yaml": platformManifestGenerator.generatePlatformManifest(validatedInput),
+    });
+
+    spinner.message("Adding LICENSE");
+    await filesystemWriter.writeProject(targetDirectory, {
+      LICENSE: bsd3ClauseLicense,
+    });
 
     const manager = validatedInput.packageManager;
 
