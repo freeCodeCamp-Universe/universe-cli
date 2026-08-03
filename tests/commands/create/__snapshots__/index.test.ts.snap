@@ -4,7 +4,9 @@ exports[`create > snapshots generated Node.js scaffold output 1`] = `
 {
   ".devcontainer/devcontainer.json": "{
   "$schema": "https://raw.githubusercontent.com/devcontainers/spec/main/schemas/devContainer.schema.json",
-  "dockerComposeFile": ["./docker-compose.yml"],
+  "dockerComposeFile": [
+    "./docker-compose.yml"
+  ],
   "service": "devcontainer",
   "workspaceFolder": "/app"
 }",
@@ -111,7 +113,9 @@ exports[`create > snapshots generated Static scaffold output 1`] = `
 {
   ".devcontainer/devcontainer.json": "{
   "$schema": "https://raw.githubusercontent.com/devcontainers/spec/main/schemas/devContainer.schema.json",
-  "dockerComposeFile": ["./docker-compose.yml"],
+  "dockerComposeFile": [
+    "./docker-compose.yml"
+  ],
   "service": "devcontainer",
   "workspaceFolder": "/app"
 }",

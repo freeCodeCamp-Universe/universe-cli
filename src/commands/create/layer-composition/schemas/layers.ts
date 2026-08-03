@@ -62,6 +62,7 @@ type Service = z.infer<typeof ServiceSchema>;
 const FrameworkSchema = z.record(
   z.string(),
   z.strictObject({
+    devContainer: z.record(z.string(), z.unknown()).optional(),
     devCopySource: z.string(),
     files: z.record(z.string(), z.string()),
     port: z.number(),

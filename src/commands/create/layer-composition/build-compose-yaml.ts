@@ -55,11 +55,18 @@ const buildDevcontainerComposeYaml = () => `services:
         target: /app/node_modules
 `;
 
-const buildDevcontainerJson = () => `{
-  "$schema": "https://raw.githubusercontent.com/devcontainers/spec/main/schemas/devContainer.schema.json",
-  "dockerComposeFile": ["./docker-compose.yml"],
-  "service": "devcontainer",
-  "workspaceFolder": "/app"
-}`;
+const buildDevcontainerJson = (
+  extras: Record<string, unknown> = {},
+) => {
+  const base = {
+    $schema:
+      "https://raw.githubusercontent.com/devcontainers/spec/main/schemas/devContainer.schema.json",
+    dockerComposeFile: ["./docker-compose.yml"],
+    service: "devcontainer",
+    workspaceFolder: "/app",
+  };
+
+  return JSON.stringify({ ...base, ...extras }, null, 2);
+};
 
 export { buildComposeYaml, buildDevcontainerComposeYaml, buildDevcontainerJson };

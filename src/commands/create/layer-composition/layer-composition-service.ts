@@ -111,7 +111,7 @@ const resolveWithLayers = (
       context,
     );
     renderedFiles[".devcontainer/docker-compose.yml"] = buildDevcontainerComposeYaml();
-    renderedFiles[".devcontainer/devcontainer.json"] = buildDevcontainerJson();
+    renderedFiles[".devcontainer/devcontainer.json"] = buildDevcontainerJson(frameworkData.devContainer ?? {});
   }
 
   return {
