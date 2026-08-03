@@ -6,6 +6,7 @@ import { createPackageSpecifier } from "./package-json-specifier.js";
 import type { PackageSpecifier } from "./package-specifier.port.js";
 import { isDockerAvailable } from "../docker-check.js";
 import { runCmdForFiles, runCmdForStdout } from "./docker-runner.js";
+import { UsageError } from "../../../errors.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -70,12 +71,27 @@ const hostRunnerFactory: PnpmRunnerFactory = (pmVersion) => ({
     );
   },
   async list(cwd) {
-    const { stdout } = await execFileAsync(
-      "pnpm",
-      ["list", "--json", "--depth=0", "--lockfile-only"],
-      { cwd, encoding: "utf8" },
-    );
-    return stdout;
+    try {
+      const { stdout } = await execFileAsync(
+        "pnpm",
+        ["list", "--json", "--depth=0", "--lockfile-only"],
+        { cwd, encoding: "utf8" },
+      );
+      return stdout;
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.message.includes("Unknown option") &&
+        error.message.includes("lockfile-only")
+      ) {
+        const { stdout } = await execFileAsync("pnpm", ["-v"])
+          
+        throw new UsageError(
+          `pnpm version ${stdout.trim()} does not support \`ls --lockfile-only\`, please use pnpm >= 10.23.0`,
+        );
+      }
+      throw error;
+    }
   },
 });
 
