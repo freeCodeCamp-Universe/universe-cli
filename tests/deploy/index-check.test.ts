@@ -24,18 +24,12 @@ describe("hasRootIndex", () => {
 
 describe("looksLikeFrameworkBuild", () => {
   it("detects a Next bare-root build (the incident)", () => {
-    expect(
-      looksLikeFrameworkBuild([
-        "BUILD_ID",
-        "build-manifest.json",
-        "server/app.js",
-      ]),
-    ).toBe(true);
-  });
-  it("detects a Next prefixed build", () => {
-    expect(looksLikeFrameworkBuild([".next/BUILD_ID", "index.html"])).toBe(
+    expect(looksLikeFrameworkBuild(["BUILD_ID", "build-manifest.json", "server/app.js"])).toBe(
       true,
     );
+  });
+  it("detects a Next prefixed build", () => {
+    expect(looksLikeFrameworkBuild([".next/BUILD_ID", "index.html"])).toBe(true);
   });
   it("detects nitro, sveltekit, nuxt, and output shapes", () => {
     expect(looksLikeFrameworkBuild(["nitro.json"])).toBe(true);
@@ -44,29 +38,19 @@ describe("looksLikeFrameworkBuild", () => {
     expect(looksLikeFrameworkBuild([".nuxt/dist/x.js"])).toBe(true);
   });
   it("normalizes Windows backslashes", () => {
-    expect(
-      looksLikeFrameworkBuild([
-        ".next\\BUILD_ID",
-        ".next\\build-manifest.json",
-      ]),
-    ).toBe(true);
+    expect(looksLikeFrameworkBuild([".next\\BUILD_ID", ".next\\build-manifest.json"])).toBe(true);
   });
   it("does not fire on a single Next marker", () => {
     expect(looksLikeFrameworkBuild(["BUILD_ID"])).toBe(false);
   });
   it("does not fire on a plain static site", () => {
-    expect(looksLikeFrameworkBuild(["index.html", "app.js", "style.css"])).toBe(
-      false,
-    );
+    expect(looksLikeFrameworkBuild(["index.html", "app.js", "style.css"])).toBe(false);
   });
 });
 
 describe("missingRootIndexMessage", () => {
   it("carries the static-export hint for a framework build", () => {
-    const msg = missingRootIndexMessage(
-      ["BUILD_ID", "build-manifest.json"],
-      "/proj/.next",
-    );
+    const msg = missingRootIndexMessage(["BUILD_ID", "build-manifest.json"], "/proj/.next");
     expect(msg).toContain("static export");
     expect(msg).toContain("/proj/.next");
   });

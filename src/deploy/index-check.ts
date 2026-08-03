@@ -31,12 +31,7 @@ export function looksLikeFrameworkBuild(files: readonly string[]): boolean {
   return hasBuildId && hasBuildManifest;
 }
 
-export function missingRootIndexMessage(
-  files: readonly string[],
-  outputDir: string,
-): string {
+export function missingRootIndexMessage(files: readonly string[], outputDir: string): string {
   const base = `No index.html at the deploy root (${outputDir}); the site cannot be served at /.`;
-  return looksLikeFrameworkBuild(files)
-    ? `${base}\n\n${STATIC_EXPORT_HINT}`
-    : base;
+  return looksLikeFrameworkBuild(files) ? `${base}\n\n${STATIC_EXPORT_HINT}` : base;
 }

@@ -9,23 +9,14 @@ import {
   PartialUploadError,
   StorageError,
 } from "../errors.js";
-import {
-  getGitState as defaultGetGitState,
-  type GitState,
-} from "../deploy/git.js";
-import {
-  hasRootIndex,
-  missingRootIndexMessage,
-} from "../deploy/index-check.js";
+import { getGitState as defaultGetGitState, type GitState } from "../deploy/git.js";
+import { hasRootIndex, missingRootIndexMessage } from "../deploy/index-check.js";
 import { walkFiles as defaultWalkFiles } from "../deploy/walk.js";
 import { runBuild as defaultRunBuild } from "../lib/build.js";
 import { DEFAULT_PROXY_URL } from "../lib/constants.js";
 import { resolveIdentity as defaultResolveIdentity } from "../lib/identity.js";
 import { createIgnoreFilter } from "../lib/ignore.js";
-import {
-  parsePlatformYaml,
-  type PlatformYamlV2,
-} from "../lib/platform-yaml.js";
+import { parsePlatformYaml, type PlatformYamlV2 } from "../lib/platform-yaml.js";
 import { suggest } from "../lib/similarity.js";
 import {
   createProxyClient as defaultCreateProxyClient,
@@ -88,13 +79,8 @@ async function readAndParseConfig(
   try {
     raw = await read(cwd);
   } catch (err) {
-    if (
-      err instanceof Error &&
-      (err as NodeJS.ErrnoException).code === "ENOENT"
-    ) {
-      throw new ConfigError(
-        `platform.yaml not found in ${cwd}. See docs/platform-yaml.md.`,
-      );
+    if (err instanceof Error && (err as NodeJS.ErrnoException).code === "ENOENT") {
+      throw new ConfigError(`platform.yaml not found in ${cwd}. See docs/platform-yaml.md.`);
     }
     throw err;
   }
@@ -119,11 +105,7 @@ function deployIdSha(deployId: string): string | null {
  */
 function rethrowProxy(prefix: string, err: unknown): never {
   if (err instanceof ProxyError) {
-    throw new ProxyError(
-      err.status,
-      err.code,
-      `${prefix} (${err.code}): ${err.message}`,
-    );
+    throw new ProxyError(err.status, err.code, `${prefix} (${err.code}): ${err.message}`);
   }
   if (err instanceof Error) throw new StorageError(`${prefix}: ${err.message}`);
   throw new StorageError(`${prefix}: ${String(err)}`);
@@ -210,10 +192,7 @@ function formatUnauthorizedSiteError(a: {
   return lines.join("\n");
 }
 
-export async function deploy(
-  options: DeployOptions,
-  deps: DeployDeps = {},
-): Promise<void> {
+export async function deploy(options: DeployOptions, deps: DeployDeps = {}): Promise<void> {
   const cwd = deps.cwd ?? process.cwd();
   const env = deps.env ?? process.env;
   const readYaml = deps.readPlatformYaml ?? defaultReadPlatformYaml;
@@ -271,9 +250,7 @@ export async function deploy(
 
     const git = gitState();
     if (git.dirty && !options.json) {
-      warn(
-        "git working tree is dirty — uncommitted changes will not be reflected.",
-      );
+      warn("git working tree is dirty — uncommitted changes will not be reflected.");
     }
     const sha = git.hash ?? syntheticSha();
 
@@ -346,9 +323,7 @@ export async function deploy(
     }
     const fileList = filtered.map((f) => f.relPath);
     if (!hasRootIndex(fileList)) {
-      throw new StorageError(
-        missingRootIndexMessage(fileList, resolvedOutputDir),
-      );
+      throw new StorageError(missingRootIndexMessage(fileList, resolvedOutputDir));
     }
 
     let initResult;
@@ -374,8 +349,7 @@ export async function deploy(
       jwt: initResult.jwt,
       files: filtered,
       onProgress: spin
-        ? (p) =>
-            spin.message(`Uploading ${p.uploaded}/${p.total} — ${p.current}`)
+        ? (p) => spin.message(`Uploading ${p.uploaded}/${p.total} — ${p.current}`)
         : undefined,
     });
     if (uploadResult.errors.length > 0) {
@@ -386,9 +360,7 @@ export async function deploy(
     }
     spin?.stop(`Uploaded ${uploadResult.fileCount} files`);
 
-    const mode: "preview" | "production" = options.promote
-      ? "production"
-      : "preview";
+    const mode: "preview" | "production" = options.promote ? "production" : "preview";
     let finalizeResult;
     try {
       finalizeResult = await client.deployFinalize({
@@ -425,10 +397,7 @@ export async function deploy(
         // the next `universe` call may fail with no obvious context
         // unless the operator sees this now. Transient network errors
         // (timeouts, DNS hiccups) stay swallowed.
-        if (
-          err instanceof ProxyError &&
-          (err.status === 401 || err.status === 403)
-        ) {
+        if (err instanceof ProxyError && (err.status === 401 || err.status === 403)) {
           warn(
             `Preview alias probe got ${err.status} (${err.code}) — token may need rotation: ${err.message}`,
           );
