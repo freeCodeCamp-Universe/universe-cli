@@ -19,7 +19,8 @@
     "url": "git+https://github.com/freeCodeCamp-Universe/universe-cli.git"
   },
   "bin": {
-    "universe": "dist/index.cjs"
+    "universe": "dist/index.cjs",
+    "create-constellation-app": "bin/create-constellation-app.mjs"
   },
   "files": [
     "dist/",
