@@ -739,7 +739,7 @@ describe("create", () => {
     });
   });
 
-  it("warns when Docker daemon is unavailable after scaffolding", async () => {
+  it("warns when Docker daemon is unavailable during scaffolding", async () => {
     const { isDockerAvailable } = await import("../../../src/commands/create/docker-check.js");
     vi.mocked(isDockerAvailable).mockReturnValue(false);
 
@@ -748,7 +748,7 @@ describe("create", () => {
 
     expect(deps.exit).not.toHaveBeenCalled();
     expect(deps.logger.warn).toHaveBeenCalledWith(
-      expect.stringContaining("docker daemon unavailable"),
+      expect.stringContaining("docker is the preferred"),
     );
 
     vi.mocked(isDockerAvailable).mockReturnValue(true);
