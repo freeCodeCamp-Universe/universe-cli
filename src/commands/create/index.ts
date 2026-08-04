@@ -122,19 +122,29 @@ export const create = async (options: CreateOptions, deps: CreateDeps = {}): Pro
     return latestCompatible;
   }
 
-  async function findTemplateDir(envVersion?: string) {
+  async function findTemplateConfig(envVersion?: string, envDir?: string) {
+    // if envDir is specified, we don't need the version (since the version is used to get the data and we have the data)
+    if (envDir && envDir.length > 0)
+      return {
+        templateDir: envDir,
+        templateVersion: null,
+      };
+
     const version =
       envVersion && envVersion.length > 0
         ? envVersion
         : await findTemplateVersion(templateVersionRange);
-    return await ensureTemplateDir(version, { forceFetch: options.forceFetch });
+    return {
+      templateDir: await ensureTemplateDir(version, { forceFetch: options.forceFetch }),
+      templateVersion: version,
+    };
   }
 
   try {
     const envDir = process.env["UNIVERSE_TEMPLATES_DIR"];
     const envVersion = process.env["UNIVERSE_TEMPLATES_VERSION"];
 
-    const templateDir = envDir && envDir.length > 0 ? envDir : await findTemplateDir(envVersion);
+    const { templateDir, templateVersion } = await findTemplateConfig(envVersion, envDir);
 
     const loadLayersFn = deps.loadLayersFn ?? loadFromDir;
     const { labels, registry } = await loadLayersFn(templateDir);
@@ -182,6 +192,10 @@ export const create = async (options: CreateOptions, deps: CreateDeps = {}): Pro
         summaryLines.push(
           `- Platform services: ${promptResult.platformServices.map((s) => getLabel(labels, "service", s)).join(", ")}`,
         );
+      }
+
+      if (templateVersion) {
+        summaryLines.push(`- Templates version: ${templateVersion}`);
       }
 
       logger.info(summaryLines.join("\n"));
@@ -316,6 +330,7 @@ export const create = async (options: CreateOptions, deps: CreateDeps = {}): Pro
           databases: validatedInput.databases,
           platformServices: validatedInput.platformServices,
           packageManager: validatedInput.packageManager ?? null,
+          templateVersion,
         }),
       );
       return;
