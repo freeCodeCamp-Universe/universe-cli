@@ -36,11 +36,16 @@ vi.mock("../../../src/lib/template-version-check.js", async (importOriginal) => 
   return { ...actual, resolveTemplateVersions: vi.fn() };
 });
 
-vi.mock("../../../src/commands/create/layer-composition/template-fetcher.js", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("../../../src/commands/create/layer-composition/template-fetcher.js")>();
-  return { ...actual, ensureTemplateDir: vi.fn() };
-});
+vi.mock(
+  "../../../src/commands/create/layer-composition/template-fetcher.js",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("../../../src/commands/create/layer-composition/template-fetcher.js")
+      >();
+    return { ...actual, ensureTemplateDir: vi.fn() };
+  },
+);
 
 const FIXTURES_DIR = resolve("tests/fixtures/templates");
 const runtimeData = RuntimeSchema.parse(runtimeFixture);

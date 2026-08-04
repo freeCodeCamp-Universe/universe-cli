@@ -48,12 +48,10 @@ describe(LayerCompositionService, () => {
   });
 
   it("derives devInstall from manifests and lockfile for bun", () => {
-    const result = service.resolveLayers(
-      {
-        ...nodeExpressSelection,
-        packageManager: "bun",
-      },
-    );
+    const result = service.resolveLayers({
+      ...nodeExpressSelection,
+      packageManager: "bun",
+    });
     expect(result.files["Dockerfile"]).toContain("COPY package.json bun.lockb ./");
     expect(result.files["Dockerfile"]).toContain("RUN bun install");
   });
@@ -67,12 +65,10 @@ describe(LayerCompositionService, () => {
   });
 
   it("emits a Dockerfile for node + typescript + pnpm", () => {
-    const result = service.resolveLayers(
-      {
-        ...nodeExpressSelection,
-        framework: "typescript",
-      },
-    );
+    const result = service.resolveLayers({
+      ...nodeExpressSelection,
+      framework: "typescript",
+    });
 
     expect(result.files["Dockerfile"]).toBeDefined();
     expect(result.files["Dockerfile"]).toContain("FROM node:24-slim AS base");
@@ -80,12 +76,10 @@ describe(LayerCompositionService, () => {
   });
 
   it("emits a compose.yaml for node + typescript + pnpm", () => {
-    const result = service.resolveLayers(
-      {
-        ...nodeExpressSelection,
-        framework: "typescript",
-      },
-    );
+    const result = service.resolveLayers({
+      ...nodeExpressSelection,
+      framework: "typescript",
+    });
 
     expect(result.files["compose.yaml"]).toBeDefined();
     expect(result.files["compose.yaml"]).toContain("3000:3000");
@@ -105,22 +99,18 @@ describe(LayerCompositionService, () => {
   });
 
   it("pins bun version in Dockerfile pmInstall", () => {
-    const result = service.resolveLayers(
-      {
-        ...nodeExpressSelection,
-        packageManager: "bun",
-      },
-    );
+    const result = service.resolveLayers({
+      ...nodeExpressSelection,
+      packageManager: "bun",
+    });
     expect(result.files["Dockerfile"]).toContain("RUN npm i -g bun@1.0.0");
   });
 
   it("does not add packageManager field to package.json for bun", () => {
-    const result = service.resolveLayers(
-      {
-        ...nodeExpressSelection,
-        packageManager: "bun",
-      },
-    );
+    const result = service.resolveLayers({
+      ...nodeExpressSelection,
+      packageManager: "bun",
+    });
     const pkg = JSON.parse(result.files["package.json"]!) as Record<string, unknown>;
     expect(pkg["packageManager"]).toBeUndefined();
   });
