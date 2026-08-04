@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.0](https://github.com/freeCodeCamp-Universe/universe-cli/compare/universe-cli-v0.15.1...universe-cli-v0.16.0) (2026-08-04)
+
+
+### Features
+
+* add bsd-3-clause license to new projects ([#56](https://github.com/freeCodeCamp-Universe/universe-cli/issues/56)) ([6f18333](https://github.com/freeCodeCamp-Universe/universe-cli/commit/6f1833365a6d9031e4209fda744640586bb06b60))
+* add create-constellation-app alias for universe create ([#60](https://github.com/freeCodeCamp-Universe/universe-cli/issues/60)) ([cb9c5ac](https://github.com/freeCodeCamp-Universe/universe-cli/commit/cb9c5ac8d37883686122c4818b34609f902ad58e))
+* customize devcontainer.json during 'create' ([#59](https://github.com/freeCodeCamp-Universe/universe-cli/issues/59)) ([9e8e6f1](https://github.com/freeCodeCamp-Universe/universe-cli/commit/9e8e6f13561237f5d0c411d37141f69864b85f78))
+* show template version on create ([#57](https://github.com/freeCodeCamp-Universe/universe-cli/issues/57)) ([18de5ba](https://github.com/freeCodeCamp-Universe/universe-cli/commit/18de5badc6ed376c67989609dc1486f0996b1709))
+
 ## [0.15.1](https://github.com/freeCodeCamp-Universe/universe-cli/compare/universe-cli-v0.15.0...universe-cli-v0.15.1) (2026-07-29)
 
 
