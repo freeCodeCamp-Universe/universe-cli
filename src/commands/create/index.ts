@@ -39,8 +39,8 @@ import type {
 import { getLabel } from "./layer-composition/labels.js";
 import { clackLogger, silentLogger, type Logger } from "../../output/logger.js";
 import { clackSpinner, silentSpinner, type Spinner } from "../../output/spinner.js";
-import { EXIT_USAGE, exitWithCode } from "../../output/exit-codes.js";
-import { CliError, UsageError } from "../../errors.js";
+import { exitWithCode } from "../../output/exit-codes.js";
+import { UsageError } from "../../errors.js";
 import { buildEnvelope } from "../../output/envelope.js";
 import { emitJson, outputError } from "../../output/format.js";
 import { LocalProjectWriter } from "./io/local-project-writer.js";
@@ -342,11 +342,6 @@ export const create = async (options: CreateOptions, deps: CreateDeps = {}): Pro
     }
   } catch (err) {
     spinner.error("Create failed");
-    const code = err instanceof CliError ? err.exitCode : EXIT_USAGE;
-    const message = err instanceof Error ? err.message : String(err);
-    outputError({ json: options.json, command: "create" }, code, message, {
-      logError: logger.error,
-    });
-    exit(code);
+    exit(outputError({ json: options.json, command: "create" }, err, { logError: logger.error }));
   }
 };

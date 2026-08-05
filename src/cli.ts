@@ -19,9 +19,8 @@ import { reject as repoReject } from "./commands/repo/reject.js";
 import { rm as repoRm } from "./commands/repo/rm.js";
 import { status as repoStatus } from "./commands/repo/status.js";
 import { ls as auditLs } from "./commands/audit/ls.js";
-import { type OutputContext, outputError } from "./output/format.js";
+import { outputError } from "./output/format.js";
 import { EXIT_USAGE, exitWithCode } from "./output/exit-codes.js";
-import { CliError } from "./errors.js";
 import { installExitNotice, refreshIfStale, spawnRefresh } from "./lib/update-notifier.js";
 
 import pkg from '../package.json' with { type: 'json' }
@@ -29,11 +28,7 @@ import pkg from '../package.json' with { type: 'json' }
 const version = pkg.version
 
 function handleActionError(command: string, json: boolean, err: unknown): void {
-  const ctx: OutputContext = { json, command };
-  const message = err instanceof Error ? err.message : "unknown error";
-  const code = err instanceof CliError ? err.exitCode : EXIT_USAGE;
-  outputError(ctx, code, message);
-  exitWithCode(code);
+  exitWithCode(outputError({ json, command }, err));
 }
 
 export function isVersionRequest(args: readonly string[]): boolean {
