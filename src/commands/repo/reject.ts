@@ -1,6 +1,5 @@
 import { log } from "@clack/prompts";
 import { ConfirmError } from "../../errors.js";
-import { wrapProxyError } from "../../lib/proxy-client.js";
 import { buildEnvelope } from "../../output/envelope.js";
 import { exitWithCode } from "../../output/exit-codes.js";
 import { emitJson, outputError } from "../../output/format.js";
@@ -77,13 +76,9 @@ export async function reject(
       );
     }
   } catch (err) {
-    const { code, message, kind, requestId } = wrapProxyError(command, err);
-    outputError({ json: options.json, command }, code, message, {
+    exit(outputError({ json: options.json, command }, err, {
       logError: error,
-      kind,
-      requestId,
       extras: identitySource ? { identitySource } : undefined,
-    });
-    exit(code);
+    }));
   }
 }

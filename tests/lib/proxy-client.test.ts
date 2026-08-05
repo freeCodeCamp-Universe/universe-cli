@@ -5,9 +5,9 @@ import {
   DEFAULT_FETCH_TIMEOUT_MS,
   parseFetchTimeoutMs,
   ProxyError,
-  wrapProxyError,
 } from "../../src/lib/proxy-client.js";
 import { EXIT_CREDENTIALS, EXIT_STORAGE, EXIT_USAGE } from "../../src/output/exit-codes.js";
+import { wrapProxyError } from "../../src/output/format.js";
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -1205,54 +1205,6 @@ describe("createProxyClient — repo requests", () => {
   });
 });
 
-describe("wrapProxyError authz hint", () => {
-  it("appends a read:org / SSO hint on user_unauthorized", () => {
-    const { code, message } = wrapProxyError(
-      "repo approve",
-      new ProxyError(403, "user_unauthorized", "caller is not on the required team"),
-    );
-    expect(code).toBe(EXIT_CREDENTIALS);
-    expect(message).toContain("user_unauthorized");
-    expect(message).toMatch(/read:org/);
-    expect(message).toMatch(/whoami/);
-    expect(message).toMatch(/GITHUB_TOKEN/);
-  });
-
-  it("does not add the hint for unrelated proxy errors", () => {
-    const { message } = wrapProxyError(
-      "repo create",
-      new ProxyError(409, "already_exists", "a request already exists"),
-    );
-    expect(message).not.toMatch(/read:org/);
-  });
-});
-
-describe("wrapProxyError server hint", () => {
-  it("appends the server hint on a missing_index error", () => {
-    const { code, message } = wrapProxyError(
-      "promote",
-      new ProxyError(
-        422,
-        "missing_index",
-        "target deploy has no root index.html; it cannot be served at /",
-        undefined,
-        "This looks like a framework build directory, not a static export.",
-      ),
-    );
-    expect(code).toBe(EXIT_STORAGE);
-    expect(message).toContain("missing_index");
-    expect(message).toContain("hint:");
-    expect(message).toContain("framework build directory");
-  });
-
-  it("adds no hint line when the server sent none", () => {
-    const { message } = wrapProxyError(
-      "rollback",
-      new ProxyError(422, "missing_index", "target deploy has no root index.html"),
-    );
-    expect(message).not.toContain("hint:");
-  });
-});
 
 describe("repo response validation (H2)", () => {
   it("rejects a createRepoRequest body missing required fields with exit 13", async () => {

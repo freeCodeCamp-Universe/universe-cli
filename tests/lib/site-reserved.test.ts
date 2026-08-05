@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { AliasDriftError, SiteReservedError, wrapProxyError } from "../../src/lib/proxy-client.js";
+import { AliasDriftError, SiteReservedError, ProxyError } from "../../src/lib/proxy-client.js";
+import { wrapProxyError } from '../../src/output/format.js'
 
 describe("409 site_reserved", () => {
   it("does not read as a credentials failure and names the recovery verb", () => {
@@ -29,8 +30,7 @@ describe("SiteReservedError request id", () => {
 
 describe("410 site_gone", () => {
   it("stays in the usage bucket and explains itself, since the server sends no message", async () => {
-    const { ProxyError, wrapProxyError: wrap } = await import("../../src/lib/proxy-client.js");
-    const { code, message } = wrap("sites promote", new ProxyError(410, "site_gone", ""));
+    const { code, message } = wrapProxyError("sites promote", new ProxyError(410, "site_gone", ""));
     expect(code).toBe(10);
     expect(message).toMatch(/no longer registered/i);
   });
