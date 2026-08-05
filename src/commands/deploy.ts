@@ -22,7 +22,6 @@ import {
   createProxyClient as defaultCreateProxyClient,
   parseFetchTimeoutMs,
   ProxyError,
-  wrapProxyError,
   type ProxyClient,
   type ProxyClientConfig,
 } from "../lib/proxy-client.js";
@@ -100,7 +99,7 @@ function deployIdSha(deployId: string): string | null {
 /**
  * Re-throws a proxy error with a prefixed message but preserves the
  * original status, code, requestId, and hint so the outer catch can
- * delegate to `wrapProxyError` for consistent formatting.
+ * delegate to `outputError` for consistent formatting.
  */
 function rethrowProxy(prefix: string, err: unknown): never {
   if (err instanceof ProxyError) {
@@ -473,10 +472,6 @@ export async function deploy(options: DeployOptions, deps: DeployDeps = {}): Pro
       );
     }
   } catch (err) {
-    const { code, message } = wrapProxyError("deploy", err);
-    outputError({ json: options.json, command: "deploy" }, code, message, {
-      logError: error,
-    });
-    exit(code);
+    exit(outputError({ json: options.json, command: "deploy" }, err, { logError: error }));
   }
 }

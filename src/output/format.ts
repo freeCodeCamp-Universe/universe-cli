@@ -1,5 +1,8 @@
 import { log } from "@clack/prompts";
+import { CliError } from "../errors.js";
+import { ProxyError } from "../lib/proxy-client.js";
 import { buildEnvelope, buildErrorEnvelope } from "./envelope.js";
+import { EXIT_USAGE } from "./exit-codes.js";
 import { redact, redactObject } from "./redact.js";
 
 export type OutputContext = {
@@ -53,7 +56,37 @@ export function outputError(
   code: number,
   message: string,
   optsOrIssues?: OutputErrorOptions | string[],
-): void {
+): number;
+export function outputError(
+  ctx: OutputContext,
+  err: unknown,
+  opts?: OutputErrorOptions,
+): number;
+export function outputError(
+  ctx: OutputContext,
+  codeOrErr: number | unknown,
+  messageOrOpts?: string | OutputErrorOptions | string[],
+  maybeOpts?: OutputErrorOptions | string[],
+): number {
+  // A raw number as `err` would match this branch — callers must pass Error objects.
+  if (typeof codeOrErr === "number") {
+    return renderError(ctx, codeOrErr, messageOrOpts as string, maybeOpts);
+  }
+  const { code, message, kind, requestId } = wrapProxyError(ctx.command, codeOrErr);
+  const opts = (messageOrOpts ?? {}) as OutputErrorOptions;
+  return renderError(ctx, code, message, {
+    ...opts,
+    kind: opts.kind ?? kind,
+    requestId: opts.requestId ?? requestId,
+  });
+}
+
+function renderError(
+  ctx: OutputContext,
+  code: number,
+  message: string,
+  optsOrIssues?: OutputErrorOptions | string[],
+): number {
   const opts: OutputErrorOptions = Array.isArray(optsOrIssues)
     ? { issues: optsOrIssues }
     : (optsOrIssues ?? {});
@@ -79,4 +112,43 @@ export function outputError(
   } else {
     (opts.logError ?? ((m: string) => log.error(m, { output: process.stderr })))(redactedMessage);
   }
+  return code;
+}
+
+/**
+ * Format a proxy or generic error into a normalized envelope.
+ *
+ *   ProxyError → `<cmd> failed (<code>): <message>` + hint
+ *   CliError   → preserve message verbatim
+ *   Error      → preserve message verbatim
+ *   other      → String(err)
+ */
+function wrapProxyError(
+  command: string,
+  err: unknown,
+): { code: number; message: string; kind?: string; requestId?: string } {
+  if (err instanceof ProxyError) {
+    let message = `${command} failed (${err.code}): ${err.message}`;
+    if (err.code === "user_unauthorized") {
+      message +=
+        "\n  hint: the active GitHub token may lack the read:org scope or SSO authorization for the org. " +
+        "$GITHUB_TOKEN / $GH_TOKEN override `gh auth token` — run `universe whoami` to check the active identity source, " +
+        "then unset them or re-authorize the token (Configure SSO).";
+    } else if (err.hint) {
+      message += `\n  hint: ${err.hint}`;
+    }
+    return {
+      code: err.exitCode,
+      message,
+      kind: err.code,
+      requestId: err.requestId,
+    };
+  }
+  if (err instanceof CliError) {
+    return { code: err.exitCode, message: err.message };
+  }
+  if (err instanceof Error) {
+    return { code: EXIT_USAGE, message: err.message };
+  }
+  return { code: EXIT_USAGE, message: String(err) };
 }
