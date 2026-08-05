@@ -5,8 +5,8 @@ import { parseError } from '../../src/output/format.js'
 describe("409 site_reserved", () => {
   it("does not read as a credentials failure and names the recovery verb", () => {
     const err = new SiteReservedError("site is reserved", "2026-08-31T09:00:00Z");
-    const { code, message } = parseError("sites register", err);
-    expect(code).toBe(10);
+    const { exitCode, message } = parseError("sites register", err);
+    expect(exitCode).toBe(10);
     expect(message).toMatch(/held by a delete/i);
     expect(message).toContain("2026-08-31T09:00:00Z");
     expect(message).toMatch(/undelete/);
@@ -30,8 +30,8 @@ describe("SiteReservedError request id", () => {
 
 describe("410 site_gone", () => {
   it("stays in the usage bucket and explains itself, since the server sends no message", async () => {
-    const { code, message } = parseError("sites promote", new ProxyError(410, "site_gone", ""));
-    expect(code).toBe(10);
+    const { exitCode, message } = parseError("sites promote", new ProxyError(410, "site_gone", ""));
+    expect(exitCode).toBe(10);
     expect(message).toMatch(/no longer registered/i);
   });
 });
