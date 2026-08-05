@@ -7,7 +7,7 @@ import {
   ProxyError,
 } from "../../src/lib/proxy-client.js";
 import { EXIT_CREDENTIALS, EXIT_STORAGE, EXIT_USAGE } from "../../src/output/exit-codes.js";
-import { wrapProxyError } from "../../src/output/format.js";
+import { parseError } from "../../src/output/format.js";
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -486,7 +486,7 @@ describe("createProxyClient", () => {
       expect(err.current).toBe("actual-id");
       expect(err.requestId).toBe("req-drift-1");
       expect(err.hint).toBe("re-read the alias");
-      expect(wrapProxyError("static promote", err).requestId).toBe("req-drift-1");
+      expect(parseError("static promote", err).requestId).toBe("req-drift-1");
     });
   });
 
