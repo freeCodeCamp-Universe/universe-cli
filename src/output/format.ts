@@ -53,7 +53,7 @@ export function outputSuccess(
 
 export function outputError(
   ctx: OutputContext,
-  code: number,
+  exitCode: number,
   message: string,
   optsOrIssues?: OutputErrorOptions | string[],
 ): number;
@@ -64,17 +64,17 @@ export function outputError(
 ): number;
 export function outputError(
   ctx: OutputContext,
-  codeOrErr: number | unknown,
+  exitCodeOrErr: number | unknown,
   messageOrOpts?: string | OutputErrorOptions | string[],
   maybeOpts?: OutputErrorOptions | string[],
 ): number {
   // A raw number as `err` would match this branch — callers must pass Error objects.
-  if (typeof codeOrErr === "number") {
-    return renderError(ctx, codeOrErr, messageOrOpts as string, maybeOpts);
+  if (typeof exitCodeOrErr === "number") {
+    return renderError(ctx, exitCodeOrErr, messageOrOpts as string, maybeOpts);
   }
-  const { code, message, kind, requestId } = parseError(ctx.command, codeOrErr);
+  const { exitCode, message, kind, requestId } = parseError(ctx.command, exitCodeOrErr);
   const opts = (messageOrOpts ?? {}) as OutputErrorOptions;
-  return renderError(ctx, code, message, {
+  return renderError(ctx, exitCode, message, {
     ...opts,
     kind: opts.kind ?? kind,
     requestId: opts.requestId ?? requestId,
@@ -83,7 +83,7 @@ export function outputError(
 
 function renderError(
   ctx: OutputContext,
-  code: number,
+  exitCode: number,
   message: string,
   optsOrIssues?: OutputErrorOptions | string[],
 ): number {
@@ -96,7 +96,7 @@ function renderError(
   if (ctx.json) {
     const envelope = buildErrorEnvelope(
       ctx.command,
-      code,
+      exitCode,
       redactedMessage,
       redactedIssues,
       opts.kind,
@@ -112,7 +112,7 @@ function renderError(
   } else {
     (opts.logError ?? ((m: string) => log.error(m, { output: process.stderr })))(redactedMessage);
   }
-  return code;
+  return exitCode;
 }
 
 /**
@@ -126,7 +126,7 @@ function renderError(
 function parseError(
   command: string,
   err: unknown,
-): { code: number; message: string; kind?: string; requestId?: string } {
+): { exitCode: number; message: string; kind?: string; requestId?: string } {
   if (err instanceof ProxyError) {
     let message = `${command} failed (${err.code}): ${err.message}`;
     if (err.code === "user_unauthorized") {
@@ -138,17 +138,17 @@ function parseError(
       message += `\n  hint: ${err.hint}`;
     }
     return {
-      code: err.exitCode,
+      exitCode: err.exitCode,
       message,
       kind: err.code,
       requestId: err.requestId,
     };
   }
   if (err instanceof CliError) {
-    return { code: err.exitCode, message: err.message };
+    return { exitCode: err.exitCode, message: err.message };
   }
   if (err instanceof Error) {
-    return { code: EXIT_USAGE, message: err.message };
+    return { exitCode: EXIT_USAGE, message: err.message };
   }
-  return { code: EXIT_USAGE, message: String(err) };
+  return { exitCode: EXIT_USAGE, message: String(err) };
 }
