@@ -15,12 +15,16 @@ interface FileOwner {
 
 const CONFIG_EXTENSIONS = new Set([".json", ".yaml", ".yml"]);
 const CONCAT_FILENAMES = new Set([".dockerignore", ".gitignore"]);
+const OVERWRITABLE_FILENAMES = new Set(["README.md"]);
 
 const isConfigFile = (filePath: string): boolean =>
   [...CONFIG_EXTENSIONS].some((ext) => filePath.endsWith(ext));
 
 const isConcatFile = (filePath: string): boolean =>
   CONCAT_FILENAMES.has(filePath.split("/").at(-1) ?? filePath);
+
+const isOverwritable = (filePath: string): boolean =>
+  OVERWRITABLE_FILENAMES.has(filePath.split("/").at(-1) ?? filePath);
 
 const isMergeableFile = (filePath: string): boolean =>
   isConfigFile(filePath) || isConcatFile(filePath);
@@ -107,6 +111,9 @@ const composeLayerFiles = (
         throw new UsageError(
           `conflict detected in the ${layer.layerType} layers between "${currentOwner.layerName}" and "${layer.name}"`,
         );
+      } else if (isOverwritable(filePath)) {
+        composedFiles[filePath] = content;
+        owners.set(filePath, { layerName: layer.name, layerType: layer.layerType });
       } else if (isMergeableFile(filePath)) {
         composedFiles[filePath] = mergeFiles(filePath, composedFiles[filePath]!, content);
         owners.set(filePath, { layerName: layer.name, layerType: layer.layerType });

@@ -7,8 +7,8 @@ describe(composeLayerFiles, () => {
   describe("conflict detection", () => {
     it("throws UsageError for a cross-stage non-config file collision", () => {
       const layers: ResolvedLayer[] = [
-        { files: { "README.md": "# Hello\n" }, layerType: "always", name: "always" },
-        { files: { "README.md": "# Node\n" }, layerType: "runtime", name: "runtime/node" },
+        { files: { "setup.sh": "#!/bin/sh\n" }, layerType: "always", name: "always" },
+        { files: { "setup.sh": "#!/bin/bash\n" }, layerType: "runtime", name: "runtime/node" },
       ];
 
       expect(() => composeLayerFiles(layers)).toThrow(UsageError);
@@ -32,6 +32,43 @@ describe(composeLayerFiles, () => {
       expect(() => composeLayerFiles(layers)).toThrow(
         'conflict detected in the services layers between "services/auth" and "services/email"',
       );
+    });
+  });
+
+  describe("overwriting", () => {
+    it("later layer replaces README.md from earlier layer", () => {
+      const layers: ResolvedLayer[] = [
+        { files: { "README.md": "# Hello\n" }, layerType: "always", name: "always" },
+        { files: { "README.md": "# Node\n" }, layerType: "runtime", name: "runtime/node" },
+      ];
+
+      expect(composeLayerFiles(layers)["README.md"]).toBe("# Node\n");
+    });
+
+    it("README.md in nested path is also overwritable", () => {
+      const layers: ResolvedLayer[] = [
+        { files: { "docs/README.md": "# Base docs\n" }, layerType: "always", name: "always" },
+        { files: { "docs/README.md": "# Node docs\n" }, layerType: "runtime", name: "runtime/node" },
+      ];
+
+      expect(composeLayerFiles(layers)["docs/README.md"]).toBe("# Node docs\n");
+    });
+
+    it("same-stage README.md collision still throws", () => {
+      const layers: ResolvedLayer[] = [
+        {
+          files: { "README.md": "# Auth\n" },
+          layerType: "services",
+          name: "services/auth",
+        },
+        {
+          files: { "README.md": "# Email\n" },
+          layerType: "services",
+          name: "services/email",
+        },
+      ];
+
+      expect(() => composeLayerFiles(layers)).toThrow(UsageError);
     });
   });
 
