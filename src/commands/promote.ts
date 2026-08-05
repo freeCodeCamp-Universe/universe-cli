@@ -9,7 +9,6 @@ import {
   AliasDriftError,
   createProxyClient as defaultCreateProxyClient,
   parseFetchTimeoutMs,
-  wrapProxyError,
   type ProxyClient,
   type ProxyClientConfig,
 } from "../lib/proxy-client.js";
@@ -192,14 +191,7 @@ export async function promote(options: PromoteOptions, deps: PromoteDeps = {}): 
       success(lines.join("\n"));
     }
   } catch (err) {
-    const { code, message } = wrapProxyError("promote", err);
-    // V3 additive: top-level `current` so scripted callers can branch +
-    // supply a fresh expectedCurrent on next attempt.
     const extras = err instanceof AliasDriftError ? { current: err.current } : undefined;
-    outputError({ json: options.json, command: "promote" }, code, message, {
-      logError: error,
-      extras,
-    });
-    exit(code);
+    exit(outputError({ json: options.json, command: "promote" }, err, { logError: error, extras }));
   }
 }
