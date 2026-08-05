@@ -3,7 +3,6 @@ import { resolveIdentity as defaultResolveIdentity } from "../lib/identity.js";
 import {
   createProxyClient as defaultCreateProxyClient,
   parseFetchTimeoutMs,
-  wrapProxyError,
   type ProxyClient,
   type ProxyClientConfig,
 } from "../lib/proxy-client.js";
@@ -79,10 +78,6 @@ export async function whoami(options: WhoAmIOptions, deps: WhoAmIDeps = {}): Pro
       );
     }
   } catch (err) {
-    const { code, message } = wrapProxyError("whoami", err);
-    outputError({ json: options.json, command: "whoami" }, code, message, {
-      logError: error,
-    });
-    exit(code);
+    exit(outputError({ json: options.json, command: "whoami" }, err, { logError: error }));
   }
 }
