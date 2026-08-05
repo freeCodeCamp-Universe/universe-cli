@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.0](https://github.com/freeCodeCamp-Universe/universe-cli/compare/universe-cli-v0.16.0...universe-cli-v0.17.0) (2026-08-05)
+
+
+### Features
+
+* overwrite README files in layer order ([#63](https://github.com/freeCodeCamp-Universe/universe-cli/issues/63)) ([5d3c83e](https://github.com/freeCodeCamp-Universe/universe-cli/commit/5d3c83e1cbfc0fcd14410ce2d30620020786300b))
+
 ## [0.16.0](https://github.com/freeCodeCamp-Universe/universe-cli/compare/universe-cli-v0.15.1...universe-cli-v0.16.0) (2026-08-04)
 
 
