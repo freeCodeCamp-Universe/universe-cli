@@ -305,53 +305,6 @@ function mapExitCode(status: number): number {
   return EXIT_USAGE;
 }
 
-/**
- * Format a proxy or generic error for the per-command catch path.
- * promote/rollback/ls share the same shape:
- *
- *   ProxyError → `<cmd> failed (<code>): <message>`
- *   CliError   → preserve message verbatim
- *   Error      → preserve message verbatim
- *   other      → String(err)
- *
- * Pure — returns `{code, message}` so the caller writes one
- * envelope/exit pair without re-implementing the dispatch.
- */
-export function wrapProxyError(
-  command: string,
-  err: unknown,
-): { code: number; message: string; kind?: string; requestId?: string } {
-  if (err instanceof ProxyError) {
-    let message = `${command} failed (${err.code}): ${err.message}`;
-    if (err.code === "user_unauthorized") {
-      // A team-membership probe denied the caller. The usual real cause
-      // is the active token, not actual non-membership: a token can read
-      // /user yet 404 on org membership when it lacks the read:org scope
-      // or SAML-SSO authorization. $GITHUB_TOKEN / $GH_TOKEN also shadow
-      // `gh auth token` in the identity chain, so a low-scope env token
-      // silently wins. Surface that so the failure is actionable.
-      message +=
-        "\n  hint: the active GitHub token may lack the read:org scope or SSO authorization for the org. " +
-        "$GITHUB_TOKEN / $GH_TOKEN override `gh auth token` — run `universe whoami` to check the active identity source, " +
-        "then unset them or re-authorize the token (Configure SSO).";
-    } else if (err.hint) {
-      message += `\n  hint: ${err.hint}`;
-    }
-    return {
-      code: err.exitCode,
-      message,
-      kind: err.code,
-      requestId: err.requestId,
-    };
-  }
-  if (err instanceof CliError) {
-    return { code: err.exitCode, message: err.message };
-  }
-  if (err instanceof Error) {
-    return { code: EXIT_USAGE, message: err.message };
-  }
-  return { code: EXIT_USAGE, message: String(err) };
-}
 
 interface ProxyErrorEnvelope {
   error?: {

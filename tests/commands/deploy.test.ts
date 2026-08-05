@@ -448,6 +448,22 @@ describe("deploy command (proxy plane)", () => {
       expect(deps.logError).toHaveBeenCalledWith(expect.stringContaining("no team"));
     });
 
+    it("surfaces user_unauthorized hint", async () => {
+      const proxy = mkProxy();
+      proxy.deployInit.mockRejectedValue(
+        new ProxyError(403, "user_unauthorized", "caller is not on the required team", "req-42", "check SSO"),
+      );
+      const deps = mkDeps({
+        createProxyClient: vi.fn().mockReturnValue(proxy),
+      });
+      await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
+      expect(deps.exit).toHaveBeenCalledWith(12);
+      const msg = (deps.logError.mock.calls[0]?.[0] as string) ?? "";
+      expect(msg).toContain("deploy failed (user_unauthorized)");
+      expect(msg).toContain("deploy init failed:");
+      expect(msg).toContain("read:org");
+    });
+
     it("propagates ProxyError from deployFinalize", async () => {
       const proxy = mkProxy();
       proxy.deployFinalize.mockRejectedValue(new ProxyError(422, "verify_failed", "missing"));
