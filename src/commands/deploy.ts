@@ -2,7 +2,6 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { log, spinner } from "@clack/prompts";
 import {
-  CliError,
   ConfigError,
   CredentialError,
   GitError,
@@ -22,12 +21,13 @@ import {
   createProxyClient as defaultCreateProxyClient,
   parseFetchTimeoutMs,
   ProxyError,
+  wrapProxyError,
   type ProxyClient,
   type ProxyClientConfig,
 } from "../lib/proxy-client.js";
 import { uploadFiles as defaultUploadFiles } from "../lib/upload.js";
 import { buildEnvelope } from "../output/envelope.js";
-import { EXIT_USAGE, exitWithCode } from "../output/exit-codes.js";
+import { exitWithCode } from "../output/exit-codes.js";
 import { emitJson, outputError } from "../output/format.js";
 
 export interface DeployOptions {
@@ -100,12 +100,18 @@ function deployIdSha(deployId: string): string | null {
 
 /**
  * Re-throws a proxy error with a prefixed message but preserves the
- * original status + code so the outer catch maps to the correct exit
- * code (401/403 → EXIT_CREDENTIALS, 422/5xx → EXIT_STORAGE).
+ * original status, code, requestId, and hint so the outer catch can
+ * delegate to `wrapProxyError` for consistent formatting.
  */
 function rethrowProxy(prefix: string, err: unknown): never {
   if (err instanceof ProxyError) {
-    throw new ProxyError(err.status, err.code, `${prefix} (${err.code}): ${err.message}`);
+    throw new ProxyError(
+      err.status,
+      err.code,
+      `${prefix}: ${err.message}`,
+      err.requestId,
+      err.hint,
+    );
   }
   if (err instanceof Error) throw new StorageError(`${prefix}: ${err.message}`);
   throw new StorageError(`${prefix}: ${String(err)}`);
@@ -439,21 +445,7 @@ export async function deploy(options: DeployOptions, deps: DeployDeps = {}): Pro
       );
     }
   } catch (err) {
-    let code: number;
-    let message: string;
-    if (err instanceof ProxyError) {
-      code = err.exitCode;
-      message = err.message;
-    } else if (err instanceof CliError) {
-      code = err.exitCode;
-      message = err.message;
-    } else if (err instanceof Error) {
-      code = EXIT_USAGE;
-      message = err.message;
-    } else {
-      code = EXIT_USAGE;
-      message = String(err);
-    }
+    const { code, message } = wrapProxyError("deploy", err);
     outputError({ json: options.json, command: "deploy" }, code, message, {
       logError: error,
     });
