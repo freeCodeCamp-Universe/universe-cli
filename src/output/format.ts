@@ -72,7 +72,7 @@ export function outputError(
   if (typeof codeOrErr === "number") {
     return renderError(ctx, codeOrErr, messageOrOpts as string, maybeOpts);
   }
-  const { code, message, kind, requestId } = wrapProxyError(ctx.command, codeOrErr);
+  const { code, message, kind, requestId } = parseError(ctx.command, codeOrErr);
   const opts = (messageOrOpts ?? {}) as OutputErrorOptions;
   return renderError(ctx, code, message, {
     ...opts,
@@ -123,7 +123,7 @@ function renderError(
  *   Error      → preserve message verbatim
  *   other      → String(err)
  */
-function wrapProxyError(
+function parseError(
   command: string,
   err: unknown,
 ): { code: number; message: string; kind?: string; requestId?: string } {
