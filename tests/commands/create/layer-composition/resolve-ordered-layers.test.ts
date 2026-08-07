@@ -8,26 +8,58 @@ import type { LayerRegistry } from "../../../../src/commands/create/layer-compos
 // ---------------------------------------------------------------------------
 
 const minimalRegistry: LayerRegistry = {
-  always: { always: { files: {} } },
+  always: { always: { files: {}, symlinks: {} } },
   frameworks: {
-    express: { devCopySource: "", files: {}, port: 3000, watchSync: [] },
-    "html-css-js": { devCopySource: "", files: {}, port: 3000, watchSync: [] },
-    typescript: { devCopySource: "", files: {}, port: 3000, watchSync: [] },
+    express: { devCopySource: "", files: {}, port: 3000, symlinks: {}, watchSync: [] },
+    "html-css-js": { devCopySource: "", files: {}, port: 3000, symlinks: {}, watchSync: [] },
+    typescript: { devCopySource: "", files: {}, port: 3000, symlinks: {}, watchSync: [] },
   },
   "package-managers": {
-    bun: { devCmd: [], files: {}, lockfile: "bun.lock", manifests: [], pmInstall: "" },
-    pnpm: { devCmd: [], files: {}, lockfile: "pnpm-lock.yaml", manifests: [], pmInstall: "" },
+    bun: {
+      devCmd: [],
+      files: {},
+      lockfile: "bun.lock",
+      manifests: [],
+      pmInstall: "",
+      pmVersion: "0.0.0",
+      symlinks: {},
+    },
+    pnpm: {
+      devCmd: [],
+      files: {},
+      lockfile: "pnpm-lock.yaml",
+      manifests: [],
+      pmInstall: "",
+      pmVersion: "0.0.0",
+      symlinks: {},
+    },
   },
   runtime: {
-    node: { baseImage: "", files: {} },
-    static_web: { baseImage: "", files: {} },
+    node: {
+      baseImage: "",
+      databases: [],
+      files: {},
+      frameworks: [],
+      packageManagers: [],
+      services: [],
+      symlinks: {},
+    },
+    static_web: {
+      baseImage: "",
+      databases: [],
+      files: {},
+      frameworks: [],
+      packageManagers: [],
+      services: [],
+      symlinks: {},
+    },
   },
   services: {
-    analytics: { files: {} },
-    auth: { files: {} },
-    email: { files: {} },
-    postgresql: { files: {} },
-    redis: { files: {} },
+    analytics: { files: {}, symlinks: {} },
+    auth: { files: {}, symlinks: {} },
+    email: { files: {}, symlinks: {} },
+    postgresql: { files: {}, symlinks: {} },
+    redis: { files: {}, symlinks: {} },
   },
 };
 

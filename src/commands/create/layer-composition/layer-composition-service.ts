@@ -10,20 +10,19 @@ import type { TemplateContext } from "./layer-template-renderer.js";
 import { getLabel } from "./labels.js";
 import { resolveOrderedLayers } from "./resolve-ordered-layers.js";
 import type {
+  FrameworkLayerData,
   LayerData,
   LayerRegistry,
   LayerType,
+  PackageManagerLayerData,
   ResolvedLayer,
 } from "./resolve-ordered-layers.js";
 import type { Labels } from "./schemas/labels.js";
-import type {
-  FrameworkLayerData,
-  PackageManagerLayerData,
-  RuntimeLayerData,
-} from "./schemas/layers.js";
+import type { RuntimeLayerData } from "./schemas/layers.js";
 interface ResolvedLayerSet {
   files: Record<string, string>;
   layers: ResolvedLayer[];
+  symlinks: Record<string, string>;
 }
 
 interface LayerComposer {
@@ -79,7 +78,7 @@ const resolveWithLayers = (
       ? layers["package-managers"][input.packageManager]
       : undefined;
 
-  const composedFiles = composeLayerFiles(resolvedLayers, pmData?.preinstall);
+  const { files: composedFiles, symlinks } = composeLayerFiles(resolvedLayers, pmData?.preinstall);
 
   const renderer = new LayerTemplateRenderer();
   const frameworkData = layers.frameworks?.[input.framework];
@@ -117,6 +116,7 @@ const resolveWithLayers = (
   return {
     files: renderedFiles,
     layers: resolvedLayers,
+    symlinks,
   };
 };
 

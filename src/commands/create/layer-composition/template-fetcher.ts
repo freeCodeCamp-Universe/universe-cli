@@ -20,7 +20,7 @@ const EXPECTED_LAYER_FILES = [
   "service.json",
 ] as const;
 
-const EXPECTED_ROOT_ENTRIES = ["labels.json", "layers"] as const;
+const EXPECTED_ROOT_ENTRIES = ["files", "labels.json", "layers"] as const;
 
 const validateEntries = (expected: readonly string[], actual: string[]): void => {
   const expectedSet = new Set<string>(expected);

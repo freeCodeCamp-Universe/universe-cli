@@ -1,5 +1,5 @@
 import { stringify as stringifyYaml } from "yaml";
-import type { FrameworkLayerData, PackageManagerLayerData } from "./schemas/layers.js";
+import type { FrameworkLayerData, PackageManagerLayerData } from "./resolve-ordered-layers.js";
 
 const buildComposeYaml = (
   framework: FrameworkLayerData,
