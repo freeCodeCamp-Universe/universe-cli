@@ -4,12 +4,13 @@ import { buildComposeYaml } from "../../../../src/commands/create/layer-composit
 import type {
   FrameworkLayerData,
   PackageManagerLayerData,
-} from "../../../../src/commands/create/layer-composition/schemas/layers.js";
+} from "../../../../src/commands/create/layer-composition/resolve-ordered-layers.js";
 
 const framework: FrameworkLayerData = {
   devCopySource: "COPY src/ ./src/",
   files: {},
   port: 3000,
+  symlinks: {},
   watchSync: [{ path: "./src", target: "/app/src" }],
 };
 
@@ -20,6 +21,7 @@ const packageManager: PackageManagerLayerData = {
   manifests: ["package.json"],
   pmInstall: "RUN corepack enable pnpm",
   pmVersion: "9.0.0",
+  symlinks: {},
 };
 
 const parseResult = (f: FrameworkLayerData, pm: PackageManagerLayerData) => {

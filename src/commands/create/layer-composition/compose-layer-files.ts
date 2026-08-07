@@ -91,22 +91,43 @@ const mergeFiles = (filePath: string, left: string, right: string): string =>
     ? left + (left.endsWith("\n") ? "" : "\n") + right
     : mergeConfigFiles(filePath, left, right);
 
+interface ComposedLayers {
+  files: Record<string, string>;
+  symlinks: Record<string, string>;
+}
+
 const composeLayerFiles = (
   layers: ResolvedLayer[],
   pmPreinstall?: string,
-): Record<string, string> => {
+): ComposedLayers => {
   const composedFiles: Record<string, string> = {};
+  const composedSymlinks: Record<string, string> = {};
   const owners = new Map<string, FileOwner>();
 
   for (const layer of layers) {
-    const fileEntries = Object.entries(layer.files);
+    for (const [filePath, target] of Object.entries(layer.symlinks)) {
+      const currentOwner = owners.get(filePath);
 
-    for (const [filePath, content] of fileEntries) {
+      if (currentOwner !== undefined) {
+        throw new UsageError(
+          `layer conflict on "${filePath}": "${currentOwner.layerName}" and "${layer.name}"`,
+        );
+      }
+
+      composedSymlinks[filePath] = target;
+      owners.set(filePath, { layerName: layer.name, layerType: layer.layerType });
+    }
+
+    for (const [filePath, content] of Object.entries(layer.files)) {
       const currentOwner = owners.get(filePath);
 
       if (currentOwner === undefined) {
         composedFiles[filePath] = content;
         owners.set(filePath, { layerName: layer.name, layerType: layer.layerType });
+      } else if (filePath in composedSymlinks) {
+        throw new UsageError(
+          `layer conflict on "${filePath}": "${currentOwner.layerName}" and "${layer.name}"`,
+        );
       } else if (currentOwner.layerType === layer.layerType) {
         throw new UsageError(
           `conflict detected in the ${layer.layerType} layers between "${currentOwner.layerName}" and "${layer.name}"`,
@@ -133,7 +154,8 @@ const composeLayerFiles = (
     );
   }
 
-  return composedFiles;
+  return { files: composedFiles, symlinks: composedSymlinks };
 };
 
 export { composeLayerFiles };
+export type { ComposedLayers };

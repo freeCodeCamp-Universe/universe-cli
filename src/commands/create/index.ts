@@ -264,6 +264,11 @@ export const create = async (options: CreateOptions, deps: CreateDeps = {}): Pro
     spinner.message("Writing project files");
     await filesystemWriter.writeProject(targetDirectory, resolvedLayers.files);
 
+    if (Object.keys(resolvedLayers.symlinks).length > 0) {
+      spinner.message("Creating symlinks");
+      await filesystemWriter.createSymlinks(targetDirectory, resolvedLayers.symlinks);
+    }
+
     spinner.message("Writing platform manifest");
     await filesystemWriter.writeProject(targetDirectory, {
       "platform.yaml": platformManifestGenerator.generatePlatformManifest(validatedInput),

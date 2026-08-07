@@ -1,20 +1,23 @@
 import { UsageError } from "../../../errors.js";
 import type { CreateSelections } from "../prompt/prompt.port.js";
-import type { FrameworkLayerData, PackageManagerLayerData, Runtime } from "./schemas/layers.js";
-
-type RuntimeEntryData = Runtime[string];
+import type { Framework, PackageManager, PackageManagerOption, Runtime } from "./schemas/layers.js";
 
 type LayerType = "always" | "frameworks" | "package-managers" | "runtime" | "services";
 
 interface LayerData {
   files: Record<string, string>;
+  symlinks: Record<string, string>;
 }
+
+type FrameworkLayerData = Framework[string] & LayerData;
+type PackageManagerLayerData = PackageManager[PackageManagerOption] & LayerData;
+type RuntimeEntryData = Runtime[string];
 
 interface LayerRegistry {
   always: Record<string, LayerData>;
   frameworks: Record<string, FrameworkLayerData>;
   "package-managers": Record<string, PackageManagerLayerData>;
-  runtime: Record<string, RuntimeEntryData>;
+  runtime: Record<string, RuntimeEntryData & LayerData>;
   services: Record<string, LayerData>;
 }
 
@@ -22,6 +25,7 @@ interface ResolvedLayer {
   files: Record<string, string>;
   layerType: LayerType;
   name: string;
+  symlinks: Record<string, string>;
 }
 
 const resolveOrderedLayers = (input: CreateSelections, layers: LayerRegistry): ResolvedLayer[] => {
@@ -49,9 +53,16 @@ const resolveOrderedLayers = (input: CreateSelections, layers: LayerRegistry): R
       throw new UsageError(`missing layer "${name}"`);
     }
 
-    return { files: layer.files, layerType, name };
+    return { files: layer.files, layerType, name, symlinks: layer.symlinks };
   });
 };
 
 export { resolveOrderedLayers };
-export type { LayerData, LayerRegistry, LayerType, ResolvedLayer };
+export type {
+  FrameworkLayerData,
+  LayerData,
+  LayerRegistry,
+  LayerType,
+  PackageManagerLayerData,
+  ResolvedLayer,
+};

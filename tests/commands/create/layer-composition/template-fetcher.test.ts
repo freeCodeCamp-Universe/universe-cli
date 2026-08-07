@@ -71,7 +71,7 @@ describe("ensureTemplateDir", () => {
     );
 
     const entries = await readdir(dir);
-    expect(entries.sort()).toEqual(["labels.json", "layers"]);
+    expect(entries.sort()).toEqual(["files", "labels.json", "layers"]);
   });
 
   it("re-downloads when forceFetch is true", async () => {
