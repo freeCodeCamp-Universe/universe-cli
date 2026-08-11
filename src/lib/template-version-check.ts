@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
+import pkg from "../../package.json" with { type: "json" };
 import { templatesCache } from "../commands/create/layer-composition/template-cache.js";
 import { ConfigError } from "../errors.js";
 import {
@@ -14,6 +15,7 @@ import {
   maxSatisfying,
 } from "./version-utils.js";
 
+const cliVersion = pkg.version;
 const CACHE_FILE = "template-version-check.json";
 const GITHUB_RELEASES_URL =
   "https://api.github.com/repos/freeCodeCamp-Universe/templates/releases?per_page=100";
@@ -70,7 +72,11 @@ export async function resolveTemplateVersions(
   now: number = Date.now(),
 ): Promise<TemplateVersions> {
   const cache = await readTemplateCacheFile();
-  if (cache !== null && now - cache.lastCheck < ttlMs()) {
+  if (
+    cache !== null &&
+    now - cache.lastCheck < ttlMs() &&
+    cache.cliVersion === cliVersion
+  ) {
     return { latest: cache.latest, latestCompatible: cache.latestCompatible };
   }
 
@@ -106,7 +112,7 @@ export async function resolveTemplateVersions(
   const latest = versions.reduce((a, b) => (compareVersions(a, b) < 0 ? b : a));
 
   try {
-    await writeTemplateCacheFile({ latest, latestCompatible, lastCheck: now });
+    await writeTemplateCacheFile({ latest, latestCompatible, lastCheck: now, cliVersion });
   } catch {
     // Non-fatal: next run retries.
   }
