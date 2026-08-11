@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, lstatSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -12,19 +12,13 @@ import type { CreateSelections, Prompt } from "../../../src/commands/create/prom
 import type { DonationConfigWriter } from "../../../src/commands/create/io/donation-config-writer.port.js";
 import type { RepoInitialiser } from "../../../src/commands/create/io/repo-initialiser.port.js";
 import type { SkillInstaller } from "../../../src/commands/create/io/skill-installer.port.js";
-import { ResolvedLayerSet } from "../../../src/commands/create/layer-composition/layer-composition-service.js";
+import type { ResolvedLayerSet } from "../../../src/commands/create/layer-composition/layer-composition-service.js";
 import { UsageError } from "../../../src/errors.js";
 import { loadFromDir } from "../../../src/commands/create/layer-composition/template-provider.js";
-import {
-  FrameworkSchema,
-  PackageManagerSchema,
-  RuntimeSchema,
-} from "../../../src/commands/create/layer-composition/schemas/layers.js";
+import { RuntimeSchema } from "../../../src/commands/create/layer-composition/schemas/layers.js";
 import { resolveTemplateVersions } from "../../../src/lib/template-version-check.js";
 import { ensureTemplateDir } from "../../../src/commands/create/layer-composition/template-fetcher.js";
 import runtimeFixture from "../../fixtures/templates/layers/runtime.json";
-import frameworkFixture from "../../fixtures/templates/layers/framework.json";
-import packageManagerFixture from "../../fixtures/templates/layers/package-manager.json";
 
 vi.mock("../../../src/commands/create/docker-check.js", () => ({
   isDockerAvailable: vi.fn(() => true),
@@ -131,7 +125,10 @@ const collectGeneratedFiles = (directory: string): Record<string, string> => {
       for (const entry of entries) {
         const entryPath = join(currentPath, entry.name);
 
-        if (entry.isDirectory()) {
+        if (entry.isSymbolicLink()) {
+          const relativePath = relative(directory, entryPath).replaceAll("\\", "/");
+          files[relativePath] = `symlink:${readlinkSync(entryPath)}`;
+        } else if (entry.isDirectory()) {
           stack.push(entryPath);
         } else {
           const relativePath = relative(directory, entryPath).replaceAll("\\", "/");
@@ -194,6 +191,25 @@ describe("create", () => {
 
     expect(deps.exit).not.toHaveBeenCalled();
     expect(existsSync(join(rootDirectory, selection.name))).toBe(true);
+  });
+
+  it("creates symlinks from template fixtures in the output directory", async () => {
+    const selection = createNodeSelection({
+      databases: [],
+      framework: "express",
+      name: "symlink-test",
+      platformServices: [],
+    });
+
+    const deps = makeDeps(rootDirectory, createPromptPort(selection));
+    await create({ json: false }, deps);
+
+    expect(deps.exit).not.toHaveBeenCalled();
+
+    const linkPath = join(rootDirectory, "symlink-test", "src/start.ts");
+    expect(lstatSync(linkPath).isSymbolicLink()).toBe(true);
+    expect(readlinkSync(linkPath)).toBe("index.ts");
+    expect(existsSync(linkPath)).toBe(true);
   });
 
   it("snapshots generated Node.js scaffold output", async () => {
@@ -399,6 +415,9 @@ describe("create", () => {
       ...makeDeps("/workspace", createPromptPort(createPromptResult)),
       donationConfigWriter: new StubDonationConfigWriter(),
       filesystemWriter: {
+        createSymlinks() {
+          return Promise.resolve();
+        },
         writeProject(targetDirectory: string, files: Record<string, string>) {
           writerCalls.push({ files, targetDirectory });
           return Promise.resolve();
@@ -406,7 +425,7 @@ describe("create", () => {
       },
       layerResolver: {
         resolveLayers(_input: CreateSelections): ResolvedLayerSet {
-          return { files: resolvedLayerFiles, layers: [] };
+          return { files: resolvedLayerFiles, layers: [], symlinks: {} };
         },
       },
       platformManifestGenerator: {
@@ -467,13 +486,16 @@ describe("create", () => {
       ...makeDeps("/workspace", createPromptPort(createPromptResult)),
       donationConfigWriter: new StubDonationConfigWriter(),
       filesystemWriter: {
+        createSymlinks() {
+          return Promise.resolve();
+        },
         writeProject(targetDirectory: string) {
           return Promise.reject(new Error(message(targetDirectory)));
         },
       },
       layerResolver: {
         resolveLayers(_input: CreateSelections): ResolvedLayerSet {
-          return { files: resolvedLayerFiles, layers: [] };
+          return { files: resolvedLayerFiles, layers: [], symlinks: {} };
         },
       },
       platformManifestGenerator: {
@@ -637,12 +659,13 @@ describe("create", () => {
     });
 
     it("honours an explicit non-recommended flag value", async () => {
-      const partialPm = PackageManagerSchema.parse({
-        pnpm: { ...packageManagerFixture["pnpm"], recommended: true },
-        bun: { ...packageManagerFixture["bun"], recommended: false },
-      });
       const modifiedLoader = async (dir: string) => {
         const base = await loadFromDir(dir);
+        const basePm = base.registry["package-managers"];
+        const partialPm = {
+          pnpm: { ...basePm["pnpm"], recommended: true },
+          bun: { ...basePm["bun"], recommended: false },
+        };
         return { ...base, registry: { ...base.registry, "package-managers": partialPm } };
       };
       const deps = {
@@ -668,12 +691,13 @@ describe("create", () => {
     });
 
     it("errors when no recommended runtimes and --runtime is omitted", async () => {
-      const noRecRuntime = RuntimeSchema.parse({
-        node: { ...runtimeFixture["node"], recommended: false },
-        static_web: { ...runtimeFixture["static_web"], recommended: false },
-      });
       const modifiedLoader = async (dir: string) => {
         const base = await loadFromDir(dir);
+        const baseRt = base.registry.runtime;
+        const noRecRuntime = {
+          node: { ...baseRt["node"], recommended: false },
+          static_web: { ...baseRt["static_web"], recommended: false },
+        };
         return { ...base, registry: { ...base.registry, runtime: noRecRuntime } };
       };
       const deps = {
@@ -691,16 +715,17 @@ describe("create", () => {
     });
 
     it("errors when no recommended frameworks and --framework is omitted", async () => {
-      const noRecFramework = FrameworkSchema.parse({
-        ...frameworkFixture,
-        express: { ...frameworkFixture["express"], recommended: false },
-        "html-css-js": { ...frameworkFixture["html-css-js"], recommended: false },
-        "react-vite": { ...frameworkFixture["react-vite"], recommended: false },
-        "tanstack-shadcn": { ...frameworkFixture["tanstack-shadcn"], recommended: false },
-        typescript: { ...frameworkFixture["typescript"], recommended: false },
-      });
       const modifiedLoader = async (dir: string) => {
         const base = await loadFromDir(dir);
+        const baseFw = base.registry.frameworks;
+        const noRecFramework = {
+          ...baseFw,
+          express: { ...baseFw["express"], recommended: false },
+          "html-css-js": { ...baseFw["html-css-js"], recommended: false },
+          "react-vite": { ...baseFw["react-vite"], recommended: false },
+          "tanstack-shadcn": { ...baseFw["tanstack-shadcn"], recommended: false },
+          typescript: { ...baseFw["typescript"], recommended: false },
+        };
         return { ...base, registry: { ...base.registry, frameworks: noRecFramework } };
       };
       const deps = {
@@ -718,12 +743,13 @@ describe("create", () => {
     });
 
     it("errors when no recommended PMs and --packageManager is omitted", async () => {
-      const noRecPm = PackageManagerSchema.parse({
-        pnpm: { ...packageManagerFixture["pnpm"], recommended: false },
-        bun: { ...packageManagerFixture["bun"], recommended: false },
-      });
       const modifiedLoader = async (dir: string) => {
         const base = await loadFromDir(dir);
+        const basePm = base.registry["package-managers"];
+        const noRecPm = {
+          pnpm: { ...basePm["pnpm"], recommended: false },
+          bun: { ...basePm["bun"], recommended: false },
+        };
         return { ...base, registry: { ...base.registry, "package-managers": noRecPm } };
       };
       const deps = {

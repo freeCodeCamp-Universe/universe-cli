@@ -58,6 +58,14 @@ describe("loadFromDir", () => {
     await expect(loadFromDir(extraDir)).rejects.toThrow("Unexpected files in templates directory");
   });
 
+  it("loads symlinks into the symlinks map with correct targets", async () => {
+    const { registry } = await loadFromDir(FIXTURES_DIR);
+
+    expect(registry.frameworks["express"].symlinks).toStrictEqual({
+      "src/start.ts": "index.ts",
+    });
+  });
+
   it("throws when JSON content fails Zod validation", async () => {
     const badDir = join(tmpDir, "bad-schema");
     await cp(FIXTURES_DIR, badDir, { recursive: true });

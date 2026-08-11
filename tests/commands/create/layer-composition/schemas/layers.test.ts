@@ -3,7 +3,6 @@ import { PackageManagerSchema } from "../../../../../src/commands/create/layer-c
 
 const layer = (pmVersion: string) => ({
   devCmd: ["run", "dev"],
-  files: {},
   lockfile: "lock",
   manifests: ["package.json"],
   pmInstall: "RUN install@{{pmVersion}}",

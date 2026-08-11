@@ -1,11 +1,5 @@
 {
-  "analytics": {
-    "files": {}
-  },
-  "auth": {
-    "files": {}
-  },
-  "email": {
-    "files": {}
-  }
+  "analytics": {},
+  "auth": {},
+  "email": {}
 }
