@@ -220,7 +220,7 @@ describe(resolveTemplateVersions, () => {
     await seedCache("1.0.0", "0.3.0", NOW - 60_000, "0.0.1" ); // default cliVersion is 0.0.0
     const fetchMock = stubFetch(jsonResponse(200, [release("0.3.0"), release("1.0.0")]));
 
-    const result = await resolveTemplateVersions(RANGE, NOW);
+    await resolveTemplateVersions(RANGE, NOW);
 
     expect(fetchMock).toHaveBeenCalledOnce();
   });
