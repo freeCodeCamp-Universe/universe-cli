@@ -20,6 +20,7 @@ export interface TemplateCacheShape {
   readonly latest: string;
   readonly latestCompatible: string;
   readonly lastCheck: number;
+  readonly cliVersion: string;
 }
 
 export interface UpdateNotice {
@@ -69,23 +70,26 @@ export function parseTemplateCache(raw: string): TemplateCacheShape | null {
     parsed === null ||
     !("latest" in parsed) ||
     !("latestCompatible" in parsed) ||
-    !("lastCheck" in parsed)
+    !("lastCheck" in parsed) ||
+    !("cliVersion" in parsed)
   ) {
     return null;
   }
-  const { latest, latestCompatible, lastCheck } = parsed as {
+  const { latest, latestCompatible, lastCheck, cliVersion } = parsed as {
     latest: unknown;
     latestCompatible: unknown;
     lastCheck: unknown;
+    cliVersion: unknown;
   };
   if (
     typeof latest !== "string" ||
     typeof latestCompatible !== "string" ||
-    typeof lastCheck !== "number"
+    typeof lastCheck !== "number" ||
+    typeof cliVersion !== "string"
   ) {
     return null;
   }
-  return { latest, latestCompatible, lastCheck };
+  return { latest, latestCompatible, lastCheck, cliVersion };
 }
 
 // Prerelease ignored ("0.7.0-rc.1" == "0.7.0") so prerelease users
