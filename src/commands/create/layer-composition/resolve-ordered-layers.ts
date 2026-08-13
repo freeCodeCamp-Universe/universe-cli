@@ -1,5 +1,5 @@
 import { UsageError } from "../../../errors.js";
-import type { CreateSelections } from "../prompt/prompt.port.js";
+import type { CreateSelections } from "../types.js";
 import type { Framework, PackageManager, PackageManagerOption, Runtime } from "./schemas/layers.js";
 
 type LayerType = "always" | "frameworks" | "package-managers" | "runtime" | "services";

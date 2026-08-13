@@ -1,4 +1,4 @@
-import type { CreateSelections } from "../prompt/prompt.port.js";
+import type { CreateSelections } from "../types.js";
 import {
   buildComposeYaml,
   buildDevcontainerComposeYaml,

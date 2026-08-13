@@ -28,7 +28,18 @@
     "LICENSE"
   ],
   "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/sdk.mjs",
+      "types": "./dist/sdk.d.mts"
+    },
+    "./cli": {
+      "import": "./dist/index.mjs",
+      "types": "./dist/index.d.mts"
+    }
+  },
   "main": "dist/index.cjs",
+  "types": "dist/sdk.d.mts",
   "publishConfig": {
     "access": "public"
   },

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { CreateSelections } from "../../../../src/commands/create/prompt/prompt.port.js";
+import type { CreateSelections } from "../../../../src/commands/create/types.js";
 import { resolveOrderedLayers } from "../../../../src/commands/create/layer-composition/resolve-ordered-layers.js";
 import type { LayerRegistry } from "../../../../src/commands/create/layer-composition/resolve-ordered-layers.js";
 

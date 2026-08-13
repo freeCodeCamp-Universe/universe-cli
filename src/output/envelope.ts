@@ -1,4 +1,4 @@
-interface Envelope {
+export interface Envelope {
   schemaVersion: string;
   command: string;
   success: boolean;

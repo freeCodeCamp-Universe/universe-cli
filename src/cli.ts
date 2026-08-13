@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { create } from "./commands/create/index.js";
+import { createHandler } from "./commands/create/index.js";
 import { deploy } from "./commands/deploy.js";
 import { init } from "./commands/init.js";
 import { login } from "./commands/login.js";
@@ -383,7 +383,7 @@ export async function run(argv = process.argv): Promise<void> {
         pkgManager?: string;
       }>();
       try {
-        await create({
+        await createHandler({
           forceFetch: opts.forceFetch ?? false,
           json: opts.json ?? false,
           yes: opts.yes ?? false,
