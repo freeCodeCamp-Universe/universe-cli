@@ -7,7 +7,7 @@ import {
 } from "./layer-composition/allowed-configuration.js";
 import type { RuntimeCombinations } from "./layer-composition/allowed-configuration.js";
 import type { Runtime } from "./layer-composition/schemas/layers.js";
-import type { CreateSelections } from "./prompt/prompt.port.js";
+import type { CreateSelections } from "./types.js";
 import { SITE_NAME_PATTERN } from "../../lib/platform-yaml.schema.js";
 
 type PathExists = (path: string) => boolean;

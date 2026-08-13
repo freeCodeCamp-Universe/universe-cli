@@ -3,7 +3,7 @@ import { UsageError } from "../../../src/errors.js";
 import type {
   CreateSelections,
   PackageManagerOption,
-} from "../../../src/commands/create/prompt/prompt.port.js";
+} from "../../../src/commands/create/types.js";
 import { CreateInputValidationService } from "../../../src/commands/create/create-input-validation-service.js";
 import { RuntimeSchema } from "../../../src/commands/create/layer-composition/schemas/layers.js";
 import runtimeFixture from "../../fixtures/templates/layers/runtime.json";
