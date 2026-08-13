@@ -1,7 +1,7 @@
 import { stat } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { logout } from "../../src/commands/logout.js";
+import { logoutHandler } from "../../src/commands/logout.js";
 import { type CliEnv, makeCliEnv } from "./_helpers/cli-env.js";
 
 interface RunResult {
@@ -14,7 +14,7 @@ async function runLogoutJson(): Promise<RunResult> {
     chunks.push(String(chunk));
     return true;
   });
-  await logout({ json: true }, { logSuccess: vi.fn(), logInfo: vi.fn() });
+  await logoutHandler({ json: true }, { logSuccess: vi.fn(), logInfo: vi.fn() });
   spy.mockRestore();
   const raw = chunks.join("").trim();
   return { envelope: JSON.parse(raw) as Record<string, unknown> };

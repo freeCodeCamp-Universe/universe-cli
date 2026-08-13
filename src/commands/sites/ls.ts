@@ -1,13 +1,17 @@
 import { log } from "@clack/prompts";
 import { type SiteRow } from "../../lib/proxy-client.js";
+import type { CommandResult } from "../../output/command-result.js";
 import { buildEnvelope } from "../../output/envelope.js";
 import { exitWithCode } from "../../output/exit-codes.js";
 import { emitJson, outputError } from "../../output/format.js";
-import { setupClient, type SitesCommandDeps } from "./_shared.js";
+import { setupClient, type SitesCommandDeps, type SitesSdkDeps } from "./_shared.js";
 
-export interface SitesLsOptions {
+interface SitesLsOptions {
+  mine?: boolean;
+}
+
+interface SitesLsHandlerOptions {
   json: boolean;
-  /** When true, intersect the registry with the caller's authorized sites. */
   mine?: boolean;
 }
 
@@ -22,37 +26,55 @@ function formatTable(rows: SiteRow[]): string {
   return [fmt(headers), ...cells.map(fmt)].join("\n");
 }
 
-export async function ls(options: SitesLsOptions, deps: SitesCommandDeps = {}): Promise<void> {
-  const command = "sites ls";
+/** List registered sites. Pass `mine: true` to filter to the caller's authorized sites. */
+async function sitesLs(
+  options: SitesLsOptions,
+  deps: SitesSdkDeps = {},
+): Promise<CommandResult> {
+  const { client, identitySource } = await setupClient(deps);
+  let rows = await client.listSites();
+  let scope: "all" | "mine" = "all";
+
+  if (options.mine) {
+    const me = await client.whoami();
+    const allowed = new Set(me.authorizedSites);
+    rows = rows.filter((r) => allowed.has(r.slug));
+    scope = "mine";
+  }
+
+  const format = formatTable(rows);
+
+  return {
+    data: buildEnvelope("sites ls", true, {
+      count: rows.length,
+      scope,
+      sites: rows,
+      identitySource,
+    }),
+    format,
+  };
+}
+
+async function sitesLsHandler(
+  options: SitesLsHandlerOptions,
+  deps: SitesCommandDeps = {},
+): Promise<void> {
   const success = deps.logSuccess ?? ((s: string) => log.message(s));
   const error = deps.logError ?? ((s: string) => log.error(s));
   const exit = deps.exit ?? exitWithCode;
 
   try {
-    const { client, identitySource } = await setupClient(deps);
-    let rows = await client.listSites();
-    let scope: "all" | "mine" = "all";
-
-    if (options.mine) {
-      const me = await client.whoami();
-      const allowed = new Set(me.authorizedSites);
-      rows = rows.filter((r) => allowed.has(r.slug));
-      scope = "mine";
-    }
+    const result = await sitesLs(options, deps);
 
     if (options.json) {
-      emitJson(
-        buildEnvelope(command, true, {
-          count: rows.length,
-          scope,
-          sites: rows,
-          identitySource,
-        }),
-      );
+      emitJson(result.data);
     } else {
-      success(formatTable(rows));
+      success(result.format);
     }
   } catch (err) {
-    exit(outputError({ json: options.json, command }, err, { logError: error }));
+    exit(outputError({ json: options.json, command: "sites ls" }, err, { logError: error }));
   }
 }
+
+export { sitesLs, sitesLsHandler };
+export type { SitesLsOptions, SitesLsHandlerOptions };

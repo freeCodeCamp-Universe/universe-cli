@@ -11,26 +11,36 @@ import {
   type ProxyClient,
   type ProxyClientConfig,
 } from "../lib/proxy-client.js";
+import type { CommandResult } from "../output/command-result.js";
 import { buildEnvelope } from "../output/envelope.js";
 import { exitWithCode } from "../output/exit-codes.js";
 import { emitJson, outputError } from "../output/format.js";
 
-export interface LsOptions {
+interface StaticLsOptions {
+  /** Override site from platform.yaml. */
+  site?: string;
+}
+
+interface StaticLsHandlerOptions {
   json: boolean;
   /** Override site from platform.yaml. */
   site?: string;
 }
 
-export interface LsDeps {
+interface StaticLsDeps {
   cwd?: string;
   env?: NodeJS.ProcessEnv;
   readPlatformYaml?: (cwd: string) => Promise<string>;
   resolveIdentity?: typeof defaultResolveIdentity;
   createProxyClient?: (cfg: ProxyClientConfig) => ProxyClient;
+}
+
+interface StaticLsHandlerDeps extends StaticLsDeps {
   logSuccess?: (msg: string) => void;
   logInfo?: (msg: string) => void;
   logError?: (msg: string) => void;
-  exit?: (code: number) => never;
+  logWarn?: (msg: string) => void;
+  exit?: (code: number) => void;
 }
 
 const defaultReadPlatformYaml = async (cwd: string): Promise<string> => {
@@ -119,85 +129,103 @@ function formatTable(deploys: DeployRow[]): string {
   return [fmt(header), ...rows.map(fmt)].join("\n");
 }
 
-export async function ls(options: LsOptions, deps: LsDeps = {}): Promise<void> {
+/** List deploys and aliases for a site. Reads `platform.yaml` for the site slug. */
+async function staticLs(
+  options: StaticLsOptions,
+  deps: StaticLsDeps = {},
+): Promise<CommandResult> {
   const cwd = deps.cwd ?? process.cwd();
   const env = deps.env ?? process.env;
   const readYaml = deps.readPlatformYaml ?? defaultReadPlatformYaml;
   const resolveId = deps.resolveIdentity ?? defaultResolveIdentity;
   const mkClient = deps.createProxyClient ?? defaultCreateProxyClient;
+
+  const identity = await resolveId({ env });
+  if (!identity) {
+    throw new CredentialError(
+      "No GitHub identity available. Run `universe login`, set $GITHUB_TOKEN, or install the gh CLI.",
+    );
+  }
+
+  let site = options.site?.trim() || null;
+  if (!site) {
+    site = await readSiteFromYaml(cwd, readYaml);
+  }
+  if (!site) {
+    throw new ConfigError(
+      "No site to list. Run from a directory with `platform.yaml`, or pass `--site <name>`.",
+    );
+  }
+
+  const baseUrl = env["UNIVERSE_PROXY_URL"] ?? DEFAULT_PROXY_URL;
+  const client = mkClient({
+    baseUrl,
+    getAuthToken: () => identity.token,
+    timeoutMs: parseFetchTimeoutMs(env),
+  });
+
+  const raw = await client.siteDeploys({ site });
+  // Defensive: artemis returns ascending (oldest-first) lex order, which
+  // makes the operator-visible top-of-list the OLDEST deploy. Reverse so
+  // the newest deploy is at index 0 — the natural operator expectation
+  // and the assumption shared by every downstream consumer.
+  const sorted = [...raw].sort((a, b) => b.deployId.localeCompare(a.deployId));
+  const parsed = sorted.map((d) => parseDeployId(d.deployId));
+
+  let previewId: string | null = null;
+  let productionId: string | null = null;
+  if (parsed.length > 0) {
+    const [preview, production] = await Promise.all([
+      client.getAlias({ site, mode: "preview" }),
+      client.getAlias({ site, mode: "production" }),
+    ]);
+    previewId = preview?.deployId ?? null;
+    productionId = production?.deployId ?? null;
+  }
+
+  const deploys: DeployRow[] = parsed.map((d, i) => ({
+    ...d,
+    state: deployState(d.deployId, previewId, productionId),
+    actor: sorted[i]?.actor,
+  }));
+
+  const format =
+    deploys.length === 0 ? `(no deploys for ${site})` : formatTable(deploys);
+
+  return {
+    data: buildEnvelope("ls", true, {
+      site,
+      deploys,
+      aliases: { preview: previewId, production: productionId },
+      identitySource: identity.source,
+    }),
+    format,
+  };
+}
+
+async function staticLsHandler(
+  options: StaticLsHandlerOptions,
+  deps: StaticLsHandlerDeps = {},
+): Promise<void> {
   const success = deps.logSuccess ?? ((s: string) => log.success(s));
   const info = deps.logInfo ?? ((s: string) => log.info(s));
   const error = deps.logError ?? ((s: string) => log.error(s));
   const exit = deps.exit ?? exitWithCode;
 
   try {
-    const identity = await resolveId({ env });
-    if (!identity) {
-      throw new CredentialError(
-        "No GitHub identity available. Run `universe login`, set $GITHUB_TOKEN, or install the gh CLI.",
-      );
-    }
-
-    let site = options.site?.trim() || null;
-    if (!site) {
-      site = await readSiteFromYaml(cwd, readYaml);
-    }
-    if (!site) {
-      throw new ConfigError(
-        "No site to list. Run from a directory with `platform.yaml`, or pass `--site <name>`.",
-      );
-    }
-
-    const baseUrl = env["UNIVERSE_PROXY_URL"] ?? DEFAULT_PROXY_URL;
-    const client = mkClient({
-      baseUrl,
-      getAuthToken: () => identity.token,
-      timeoutMs: parseFetchTimeoutMs(env),
-    });
-
-    const raw = await client.siteDeploys({ site });
-    // Defensive: artemis returns ascending (oldest-first) lex order, which
-    // makes the operator-visible top-of-list the OLDEST deploy. Reverse so
-    // the newest deploy is at index 0 — the natural operator expectation
-    // and the assumption shared by every downstream consumer.
-    const sorted = [...raw].sort((a, b) => b.deployId.localeCompare(a.deployId));
-    const parsed = sorted.map((d) => parseDeployId(d.deployId));
-
-    let previewId: string | null = null;
-    let productionId: string | null = null;
-    if (parsed.length > 0) {
-      const [preview, production] = await Promise.all([
-        client.getAlias({ site, mode: "preview" }),
-        client.getAlias({ site, mode: "production" }),
-      ]);
-      previewId = preview?.deployId ?? null;
-      productionId = production?.deployId ?? null;
-    }
-
-    const deploys: DeployRow[] = parsed.map((d, i) => ({
-      ...d,
-      state: deployState(d.deployId, previewId, productionId),
-      actor: sorted[i]?.actor,
-    }));
+    const result = await staticLs(options, deps);
 
     if (options.json) {
-      emitJson(
-        buildEnvelope("ls", true, {
-          site,
-          deploys,
-          aliases: { preview: previewId, production: productionId },
-          identitySource: identity.source,
-        }),
-      );
-      return;
+      emitJson(result.data);
+    } else if (result.format.startsWith("(")) {
+      info(result.format);
+    } else {
+      success(result.format);
     }
-
-    if (deploys.length === 0) {
-      info(`(no deploys for ${site})`);
-      return;
-    }
-    success(formatTable(deploys));
   } catch (err) {
     exit(outputError({ json: options.json, command: "ls" }, err, { logError: error }));
   }
 }
+
+export { staticLs, staticLsHandler };
+export type { StaticLsOptions, StaticLsHandlerOptions, StaticLsDeps, StaticLsHandlerDeps };

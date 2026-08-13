@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { deploy } from "../../src/commands/deploy.js";
+import { staticDeployHandler } from "../../src/commands/deploy.js";
 import { ls as staticLs } from "../../src/commands/ls.js";
 import { whoami } from "../../src/commands/whoami.js";
 
@@ -175,7 +175,7 @@ describe.skipIf(!REAL_E2E)("real-artemis smoke (opt-in)", () => {
 
     const env = makeEnv();
     const r = await captureJsonRun(() =>
-      deploy(
+      staticDeployHandler(
         { json: true, promote: false },
         {
           cwd: projectDir!,
@@ -225,7 +225,7 @@ describe.skipIf(!REAL_E2E)("real-artemis smoke (opt-in)", () => {
 
     const env = makeEnv();
     const r = await captureJsonRun(() =>
-      deploy(
+      staticDeployHandler(
         { json: true, promote: true },
         {
           cwd: projectDir!,

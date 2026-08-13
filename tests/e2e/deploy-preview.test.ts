@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { deploy } from "../../src/commands/deploy.js";
+import { staticDeployHandler } from "../../src/commands/deploy.js";
 import { type CliEnv, makeCliEnv } from "./_helpers/cli-env.js";
 import { type FakeArtemis, startFakeArtemis } from "./_helpers/fake-artemis.js";
 
@@ -42,7 +42,7 @@ async function runDeploy(
   const captured: CapturedExit = {};
   const warns: string[] = [];
   try {
-    await deploy(options, {
+    await staticDeployHandler(options, {
       cwd,
       env,
       exit: makeExit(captured),
@@ -78,7 +78,7 @@ async function runDeployText(
   const warns: string[] = [];
   const errors: string[] = [];
   try {
-    await deploy(
+    await staticDeployHandler(
       { json: false, ...options },
       {
         cwd,

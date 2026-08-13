@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { register } from "../../../src/commands/sites/register.js";
+import { sitesRegister, sitesRegisterHandler } from "../../../src/commands/sites/register.js";
+import { CredentialError } from "../../../src/errors.js";
+import { ProxyError } from "../../../src/lib/proxy-client.js";
 
 function mkProxy() {
   return {
@@ -31,19 +33,14 @@ function mkDeps(overrides: Record<string, unknown> = {}) {
       source: "env_GITHUB_TOKEN",
     }),
     createProxyClient: vi.fn().mockReturnValue(mkProxy()),
-    logSuccess: vi.fn(),
-    logError: vi.fn(),
-    exit: vi.fn().mockImplementation((_code: number) => {
-      throw new Error("__exit__");
-    }),
     ...overrides,
   };
 }
 
-describe("sites register command", () => {
+describe("sitesRegister SDK", () => {
   it("calls registerSite with slug + parsed teams", async () => {
     const deps = mkDeps();
-    await register({ json: false, slug: "blog", team: "staff,news" }, deps);
+    await sitesRegister({ slug: "blog", team: "staff,news" }, deps);
     const proxy = deps.createProxyClient.mock.results[0]?.value;
     expect(proxy.registerSite).toHaveBeenCalledWith({
       slug: "blog",
@@ -53,7 +50,7 @@ describe("sites register command", () => {
 
   it("omits teams when --team flag absent (server applies default)", async () => {
     const deps = mkDeps();
-    await register({ json: false, slug: "blog" }, deps);
+    await sitesRegister({ slug: "blog" }, deps);
     const proxy = deps.createProxyClient.mock.results[0]?.value;
     expect(proxy.registerSite).toHaveBeenCalledWith({
       slug: "blog",
@@ -61,6 +58,43 @@ describe("sites register command", () => {
     });
   });
 
+  it("returns CommandResult with envelope and format", async () => {
+    const deps = mkDeps();
+    const result = await sitesRegister({ slug: "blog", team: "staff" }, deps);
+    expect(result.data.command).toBe("sites register");
+    expect(result.data.success).toBe(true);
+    expect(result.data.slug).toBe("blog");
+    expect(result.data.teams).toEqual(["staff"]);
+    expect(result.data.createdBy).toBe("alice");
+    expect(result.data.identitySource).toBe("env_GITHUB_TOKEN");
+    expect(result.format).toContain("Registered blog");
+  });
+
+  it("throws UsageError on empty slug", async () => {
+    const deps = mkDeps();
+    await expect(sitesRegister({ slug: "" }, deps)).rejects.toThrow(/slug is required/i);
+  });
+
+  it("throws CredentialError when identity chain returns null", async () => {
+    const deps = mkDeps({
+      resolveIdentity: vi.fn().mockResolvedValue(null),
+    });
+    await expect(sitesRegister({ slug: "blog" }, deps)).rejects.toThrow(CredentialError);
+  });
+
+  it("throws proxy errors directly", async () => {
+    const proxy = mkProxy();
+    proxy.registerSite = vi
+      .fn()
+      .mockRejectedValue(new ProxyError(409, "already_exists", "site is already registered"));
+    const deps = mkDeps({
+      createProxyClient: vi.fn().mockReturnValue(proxy),
+    });
+    await expect(sitesRegister({ slug: "blog" }, deps)).rejects.toThrow(ProxyError);
+  });
+});
+
+describe("sitesRegisterHandler", () => {
   it("emits success envelope in JSON mode", async () => {
     const stdout: string[] = [];
     const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
@@ -69,7 +103,7 @@ describe("sites register command", () => {
     });
 
     const deps = mkDeps();
-    await register({ json: true, slug: "blog", team: "staff" }, deps);
+    await sitesRegisterHandler({ json: true, slug: "blog", team: "staff" }, deps);
     writeSpy.mockRestore();
 
     const env = JSON.parse(stdout.join("").trim());
@@ -78,47 +112,62 @@ describe("sites register command", () => {
     expect(env.slug).toBe("blog");
     expect(env.teams).toEqual(["staff"]);
     expect(env.createdBy).toBe("alice");
-    // identitySource is carried through to JSON envelope for parity
-    // with whoami/ls/deploy/promote/rollback.
     expect(env.identitySource).toBe("env_GITHUB_TOKEN");
   });
 
+  it("calls logSuccess in text mode", async () => {
+    const logSuccess = vi.fn();
+    const deps = { ...mkDeps(), logSuccess, logError: vi.fn() };
+    await sitesRegisterHandler({ json: false, slug: "blog", team: "staff" }, deps);
+    expect(logSuccess).toHaveBeenCalledWith(expect.stringContaining("Registered blog"));
+  });
+
   it("rejects empty slug with EXIT_USAGE", async () => {
-    const deps = mkDeps();
-    await expect(register({ json: false, slug: "" }, deps)).rejects.toThrow("__exit__");
-    expect(deps.exit).toHaveBeenCalledWith(10);
-    expect(deps.logError).toHaveBeenCalledWith(expect.stringMatching(/slug is required/i));
+    const exit = vi.fn().mockImplementation((_code: number) => {
+      throw new Error("__exit__");
+    });
+    const logError = vi.fn();
+    const deps = { ...mkDeps(), logError, exit };
+    await expect(sitesRegisterHandler({ json: false, slug: "" }, deps)).rejects.toThrow("__exit__");
+    expect(exit).toHaveBeenCalledWith(10);
+    expect(logError).toHaveBeenCalledWith(expect.stringMatching(/slug is required/i));
   });
 
   it("errors with EXIT_CREDENTIALS when identity chain returns null", async () => {
-    const deps = mkDeps({
-      resolveIdentity: vi.fn().mockResolvedValue(null),
+    const exit = vi.fn().mockImplementation((_code: number) => {
+      throw new Error("__exit__");
     });
-    await expect(register({ json: false, slug: "blog" }, deps)).rejects.toThrow("__exit__");
-    expect(deps.exit).toHaveBeenCalledWith(12);
-    expect(deps.logError).toHaveBeenCalledWith(expect.stringMatching(/login|identity/i));
+    const logError = vi.fn();
+    const deps = {
+      ...mkDeps({ resolveIdentity: vi.fn().mockResolvedValue(null) }),
+      logError,
+      exit,
+    };
+    await expect(sitesRegisterHandler({ json: false, slug: "blog" }, deps)).rejects.toThrow(
+      "__exit__",
+    );
+    expect(exit).toHaveBeenCalledWith(12);
+    expect(logError).toHaveBeenCalledWith(expect.stringMatching(/login|identity/i));
   });
 
   it("maps proxy 409 already_exists to EXIT_USAGE with surfaced code", async () => {
     const proxy = mkProxy();
-    proxy.registerSite = vi.fn().mockRejectedValue(
-      Object.assign(new Error("site is already registered"), {
-        status: 409,
-        code: "already_exists",
-        exitCode: 10,
-        constructor: { name: "ProxyError" },
-      }),
-    );
-    // Use the actual ProxyError class so wrapProxyError detects it.
-    const { ProxyError } = await import("../../../src/lib/proxy-client.js");
     proxy.registerSite = vi
       .fn()
       .mockRejectedValue(new ProxyError(409, "already_exists", "site is already registered"));
-    const deps = mkDeps({
-      createProxyClient: vi.fn().mockReturnValue(proxy),
+    const exit = vi.fn().mockImplementation((_code: number) => {
+      throw new Error("__exit__");
     });
-    await expect(register({ json: false, slug: "blog" }, deps)).rejects.toThrow("__exit__");
-    expect(deps.exit).toHaveBeenCalledWith(10);
-    expect(deps.logError).toHaveBeenCalledWith(expect.stringContaining("already_exists"));
+    const logError = vi.fn();
+    const deps = {
+      ...mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) }),
+      logError,
+      exit,
+    };
+    await expect(sitesRegisterHandler({ json: false, slug: "blog" }, deps)).rejects.toThrow(
+      "__exit__",
+    );
+    expect(exit).toHaveBeenCalledWith(10);
+    expect(logError).toHaveBeenCalledWith(expect.stringContaining("already_exists"));
   });
 });

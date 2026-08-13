@@ -1,7 +1,14 @@
 import { log } from "@clack/prompts";
 import { CredentialError } from "../errors.js";
+import { clackDriver, drive } from "../interaction/clack-driver.js";
+import type { Step, StepResponse } from "../interaction/step.js";
 import { DEFAULT_GH_CLIENT_ID } from "../lib/constants.js";
-import { runDeviceFlow as defaultRunDeviceFlow } from "../lib/device-flow.js";
+import {
+  requestDeviceCode as defaultRequestDeviceCode,
+  pollDeviceToken as defaultPollDeviceToken,
+  type RequestDeviceCodeOptions,
+  type PollDeviceTokenOptions,
+} from "../lib/device-flow.js";
 import {
   createProxyClient as defaultCreateProxyClient,
   parseFetchTimeoutMs,
@@ -12,26 +19,34 @@ import {
   loadToken as defaultLoadToken,
   saveToken as defaultSaveToken,
 } from "../lib/token-store.js";
+import type { CommandResult } from "../output/command-result.js";
 import { buildEnvelope } from "../output/envelope.js";
 import { EXIT_CONFIRM, exitWithCode } from "../output/exit-codes.js";
 import { emitJson, outputError } from "../output/format.js";
 
-export interface LoginOptions {
-  json: boolean;
+interface LoginOptions {
   force?: boolean;
 }
 
-export interface LoginDeps {
-  runDeviceFlow?: typeof defaultRunDeviceFlow;
+interface LoginSdkDeps {
+  requestDeviceCode?: (opts: RequestDeviceCodeOptions) => ReturnType<typeof defaultRequestDeviceCode>;
+  pollDeviceToken?: (opts: PollDeviceTokenOptions) => ReturnType<typeof defaultPollDeviceToken>;
   saveToken?: typeof defaultSaveToken;
   loadToken?: typeof defaultLoadToken;
   createProxyClient?: (cfg: ProxyClientConfig) => ProxyClient;
   env?: NodeJS.ProcessEnv;
+}
+
+interface LoginHandlerOptions {
+  json: boolean;
+  force?: boolean;
+}
+
+interface LoginHandlerDeps extends LoginSdkDeps {
   logSuccess?: (msg: string) => void;
-  logInfo?: (msg: string) => void;
   logWarn?: (msg: string) => void;
   logError?: (msg: string) => void;
-  exit?: (code: number) => never;
+  exit?: (code: number) => void;
 }
 
 const DEFAULT_SCOPE = "read:org user:email";
@@ -49,116 +64,16 @@ const NO_SITES_WARNING = [
   "     https://github.com/orgs/freeCodeCamp-Universe/teams.",
 ].join("\n");
 
-export async function login(options: LoginOptions, deps: LoginDeps = {}): Promise<void> {
-  const env = deps.env ?? process.env;
-  const runFlow = deps.runDeviceFlow ?? defaultRunDeviceFlow;
-  const save = deps.saveToken ?? defaultSaveToken;
-  const load = deps.loadToken ?? defaultLoadToken;
-  const success = deps.logSuccess ?? ((s: string) => log.success(s));
-  const info = deps.logInfo ?? ((s: string) => log.info(s));
-  const error = deps.logError ?? ((s: string) => log.error(s));
-  const exit = deps.exit ?? exitWithCode;
-
-  const envClientId = env["UNIVERSE_GH_CLIENT_ID"];
-  const clientId =
-    envClientId && envClientId.trim().length > 0 ? envClientId : DEFAULT_GH_CLIENT_ID;
-
-  if (!options.force) {
-    const existing = await load();
-    if (existing) {
-      const msg =
-        "Already logged in. Run `universe logout` first or pass --force to replace the stored token.";
-      if (options.json) {
-        emitJson({
-          schemaVersion: "1",
-          command: "login",
-          success: false,
-          timestamp: new Date().toISOString(),
-          error: { code: EXIT_CONFIRM, message: msg },
-        });
-      } else {
-        error(msg);
-      }
-      exit(EXIT_CONFIRM);
-      return;
-    }
-  }
-
-  let token: string;
-  try {
-    token = await runFlow({
-      clientId,
-      scope: DEFAULT_SCOPE,
-      onPrompt: ({ userCode, verificationUri, expiresIn }) => {
-        if (options.json) {
-          emitJson(
-            buildEnvelope("login", true, {
-              userCode,
-              verificationUri,
-              expiresIn,
-              stored: false,
-            }),
-          );
-        } else {
-          info(
-            [
-              `Open ${verificationUri} in your browser`,
-              `and enter code: ${userCode}`,
-              `(code expires in ${Math.round(expiresIn / 60)} min)`,
-            ].join("\n"),
-          );
-        }
-      },
-    });
-  } catch (err) {
-    const credErr = err instanceof CredentialError ? err : new CredentialError(err instanceof Error ? err.message : String(err));
-    exit(outputError({ json: options.json, command: "login" }, credErr, { logError: error }));
-    return;
-  }
-
-  await save(token);
-
-  const selfCheck = await postLoginSelfCheck(token, env, deps);
-
-  if (options.json) {
-    emitJson(
-      buildEnvelope("login", true, {
-        stored: true,
-        ...(selfCheck.checked
-          ? {
-              authorizedSitesCount: selfCheck.authorizedSitesCount,
-              ...(selfCheck.warning ? { warning: selfCheck.warning } : {}),
-            }
-          : {}),
-      }),
-    );
-  } else {
-    success("Logged in. Token stored at ~/.config/universe-cli/token.");
-    if (selfCheck.checked && selfCheck.warning) {
-      const warn = deps.logWarn ?? ((s: string) => log.warn(s));
-      warn(selfCheck.warning);
-    }
-  }
-}
-
 interface SelfCheckResult {
-  /** False if the proxy probe failed (network etc.) — login still succeeds. */
   checked: boolean;
   authorizedSitesCount: number;
-  /** Set only when count is 0. Carries the human-readable hint. */
   warning?: string;
 }
 
-/**
- * Best-effort post-login probe. Never throws — login itself must
- * succeed regardless of proxy reachability. If the bearer can't see
- * any authorized sites, surface the hint so users don't discover the
- * App-installation gap at `sites register` time.
- */
 async function postLoginSelfCheck(
   token: string,
   env: NodeJS.ProcessEnv,
-  deps: LoginDeps,
+  deps: LoginSdkDeps,
 ): Promise<SelfCheckResult> {
   const mkClient = deps.createProxyClient ?? defaultCreateProxyClient;
   try {
@@ -171,14 +86,161 @@ async function postLoginSelfCheck(
     const result = await client.whoami();
     const count = result.authorizedSites.length;
     if (count === 0) {
-      return {
-        checked: true,
-        authorizedSitesCount: 0,
-        warning: NO_SITES_WARNING,
-      };
+      return { checked: true, authorizedSitesCount: 0, warning: NO_SITES_WARNING };
     }
     return { checked: true, authorizedSitesCount: count };
   } catch {
     return { checked: false, authorizedSitesCount: 0 };
   }
 }
+
+/** Run the GitHub device-flow login and store the token. Yields info/progress/warning steps. */
+async function* login(
+  options: LoginOptions,
+  deps: LoginSdkDeps = {},
+): AsyncGenerator<Step, CommandResult, StepResponse> {
+  const env = deps.env ?? process.env;
+  const reqDeviceCode = deps.requestDeviceCode ?? defaultRequestDeviceCode;
+  const pollToken = deps.pollDeviceToken ?? defaultPollDeviceToken;
+  const save = deps.saveToken ?? defaultSaveToken;
+  const load = deps.loadToken ?? defaultLoadToken;
+
+  const envClientId = env["UNIVERSE_GH_CLIENT_ID"];
+  const clientId =
+    envClientId && envClientId.trim().length > 0 ? envClientId : DEFAULT_GH_CLIENT_ID;
+
+  if (!options.force) {
+    const existing = await load();
+    if (existing) {
+      yield {
+        type: "warning",
+        message:
+          "Already logged in. Run `universe logout` first or pass --force to replace the stored token.",
+      };
+      return {
+        data: buildEnvelope("login", false, {
+          stored: false,
+          error: {
+            code: EXIT_CONFIRM,
+            message:
+              "Already logged in. Run `universe logout` first or pass --force to replace the stored token.",
+          },
+        }),
+        format:
+          "Already logged in. Run `universe logout` first or pass --force to replace the stored token.",
+      };
+    }
+  }
+
+  const deviceCode = await reqDeviceCode({ clientId, scope: DEFAULT_SCOPE });
+
+  yield {
+    type: "info",
+    field: "device-code",
+    message: [
+      `Open ${deviceCode.verificationUri} in your browser`,
+      `and enter code: ${deviceCode.userCode}`,
+      `(code expires in ${Math.round(deviceCode.expiresIn / 60)} min)`,
+    ].join("\n"),
+    data: {
+      userCode: deviceCode.userCode,
+      verificationUri: deviceCode.verificationUri,
+      expiresIn: deviceCode.expiresIn,
+    },
+  };
+
+  yield { type: "progress", message: "Waiting for device authorization" };
+
+  const token = await pollToken({
+    clientId,
+    deviceCode: deviceCode.device_code,
+    interval: deviceCode.interval,
+  });
+
+  await save(token);
+
+  const selfCheck = await postLoginSelfCheck(token, env, deps);
+
+  if (selfCheck.checked && selfCheck.warning) {
+    yield { type: "warning", message: selfCheck.warning };
+  }
+
+  return {
+    data: buildEnvelope("login", true, {
+      stored: true,
+      ...(selfCheck.checked
+        ? {
+            authorizedSitesCount: selfCheck.authorizedSitesCount,
+            ...(selfCheck.warning ? { warning: selfCheck.warning } : {}),
+          }
+        : {}),
+    }),
+    format: "Logged in. Token stored at ~/.config/universe-cli/token.",
+  };
+}
+
+
+
+async function loginHandler(
+  options: LoginHandlerOptions,
+  deps: LoginHandlerDeps = {},
+): Promise<void> {
+  const success = deps.logSuccess ?? ((s: string) => log.success(s));
+  const error = deps.logError ?? ((s: string) => log.error(s));
+  const exit = deps.exit ?? exitWithCode;
+
+  let result: CommandResult;
+  try {
+    const gen = login({ force: options.force }, deps);
+    if (options.json) {
+      // In JSON mode, intercept the device-code info step to emit it as a
+      // separate JSON envelope (matching the pre-refactor behaviour).
+      result = await drive(gen, async (step) => {
+        if (step.type === "info" && step.field === "device-code" && step.data) {
+          emitJson(
+            buildEnvelope("login", true, {
+              userCode: step.data.userCode,
+              verificationUri: step.data.verificationUri,
+              expiresIn: step.data.expiresIn,
+              stored: false,
+            }),
+          );
+        }
+        return step.type === "confirm" ? false : undefined;
+      }, () => {});
+    } else {
+      result = await clackDriver(gen);
+    }
+  } catch (err) {
+    const credErr =
+      err instanceof CredentialError
+        ? err
+        : new CredentialError(err instanceof Error ? err.message : String(err));
+    exit(outputError({ json: options.json, command: "login" }, credErr, { logError: error }));
+    return;
+  }
+
+  if (!result.data.success) {
+    if (options.json) {
+      emitJson(result.data);
+    } else {
+      error(result.format);
+    }
+    exit(EXIT_CONFIRM);
+    return;
+  }
+
+  if (options.json) {
+    emitJson(result.data);
+  } else {
+    success(result.format);
+    const warning = result.data.warning as string | undefined;
+    if (warning) {
+      const warn = deps.logWarn ?? ((s: string) => log.warn(s));
+      warn(warning);
+    }
+  }
+}
+
+export { login, loginHandler };
+export type { LoginOptions, LoginSdkDeps, LoginHandlerOptions, LoginHandlerDeps };

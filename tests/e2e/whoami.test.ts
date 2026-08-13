@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { whoami } from "../../src/commands/whoami.js";
+import { whoamiHandler } from "../../src/commands/whoami.js";
 import { type FakeArtemis, startFakeArtemis } from "./_helpers/fake-artemis.js";
 import { type CliEnv, makeCliEnv } from "./_helpers/cli-env.js";
 import { runBinary } from "./_helpers/spawn-cli.js";
@@ -46,7 +46,7 @@ async function runWhoamiJson(env: NodeJS.ProcessEnv): Promise<RunResult> {
   const logSuccess = vi.fn();
   const logError = vi.fn();
   try {
-    await whoami({ json: true }, { env, exit: makeExit(captured), logSuccess, logError });
+    await whoamiHandler({ json: true }, { env, exit: makeExit(captured), logSuccess, logError });
   } catch (err) {
     if (!(err instanceof Error) || !("__exit__" in err)) throw err;
   }

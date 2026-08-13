@@ -1,24 +1,24 @@
 import { Command } from "commander";
-import { create } from "./commands/create/index.js";
-import { deploy } from "./commands/deploy.js";
-import { init } from "./commands/init.js";
-import { login } from "./commands/login.js";
-import { logout } from "./commands/logout.js";
-import { ls } from "./commands/ls.js";
-import { promote } from "./commands/promote.js";
-import { rollback } from "./commands/rollback.js";
-import { whoami } from "./commands/whoami.js";
-import { ls as sitesLs } from "./commands/sites/ls.js";
-import { register as sitesRegister } from "./commands/sites/register.js";
-import { rm as sitesRm } from "./commands/sites/rm.js";
-import { update as sitesUpdate } from "./commands/sites/update.js";
-import { approve as repoApprove } from "./commands/repo/approve.js";
-import { create as repoCreate } from "./commands/repo/create.js";
-import { ls as repoLs } from "./commands/repo/ls.js";
-import { reject as repoReject } from "./commands/repo/reject.js";
-import { rm as repoRm } from "./commands/repo/rm.js";
-import { status as repoStatus } from "./commands/repo/status.js";
-import { ls as auditLs } from "./commands/audit/ls.js";
+import { createHandler } from "./commands/create/index.js";
+import { staticDeployHandler } from "./commands/deploy.js";
+import { initHandler } from "./commands/init.js";
+import { loginHandler } from "./commands/login.js";
+import { logoutHandler } from "./commands/logout.js";
+import { staticLsHandler } from "./commands/ls.js";
+import { staticPromoteHandler } from "./commands/promote.js";
+import { staticRollbackHandler } from "./commands/rollback.js";
+import { whoamiHandler } from "./commands/whoami.js";
+import { sitesLsHandler } from "./commands/sites/ls.js";
+import { sitesRegisterHandler } from "./commands/sites/register.js";
+import { sitesRmHandler } from "./commands/sites/rm.js";
+import { sitesUpdateHandler } from "./commands/sites/update.js";
+import { repoApproveHandler } from "./commands/repo/approve.js";
+import { repoCreateHandler } from "./commands/repo/create.js";
+import { repoLsHandler } from "./commands/repo/ls.js";
+import { repoRejectHandler } from "./commands/repo/reject.js";
+import { repoRmHandler } from "./commands/repo/rm.js";
+import { repoStatusHandler } from "./commands/repo/status.js";
+import { auditLsHandler } from "./commands/audit/ls.js";
 import { outputError } from "./output/format.js";
 import { EXIT_USAGE, exitWithCode } from "./output/exit-codes.js";
 import { installExitNotice, refreshIfStale, spawnRefresh } from "./lib/update-notifier.js";
@@ -100,7 +100,7 @@ export async function run(argv = process.argv): Promise<void> {
         team?: string | string[];
       }>();
       try {
-        await sitesRegister({
+        await sitesRegisterHandler({
           json: opts.json ?? false,
           slug,
           team: opts.team,
@@ -117,7 +117,7 @@ export async function run(argv = process.argv): Promise<void> {
     .action(async (_opts, cmd: Command) => {
       const opts = cmd.optsWithGlobals<{ json?: boolean; mine?: boolean }>();
       try {
-        await sitesLs({
+        await sitesLsHandler({
           json: opts.json ?? false,
           mine: opts.mine ?? false,
         });
@@ -136,7 +136,7 @@ export async function run(argv = process.argv): Promise<void> {
         team?: string | string[];
       }>();
       try {
-        await sitesUpdate({
+        await sitesUpdateHandler({
           json: opts.json ?? false,
           slug,
           team: opts.team,
@@ -152,7 +152,7 @@ export async function run(argv = process.argv): Promise<void> {
     .action(async (slug: string, _opts, cmd: Command) => {
       const opts = cmd.optsWithGlobals<{ json?: boolean }>();
       try {
-        await sitesRm({ json: opts.json ?? false, slug });
+        await sitesRmHandler({ json: opts.json ?? false, slug });
       } catch (err: unknown) {
         handleActionError("sites rm", opts.json ?? false, err);
       }
@@ -174,7 +174,7 @@ export async function run(argv = process.argv): Promise<void> {
         yes?: boolean;
       }>();
       try {
-        await repoCreate({
+        await repoCreateHandler({
           json: opts.json ?? false,
           name,
           visibility: opts.visibility,
@@ -201,7 +201,7 @@ export async function run(argv = process.argv): Promise<void> {
         all?: boolean;
       }>();
       try {
-        await repoLs({
+        await repoLsHandler({
           json: opts.json ?? false,
           status: opts.status,
           mine: opts.mine ?? false,
@@ -219,7 +219,7 @@ export async function run(argv = process.argv): Promise<void> {
     .action(async (id: string, _opts, cmd: Command) => {
       const opts = cmd.optsWithGlobals<{ json?: boolean; yes?: boolean }>();
       try {
-        await repoApprove({
+        await repoApproveHandler({
           json: opts.json ?? false,
           id,
           yes: opts.yes ?? false,
@@ -241,7 +241,7 @@ export async function run(argv = process.argv): Promise<void> {
         yes?: boolean;
       }>();
       try {
-        await repoReject({
+        await repoRejectHandler({
           json: opts.json ?? false,
           id,
           reason: opts.reason,
@@ -258,7 +258,7 @@ export async function run(argv = process.argv): Promise<void> {
     .action(async (id: string, _opts, cmd: Command) => {
       const opts = cmd.optsWithGlobals<{ json?: boolean }>();
       try {
-        await repoStatus({ json: opts.json ?? false, id });
+        await repoStatusHandler({ json: opts.json ?? false, id });
       } catch (err: unknown) {
         handleActionError("repo status", opts.json ?? false, err);
       }
@@ -271,7 +271,7 @@ export async function run(argv = process.argv): Promise<void> {
     .action(async (id: string, _opts, cmd: Command) => {
       const opts = cmd.optsWithGlobals<{ json?: boolean; yes?: boolean }>();
       try {
-        await repoRm({
+        await repoRmHandler({
           json: opts.json ?? false,
           id,
           yes: opts.yes ?? false,
@@ -293,7 +293,7 @@ export async function run(argv = process.argv): Promise<void> {
         dir?: string;
       }>();
       try {
-        await deploy({
+        await staticDeployHandler({
           json: opts.json ?? false,
           promote: opts.promote ?? false,
           dir: opts.dir,
@@ -310,7 +310,7 @@ export async function run(argv = process.argv): Promise<void> {
     .action(async (_opts, cmd: Command) => {
       const opts = cmd.optsWithGlobals<{ json?: boolean; from?: string }>();
       try {
-        await promote({
+        await staticPromoteHandler({
           json: opts.json ?? false,
           from: opts.from,
         });
@@ -326,7 +326,7 @@ export async function run(argv = process.argv): Promise<void> {
     .action(async (_opts, cmd: Command) => {
       const opts = cmd.optsWithGlobals<{ json?: boolean; to?: string }>();
       try {
-        await rollback({
+        await staticRollbackHandler({
           json: opts.json ?? false,
           to: opts.to,
         });
@@ -342,7 +342,7 @@ export async function run(argv = process.argv): Promise<void> {
     .action(async (_opts, cmd: Command) => {
       const opts = cmd.optsWithGlobals<{ json?: boolean; site?: string }>();
       try {
-        await ls({
+        await staticLsHandler({
           json: opts.json ?? false,
           site: opts.site,
         });
@@ -375,7 +375,7 @@ export async function run(argv = process.argv): Promise<void> {
         pkgManager?: string;
       }>();
       try {
-        await create({
+        await createHandler({
           forceFetch: opts.forceFetch ?? false,
           json: opts.json ?? false,
           yes: opts.yes ?? false,
@@ -407,7 +407,7 @@ export async function run(argv = process.argv): Promise<void> {
         yes?: boolean;
       }>();
       try {
-        await init({
+        await initHandler({
           json: opts.json ?? false,
           site: opts.site,
           dir: opts.dir,
@@ -426,7 +426,7 @@ export async function run(argv = process.argv): Promise<void> {
     .action(async (_opts, cmd: Command) => {
       const opts = cmd.optsWithGlobals<{ json?: boolean; force?: boolean }>();
       try {
-        await login({
+        await loginHandler({
           json: opts.json ?? false,
           force: opts.force ?? false,
         });
@@ -441,7 +441,7 @@ export async function run(argv = process.argv): Promise<void> {
     .action(async (_opts, cmd: Command) => {
       const opts = cmd.optsWithGlobals<{ json?: boolean }>();
       try {
-        await logout({ json: opts.json ?? false });
+        await logoutHandler({ json: opts.json ?? false });
       } catch (err: unknown) {
         handleActionError("logout", opts.json ?? false, err);
       }
@@ -453,7 +453,7 @@ export async function run(argv = process.argv): Promise<void> {
     .action(async (_opts, cmd: Command) => {
       const opts = cmd.optsWithGlobals<{ json?: boolean }>();
       try {
-        await whoami({ json: opts.json ?? false });
+        await whoamiHandler({ json: opts.json ?? false });
       } catch (err: unknown) {
         handleActionError("whoami", opts.json ?? false, err);
       }
@@ -477,7 +477,7 @@ export async function run(argv = process.argv): Promise<void> {
         limit?: number;
       }>();
       try {
-        await auditLs({
+        await auditLsHandler({
           json: opts.json ?? false,
           actor: opts.actor,
           action: opts.action,

@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { ls } from "../../../src/commands/repo/ls.js";
+import { repoLs, repoLsHandler } from "../../../src/commands/repo/ls.js";
+import { CredentialError, UsageError } from "../../../src/errors.js";
+import { ProxyError } from "../../../src/lib/proxy-client.js";
 
 function repoRow(over: Record<string, unknown> = {}) {
   return {
@@ -43,19 +45,14 @@ function mkDeps(overrides: Record<string, unknown> = {}) {
     env: {} as NodeJS.ProcessEnv,
     resolveIdentity: vi.fn().mockResolvedValue({ token: "ghp_x", source: "env_GITHUB_TOKEN" }),
     createProxyClient: vi.fn().mockReturnValue(mkProxy()),
-    logMessage: vi.fn(),
-    logError: vi.fn(),
-    exit: vi.fn().mockImplementation((_c: number) => {
-      throw new Error("__exit__");
-    }),
     ...overrides,
   };
 }
 
-describe("repo ls command", () => {
+describe("repoLs SDK", () => {
   it("passes status + mine through to the client", async () => {
     const deps = mkDeps();
-    await ls({ json: false, status: "active", mine: true }, deps);
+    await repoLs({ status: "active", mine: true }, deps);
     const proxy = deps.createProxyClient.mock.results[0]?.value;
     expect(proxy.listRepoRequests).toHaveBeenCalledWith({
       status: "active",
@@ -63,6 +60,84 @@ describe("repo ls command", () => {
     });
   });
 
+  it("returns CommandResult with envelope containing default status", async () => {
+    const deps = mkDeps();
+    const result = await repoLs({}, deps);
+    expect(result.data.command).toBe("repo ls");
+    expect(result.data.status).toBe("pending");
+    expect(result.data.count).toBe(1);
+    expect(result.data.requests).toHaveLength(1);
+    expect(result.data.identitySource).toBe("env_GITHUB_TOKEN");
+  });
+
+  it("returns status-specific empty message when there are no rows", async () => {
+    const proxy = mkProxy();
+    proxy.listRepoRequests = vi.fn().mockResolvedValue([]);
+    const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
+    const result = await repoLs({ status: "pending" }, deps);
+    expect(result.format).toBe("No pending repo requests.");
+  });
+
+  it("renders a table for human output", async () => {
+    const deps = mkDeps();
+    const result = await repoLs({}, deps);
+    expect(result.format).toContain("alpha");
+  });
+
+  it("throws UsageError for an unknown --status before any call", async () => {
+    const deps = mkDeps();
+    await expect(repoLs({ status: "actve" }, deps)).rejects.toThrow(UsageError);
+    expect(deps.createProxyClient).not.toHaveBeenCalled();
+  });
+
+  it("accepts the 'all' pseudo-status", async () => {
+    const deps = mkDeps();
+    await repoLs({ status: "all" }, deps);
+    const proxy = deps.createProxyClient.mock.results[0]?.value;
+    expect(proxy.listRepoRequests).toHaveBeenCalledWith({
+      status: "all",
+      mine: false,
+    });
+  });
+
+  it("maps --all to status 'all'", async () => {
+    const deps = mkDeps();
+    await repoLs({ all: true }, deps);
+    const proxy = deps.createProxyClient.mock.results[0]?.value;
+    expect(proxy.listRepoRequests).toHaveBeenCalledWith({
+      status: "all",
+      mine: false,
+    });
+  });
+
+  it("--all overrides an explicit --status", async () => {
+    const deps = mkDeps();
+    await repoLs({ status: "pending", all: true }, deps);
+    const proxy = deps.createProxyClient.mock.results[0]?.value;
+    expect(proxy.listRepoRequests).toHaveBeenCalledWith({
+      status: "all",
+      mine: false,
+    });
+  });
+
+  it("throws CredentialError when identity chain returns null", async () => {
+    const deps = mkDeps({
+      resolveIdentity: vi.fn().mockResolvedValue(null),
+    });
+    await expect(repoLs({}, deps)).rejects.toThrow(CredentialError);
+  });
+
+  it("throws proxy errors directly", async () => {
+    const proxy = mkProxy();
+    proxy.listRepoRequests = vi
+      .fn()
+      .mockRejectedValue(new ProxyError(403, "user_unauthorized", "denied"));
+    const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
+    await expect(repoLs({}, deps)).rejects.toThrow(ProxyError);
+  });
+});
+
+describe("repoLsHandler", () => {
   it("emits a JSON envelope with the effective default status", async () => {
     const stdout: string[] = [];
     const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((c: unknown) => {
@@ -70,7 +145,7 @@ describe("repo ls command", () => {
       return true;
     });
     const deps = mkDeps();
-    await ls({ json: true }, deps);
+    await repoLsHandler({ json: true }, deps);
     writeSpy.mockRestore();
 
     const env = JSON.parse(stdout.join("").trim());
@@ -83,63 +158,52 @@ describe("repo ls command", () => {
   it("prints a status-specific empty message when there are no rows", async () => {
     const proxy = mkProxy();
     proxy.listRepoRequests = vi.fn().mockResolvedValue([]);
-    const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
-    await ls({ json: false, status: "pending" }, deps);
-    expect(deps.logMessage).toHaveBeenCalledWith("No pending repo requests.");
+    const logMessage = vi.fn();
+    const deps = {
+      ...mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) }),
+      logMessage,
+      logError: vi.fn(),
+    };
+    await repoLsHandler({ json: false, status: "pending" }, deps);
+    expect(logMessage).toHaveBeenCalledWith("No pending repo requests.");
   });
 
   it("renders a table for human output", async () => {
-    const deps = mkDeps();
-    await ls({ json: false }, deps);
-    expect(deps.logMessage).toHaveBeenCalledWith(expect.stringContaining("alpha"));
+    const logMessage = vi.fn();
+    const deps = { ...mkDeps(), logMessage, logError: vi.fn() };
+    await repoLsHandler({ json: false }, deps);
+    expect(logMessage).toHaveBeenCalledWith(expect.stringContaining("alpha"));
   });
 
   it("rejects an unknown --status with a usage error before any call", async () => {
-    const deps = mkDeps();
-    await expect(ls({ json: false, status: "actve" }, deps)).rejects.toThrow("__exit__");
-    expect(deps.exit).toHaveBeenCalledWith(10);
+    const exit = vi.fn().mockImplementation((_c: number) => {
+      throw new Error("__exit__");
+    });
+    const logError = vi.fn();
+    const deps = { ...mkDeps(), logError, exit };
+    await expect(repoLsHandler({ json: false, status: "actve" }, deps)).rejects.toThrow(
+      "__exit__",
+    );
+    expect(exit).toHaveBeenCalledWith(10);
     expect(deps.createProxyClient).not.toHaveBeenCalled();
   });
 
-  it("accepts the 'all' pseudo-status", async () => {
-    const deps = mkDeps();
-    await ls({ json: false, status: "all" }, deps);
-    const proxy = deps.createProxyClient.mock.results[0]?.value;
-    expect(proxy.listRepoRequests).toHaveBeenCalledWith({
-      status: "all",
-      mine: false,
-    });
-  });
-
-  it("maps --all to status 'all'", async () => {
-    const deps = mkDeps();
-    await ls({ json: false, all: true }, deps);
-    const proxy = deps.createProxyClient.mock.results[0]?.value;
-    expect(proxy.listRepoRequests).toHaveBeenCalledWith({
-      status: "all",
-      mine: false,
-    });
-  });
-
-  it("--all overrides an explicit --status", async () => {
-    const deps = mkDeps();
-    await ls({ json: false, status: "pending", all: true }, deps);
-    const proxy = deps.createProxyClient.mock.results[0]?.value;
-    expect(proxy.listRepoRequests).toHaveBeenCalledWith({
-      status: "all",
-      mine: false,
-    });
-  });
-
   it("maps a proxy error to its exit code", async () => {
-    const { ProxyError } = await import("../../../src/lib/proxy-client.js");
     const proxy = mkProxy();
     proxy.listRepoRequests = vi
       .fn()
       .mockRejectedValue(new ProxyError(403, "user_unauthorized", "denied"));
-    const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
-    await expect(ls({ json: false }, deps)).rejects.toThrow("__exit__");
-    expect(deps.exit).toHaveBeenCalledWith(12); // EXIT_CREDENTIALS
-    expect(deps.logError).toHaveBeenCalledWith(expect.stringContaining("user_unauthorized"));
+    const exit = vi.fn().mockImplementation((_c: number) => {
+      throw new Error("__exit__");
+    });
+    const logError = vi.fn();
+    const deps = {
+      ...mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) }),
+      logError,
+      exit,
+    };
+    await expect(repoLsHandler({ json: false }, deps)).rejects.toThrow("__exit__");
+    expect(exit).toHaveBeenCalledWith(12); // EXIT_CREDENTIALS
+    expect(logError).toHaveBeenCalledWith(expect.stringContaining("user_unauthorized"));
   });
 });

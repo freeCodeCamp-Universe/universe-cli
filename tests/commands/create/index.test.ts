@@ -2,13 +2,13 @@ import { existsSync, lstatSync, mkdtempSync, readdirSync, readFileSync, readlink
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { create } from "../../../src/commands/create/index.js";
+import { createHandler } from "../../../src/commands/create/index.js";
 import type {
   PackageManager,
   RunOptions,
 } from "../../../src/commands/create/package-manager/package-manager.service.js";
 import { CreateInputValidationService } from "../../../src/commands/create/create-input-validation-service.js";
-import type { CreateSelections, Prompt } from "../../../src/commands/create/prompt/prompt.port.js";
+import type { CreateSelections } from "../../../src/commands/create/types.js";
 import type { DonationConfigWriter } from "../../../src/commands/create/io/donation-config-writer.port.js";
 import type { RepoInitialiser } from "../../../src/commands/create/io/repo-initialiser.port.js";
 import type { SkillInstaller } from "../../../src/commands/create/io/skill-installer.port.js";
@@ -56,11 +56,19 @@ interface MakeDepsOptions {
   skillInstaller?: SkillInstaller;
 }
 
-const createPromptPort = (selection: CreateSelections | null): Prompt => ({
-  promptForCreateInputs() {
-    return Promise.resolve(selection);
-  },
-});
+// Backward-compat stub — makeDeps ignores this arg
+const createPromptPort = (_selection: CreateSelections | null) => null;
+
+function selectionToOptions(selection: CreateSelections) {
+  return {
+    name: selection.name,
+    runtime: selection.runtime,
+    framework: selection.framework,
+    databases: selection.databases,
+    services: selection.platformServices,
+    packageManager: selection.packageManager,
+  };
+}
 
 class StubRepoInitialiser implements RepoInitialiser {
   async initialise(_projectDirectory: string): Promise<void> {
@@ -144,7 +152,8 @@ const collectGeneratedFiles = (directory: string): Record<string, string> => {
   );
 };
 
-const makeDeps = (cwd: string, prompt: Prompt, options: MakeDepsOptions = {}) => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const makeDeps = (cwd: string, _prompt?: any, options: MakeDepsOptions = {}) => {
   const {
     packageManager = { specifyDeps: vi.fn(() => Promise.resolve()) },
     repoInitialiser = new StubRepoInitialiser(),
@@ -154,13 +163,10 @@ const makeDeps = (cwd: string, prompt: Prompt, options: MakeDepsOptions = {}) =>
     cwd,
     donationConfigWriter: new StubDonationConfigWriter(),
     exit: vi.fn(),
-    isTTY: true,
-    logger: { error: vi.fn(), info: vi.fn(), success: vi.fn(), warn: vi.fn() },
+    logError: vi.fn(),
     packageManager,
-    prompt,
     repoInitialiser,
     skillInstaller,
-    spinner: { message: vi.fn(), start: vi.fn(), stop: vi.fn(), error: vi.fn() },
     validator: new CreateInputValidationService((path) => existsSync(join(cwd, path)), runtimeData),
   };
 };
@@ -186,8 +192,8 @@ describe("create", () => {
       platformServices: [],
     });
 
-    const deps = makeDeps(rootDirectory, createPromptPort(selection));
-    await create({ json: false }, deps);
+    const deps = makeDeps(rootDirectory);
+    await createHandler({ json: false, yes: true, ...selectionToOptions(selection) }, deps);
 
     expect(deps.exit).not.toHaveBeenCalled();
     expect(existsSync(join(rootDirectory, selection.name))).toBe(true);
@@ -201,8 +207,8 @@ describe("create", () => {
       platformServices: [],
     });
 
-    const deps = makeDeps(rootDirectory, createPromptPort(selection));
-    await create({ json: false }, deps);
+    const deps = makeDeps(rootDirectory);
+    await createHandler({ json: false, yes: true, ...selectionToOptions(selection) }, deps);
 
     expect(deps.exit).not.toHaveBeenCalled();
 
@@ -220,8 +226,8 @@ describe("create", () => {
       platformServices: ["analytics", "auth", "email"],
     });
 
-    const deps = makeDeps(rootDirectory, createPromptPort(selection));
-    await create({ json: false }, deps);
+    const deps = makeDeps(rootDirectory);
+    await createHandler({ json: false, yes: true, ...selectionToOptions(selection) }, deps);
 
     expect(deps.exit).not.toHaveBeenCalled();
 
@@ -244,7 +250,7 @@ describe("create", () => {
     const deps = makeDeps(rootDirectory, createPromptPort(selection), {
       packageManager: { specifyDeps },
     });
-    await create({ json: false }, deps);
+    await createHandler({ json: false, yes: true, ...selectionToOptions(selection) }, deps);
 
     expect(deps.exit).not.toHaveBeenCalled();
     expect(specifyDeps).toHaveBeenCalledWith({
@@ -263,7 +269,7 @@ describe("create", () => {
     const deps = makeDeps(rootDirectory, createPromptPort(selection), {
       packageManager: { specifyDeps },
     });
-    await create({ json: false }, deps);
+    await createHandler({ json: false, yes: true, ...selectionToOptions(selection) }, deps);
 
     expect(deps.exit).not.toHaveBeenCalled();
     expect(specifyDeps).toHaveBeenCalledWith({
@@ -289,7 +295,7 @@ describe("create", () => {
     const deps = makeDeps(rootDirectory, createPromptPort(selection), {
       repoInitialiser,
     });
-    await create({ json: false }, deps);
+    await createHandler({ json: false, yes: true, ...selectionToOptions(selection) }, deps);
 
     expect(deps.exit).not.toHaveBeenCalled();
     expect(repoInitialiser.initialise).toHaveBeenCalledWith(join(rootDirectory, name));
@@ -306,7 +312,7 @@ describe("create", () => {
     const deps = makeDeps(rootDirectory, createPromptPort(selection), {
       repoInitialiser,
     });
-    await create({ json: false }, deps);
+    await createHandler({ json: false, yes: true, ...selectionToOptions(selection) }, deps);
 
     expect(deps.exit).not.toHaveBeenCalled();
     expect(repoInitialiser.initialise).toHaveBeenCalledWith(join(rootDirectory, name));
@@ -328,7 +334,7 @@ describe("create", () => {
     const deps = makeDeps(rootDirectory, createPromptPort(selection), {
       skillInstaller,
     });
-    await create({ json: false }, deps);
+    await createHandler({ json: false, yes: true, ...selectionToOptions(selection) }, deps);
 
     expect(deps.exit).not.toHaveBeenCalled();
     expect(skillInstaller.installSkills).toHaveBeenCalledWith(
@@ -366,7 +372,7 @@ describe("create", () => {
       repoInitialiser,
       skillInstaller,
     });
-    await create({ json: false }, deps);
+    await createHandler({ json: false, yes: true, ...selectionToOptions(selection) }, deps);
 
     expect(deps.exit).not.toHaveBeenCalled();
     expect(callOrder).toStrictEqual(["installSkills", "initialise"]);
@@ -387,7 +393,7 @@ describe("create", () => {
     const deps = makeDeps(rootDirectory, createPromptPort(selection), {
       skillInstaller,
     });
-    await create({ json: false }, deps);
+    await createHandler({ json: false, yes: true, ...selectionToOptions(selection) }, deps);
 
     expect(deps.exit).not.toHaveBeenCalled();
     expect(skillInstaller.installSkills).not.toHaveBeenCalled();
@@ -396,8 +402,8 @@ describe("create", () => {
   it("snapshots generated Static scaffold output", async () => {
     const selection = createStaticSelection("snapshot-static-app");
 
-    const deps = makeDeps(rootDirectory, createPromptPort(selection));
-    await create({ json: false }, deps);
+    const deps = makeDeps(rootDirectory);
+    await createHandler({ json: false, yes: true, ...selectionToOptions(selection) }, deps);
 
     expect(deps.exit).not.toHaveBeenCalled();
 
@@ -438,7 +444,7 @@ describe("create", () => {
       },
     };
 
-    await create({ json: false }, deps);
+    await createHandler({ json: false, yes: true, ...selectionToOptions(createPromptResult) }, deps);
 
     expect(writerCalls).toStrictEqual([
       {
@@ -454,13 +460,11 @@ describe("create", () => {
         targetDirectory: "/workspace/hello-universe",
       },
     ]);
-    expect(deps.logger.success).toHaveBeenCalled();
   });
 
-  it("returns non-zero when prompt flow is cancelled", async () => {
-    const deps = makeDeps("/workspace", createPromptPort(null));
-
-    await create({ json: false }, deps);
+  it("errors with EXIT_USAGE when name is missing in non-interactive mode", async () => {
+    const deps = makeDeps("/workspace");
+    await createHandler({ json: false, yes: true }, deps);
     expect(deps.exit).toHaveBeenCalledWith(10);
   });
 
@@ -475,9 +479,9 @@ describe("create", () => {
       },
     };
 
-    await create({ json: false }, deps);
+    await createHandler({ json: false, yes: true, ...selectionToOptions(createPromptResult) }, deps);
 
-    expect(deps.logger.error).toHaveBeenCalledWith("InvalidName");
+    expect(deps.logError).toHaveBeenCalledWith("InvalidName");
   });
 
   it("throws a typed write failure when scaffold output cannot be written", async () => {
@@ -508,22 +512,19 @@ describe("create", () => {
       },
     };
 
-    await create({ json: false }, deps);
+    await createHandler({ json: false, yes: true, ...selectionToOptions(createPromptResult) }, deps);
 
-    expect(deps.logger.error).toHaveBeenCalledWith(message("/workspace/hello-universe"));
+    expect(deps.logError).toHaveBeenCalledWith(message("/workspace/hello-universe"));
   });
 
   describe("non-interactive mode", () => {
     it("scaffolds with explicit flags and skips prompts", async () => {
-      const prompt = createPromptPort(null);
-      const promptSpy = vi.spyOn(prompt, "promptForCreateInputs");
-
       const deps = {
-        ...makeDeps(rootDirectory, prompt),
+        ...makeDeps(rootDirectory),
         isTTY: false,
       };
 
-      await create(
+      await createHandler(
         {
           json: false,
           yes: true,
@@ -537,10 +538,8 @@ describe("create", () => {
         deps,
       );
 
-      expect(promptSpy).not.toHaveBeenCalled();
       expect(deps.exit).not.toHaveBeenCalled();
       expect(existsSync(join(rootDirectory, "non-interactive-app"))).toBe(true);
-      expect(deps.logger.success).toHaveBeenCalled();
     });
 
     it("emits a JSON success envelope when --json is set", async () => {
@@ -557,7 +556,7 @@ describe("create", () => {
         isTTY: false,
       };
 
-      await create(
+      await createHandler(
         {
           json: true,
           yes: true,
@@ -599,7 +598,7 @@ describe("create", () => {
       };
       const validateSpy = vi.spyOn(deps.validator, "validateCreateInput");
 
-      await create(
+      await createHandler(
         {
           json: false,
           yes: true,
@@ -621,7 +620,7 @@ describe("create", () => {
       };
       const validateSpy = vi.spyOn(deps.validator, "validateCreateInput");
 
-      await create(
+      await createHandler(
         {
           json: false,
           yes: true,
@@ -643,7 +642,7 @@ describe("create", () => {
       };
       const validateSpy = vi.spyOn(deps.validator, "validateCreateInput");
 
-      await create(
+      await createHandler(
         {
           json: false,
           yes: true,
@@ -674,7 +673,7 @@ describe("create", () => {
         loadLayersFn: modifiedLoader,
       };
 
-      await create(
+      await createHandler(
         {
           json: false,
           yes: true,
@@ -706,10 +705,10 @@ describe("create", () => {
         loadLayersFn: modifiedLoader,
       };
 
-      await create({ json: false, yes: true, name: "no-rec-runtime" }, deps);
+      await createHandler({ json: false, yes: true, name: "no-rec-runtime" }, deps);
 
       expect(deps.exit).toHaveBeenCalled();
-      expect(deps.logger.error).toHaveBeenCalledWith(
+      expect(deps.logError).toHaveBeenCalledWith(
         expect.stringContaining("No recommended runtimes"),
       );
     });
@@ -734,10 +733,10 @@ describe("create", () => {
         loadLayersFn: modifiedLoader,
       };
 
-      await create({ json: false, yes: true, name: "no-rec-fw", runtime: "node" }, deps);
+      await createHandler({ json: false, yes: true, name: "no-rec-fw", runtime: "node" }, deps);
 
       expect(deps.exit).toHaveBeenCalled();
-      expect(deps.logger.error).toHaveBeenCalledWith(
+      expect(deps.logError).toHaveBeenCalledWith(
         expect.stringContaining("No recommended frameworks"),
       );
     });
@@ -758,29 +757,26 @@ describe("create", () => {
         loadLayersFn: modifiedLoader,
       };
 
-      await create(
+      await createHandler(
         { json: false, yes: true, name: "no-rec-pm", runtime: "node", framework: "express" },
         deps,
       );
 
       expect(deps.exit).toHaveBeenCalled();
-      expect(deps.logger.error).toHaveBeenCalledWith(
+      expect(deps.logError).toHaveBeenCalledWith(
         expect.stringContaining("No recommended package managers"),
       );
     });
   });
 
-  it("warns when Docker daemon is unavailable after scaffolding", async () => {
+  it("succeeds even when Docker daemon is unavailable", async () => {
     const { isDockerAvailable } = await import("../../../src/commands/create/docker-check.js");
     vi.mocked(isDockerAvailable).mockReturnValue(false);
 
-    const deps = makeDeps(rootDirectory, createPromptPort(createPromptResult));
-    await create({ json: false }, deps);
+    const deps = makeDeps(rootDirectory);
+    await createHandler({ json: false, yes: true, ...selectionToOptions(createPromptResult) }, deps);
 
     expect(deps.exit).not.toHaveBeenCalled();
-    expect(deps.logger.warn).toHaveBeenCalledWith(
-      expect.stringContaining("docker daemon unavailable"),
-    );
 
     vi.mocked(isDockerAvailable).mockReturnValue(true);
   });
@@ -800,7 +796,7 @@ describe("create", () => {
       isTTY: false,
     };
 
-    await create({ json: false, yes: true, name: "compat-version-app" }, deps);
+    await createHandler({ json: false, yes: true, name: "compat-version-app" }, deps);
 
     expect(ensureTemplateDir).toHaveBeenCalledWith("1.5.0", expect.anything());
   });

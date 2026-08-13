@@ -1,5 +1,5 @@
 import { stringify as stringifyYaml } from "yaml";
-import type { CreateSelections } from "./prompt/prompt.port.js";
+import type { CreateSelections } from "./types.js";
 
 interface PlatformManifestGenerator {
   generatePlatformManifest(input: CreateSelections): string;

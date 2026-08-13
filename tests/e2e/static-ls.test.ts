@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ls } from "../../src/commands/ls.js";
+import { staticLsHandler } from "../../src/commands/ls.js";
 import { type CliEnv, makeCliEnv } from "./_helpers/cli-env.js";
 import { type FakeArtemis, startFakeArtemis } from "./_helpers/fake-artemis.js";
 
@@ -46,7 +46,7 @@ async function runLsJson(
   const logError = vi.fn();
   const logInfo = vi.fn();
   try {
-    await ls(options, {
+    await staticLsHandler(options, {
       cwd: cwd ?? process.cwd(),
       env,
       exit: makeExit(captured),

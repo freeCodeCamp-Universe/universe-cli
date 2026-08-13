@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { update } from "../../../src/commands/sites/update.js";
+import { sitesUpdate, sitesUpdateHandler } from "../../../src/commands/sites/update.js";
+import { CredentialError } from "../../../src/errors.js";
+import { ProxyError } from "../../../src/lib/proxy-client.js";
 
 function mkProxy() {
   return {
@@ -31,19 +33,14 @@ function mkDeps(overrides: Record<string, unknown> = {}) {
       source: "env_GITHUB_TOKEN",
     }),
     createProxyClient: vi.fn().mockReturnValue(mkProxy()),
-    logSuccess: vi.fn(),
-    logError: vi.fn(),
-    exit: vi.fn().mockImplementation((_code: number) => {
-      throw new Error("__exit__");
-    }),
     ...overrides,
   };
 }
 
-describe("sites update command", () => {
+describe("sitesUpdate SDK", () => {
   it("calls updateSite with slug + parsed teams", async () => {
     const deps = mkDeps();
-    await update({ json: false, slug: "blog", team: "news-editors,platform" }, deps);
+    await sitesUpdate({ slug: "blog", team: "news-editors,platform" }, deps);
     const proxy = deps.createProxyClient.mock.results[0]?.value;
     expect(proxy.updateSite).toHaveBeenCalledWith({
       slug: "blog",
@@ -51,29 +48,58 @@ describe("sites update command", () => {
     });
   });
 
-  it("rejects empty slug with EXIT_USAGE", async () => {
+  it("returns CommandResult with envelope and format", async () => {
     const deps = mkDeps();
-    await expect(update({ json: false, slug: "", team: "staff" }, deps)).rejects.toThrow(
-      "__exit__",
+    const result = await sitesUpdate({ slug: "blog", team: "news-editors,platform" }, deps);
+    expect(result.data.command).toBe("sites update");
+    expect(result.data.success).toBe(true);
+    expect(result.data.slug).toBe("blog");
+    expect(result.data.teams).toEqual(["news-editors", "platform"]);
+    expect(result.data.identitySource).toBe("env_GITHUB_TOKEN");
+    expect(result.format).toContain("Updated blog");
+  });
+
+  it("throws UsageError on empty slug", async () => {
+    const deps = mkDeps();
+    await expect(sitesUpdate({ slug: "", team: "staff" }, deps)).rejects.toThrow(
+      /slug is required/i,
     );
-    expect(deps.exit).toHaveBeenCalledWith(10);
-    expect(deps.logError).toHaveBeenCalledWith(expect.stringMatching(/slug is required/i));
   });
 
-  it("rejects missing --team with EXIT_USAGE (server enforces too)", async () => {
+  it("throws UsageError on missing --team", async () => {
     const deps = mkDeps();
-    await expect(update({ json: false, slug: "blog" }, deps)).rejects.toThrow("__exit__");
-    expect(deps.exit).toHaveBeenCalledWith(10);
-    expect(deps.logError).toHaveBeenCalledWith(expect.stringMatching(/--team is required/i));
+    await expect(sitesUpdate({ slug: "blog" }, deps)).rejects.toThrow(/--team is required/i);
   });
 
-  it("rejects empty --team string with EXIT_USAGE", async () => {
+  it("throws UsageError on empty --team string", async () => {
     const deps = mkDeps();
-    await expect(update({ json: false, slug: "blog", team: "" }, deps)).rejects.toThrow("__exit__");
-    expect(deps.exit).toHaveBeenCalledWith(10);
-    expect(deps.logError).toHaveBeenCalledWith(expect.stringMatching(/--team is required/i));
+    await expect(sitesUpdate({ slug: "blog", team: "" }, deps)).rejects.toThrow(
+      /--team is required/i,
+    );
   });
 
+  it("throws CredentialError when identity chain returns null", async () => {
+    const deps = mkDeps({
+      resolveIdentity: vi.fn().mockResolvedValue(null),
+    });
+    await expect(sitesUpdate({ slug: "blog", team: "staff" }, deps)).rejects.toThrow(
+      CredentialError,
+    );
+  });
+
+  it("throws proxy errors directly", async () => {
+    const proxy = mkProxy();
+    proxy.updateSite = vi
+      .fn()
+      .mockRejectedValue(new ProxyError(404, "not_found", "site is not registered"));
+    const deps = mkDeps({
+      createProxyClient: vi.fn().mockReturnValue(proxy),
+    });
+    await expect(sitesUpdate({ slug: "ghost", team: "staff" }, deps)).rejects.toThrow(ProxyError);
+  });
+});
+
+describe("sitesUpdateHandler", () => {
   it("emits success envelope in JSON mode", async () => {
     const stdout: string[] = [];
     const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
@@ -82,7 +108,7 @@ describe("sites update command", () => {
     });
 
     const deps = mkDeps();
-    await update({ json: true, slug: "blog", team: "news-editors,platform" }, deps);
+    await sitesUpdateHandler({ json: true, slug: "blog", team: "news-editors,platform" }, deps);
     writeSpy.mockRestore();
 
     const env = JSON.parse(stdout.join("").trim());
@@ -90,24 +116,76 @@ describe("sites update command", () => {
     expect(env.success).toBe(true);
     expect(env.slug).toBe("blog");
     expect(env.teams).toEqual(["news-editors", "platform"]);
-    // identitySource is carried through to JSON envelope for parity
-    // with whoami/deploy/promote/rollback.
     expect(env.identitySource).toBe("env_GITHUB_TOKEN");
   });
 
+  it("calls logSuccess in text mode", async () => {
+    const logSuccess = vi.fn();
+    const deps = { ...mkDeps(), logSuccess, logError: vi.fn() };
+    await sitesUpdateHandler(
+      { json: false, slug: "blog", team: "news-editors,platform" },
+      deps,
+    );
+    expect(logSuccess).toHaveBeenCalledWith(expect.stringContaining("Updated blog"));
+  });
+
+  it("rejects empty slug with EXIT_USAGE", async () => {
+    const exit = vi.fn().mockImplementation((_code: number) => {
+      throw new Error("__exit__");
+    });
+    const logError = vi.fn();
+    const deps = { ...mkDeps(), logError, exit };
+    await expect(
+      sitesUpdateHandler({ json: false, slug: "", team: "staff" }, deps),
+    ).rejects.toThrow("__exit__");
+    expect(exit).toHaveBeenCalledWith(10);
+    expect(logError).toHaveBeenCalledWith(expect.stringMatching(/slug is required/i));
+  });
+
+  it("rejects missing --team with EXIT_USAGE (server enforces too)", async () => {
+    const exit = vi.fn().mockImplementation((_code: number) => {
+      throw new Error("__exit__");
+    });
+    const logError = vi.fn();
+    const deps = { ...mkDeps(), logError, exit };
+    await expect(sitesUpdateHandler({ json: false, slug: "blog" }, deps)).rejects.toThrow(
+      "__exit__",
+    );
+    expect(exit).toHaveBeenCalledWith(10);
+    expect(logError).toHaveBeenCalledWith(expect.stringMatching(/--team is required/i));
+  });
+
+  it("rejects empty --team string with EXIT_USAGE", async () => {
+    const exit = vi.fn().mockImplementation((_code: number) => {
+      throw new Error("__exit__");
+    });
+    const logError = vi.fn();
+    const deps = { ...mkDeps(), logError, exit };
+    await expect(
+      sitesUpdateHandler({ json: false, slug: "blog", team: "" }, deps),
+    ).rejects.toThrow("__exit__");
+    expect(exit).toHaveBeenCalledWith(10);
+    expect(logError).toHaveBeenCalledWith(expect.stringMatching(/--team is required/i));
+  });
+
   it("maps proxy 404 not_found to surfaced code", async () => {
-    const { ProxyError } = await import("../../../src/lib/proxy-client.js");
     const proxy = mkProxy();
     proxy.updateSite = vi
       .fn()
       .mockRejectedValue(new ProxyError(404, "not_found", "site is not registered"));
-    const deps = mkDeps({
-      createProxyClient: vi.fn().mockReturnValue(proxy),
+    const exit = vi.fn().mockImplementation((_code: number) => {
+      throw new Error("__exit__");
     });
-    await expect(update({ json: false, slug: "ghost", team: "staff" }, deps)).rejects.toThrow(
-      "__exit__",
-    );
-    expect(deps.exit).toHaveBeenCalledWith(10);
-    expect(deps.logError).toHaveBeenCalledWith(expect.stringContaining("not_found"));
+    const logError = vi.fn();
+    const deps = {
+      ...mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) }),
+      logError,
+      exit,
+    };
+    await expect(
+      sitesUpdateHandler({ json: false, slug: "ghost", team: "staff" }, deps),
+    ).rejects.toThrow("__exit__");
+    expect(exit).toHaveBeenCalledWith(10);
+    expect(logError).toHaveBeenCalledWith(expect.stringContaining("not_found"));
   });
 });

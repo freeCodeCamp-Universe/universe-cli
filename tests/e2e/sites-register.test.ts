@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { register } from "../../src/commands/sites/register.js";
+import { sitesRegisterHandler } from "../../src/commands/sites/register.js";
 import { type CliEnv, makeCliEnv } from "./_helpers/cli-env.js";
 import { type FakeArtemis, startFakeArtemis } from "./_helpers/fake-artemis.js";
 
@@ -36,7 +36,7 @@ async function runRegister(
   });
   const captured: CapturedExit = {};
   try {
-    await register(options, {
+    await sitesRegisterHandler(options, {
       env,
       exit: makeExit(captured),
       logSuccess: vi.fn(),

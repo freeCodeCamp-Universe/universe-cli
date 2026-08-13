@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { status } from "../../../src/commands/repo/status.js";
+import { repoStatus, repoStatusHandler } from "../../../src/commands/repo/status.js";
+import { CredentialError, UsageError } from "../../../src/errors.js";
 import { ProxyError } from "../../../src/lib/proxy-client.js";
 
 function repoRow(over: Record<string, unknown> = {}) {
@@ -46,20 +47,54 @@ function mkDeps(overrides: Record<string, unknown> = {}) {
     env: {} as NodeJS.ProcessEnv,
     resolveIdentity: vi.fn().mockResolvedValue({ token: "ghp_x", source: "env_GITHUB_TOKEN" }),
     createProxyClient: vi.fn().mockReturnValue(mkProxy()),
-    logMessage: vi.fn(),
-    logError: vi.fn(),
-    exit: vi.fn().mockImplementation((_c: number) => {
-      throw new Error("__exit__");
-    }),
     ...overrides,
   };
 }
 
-describe("repo status command", () => {
-  it("requires an id", async () => {
+describe("repoStatus SDK", () => {
+  it("returns CommandResult with envelope and format", async () => {
     const deps = mkDeps();
-    await expect(status({ json: false, id: "" }, deps)).rejects.toThrow("__exit__");
-    expect(deps.exit).toHaveBeenCalledWith(10);
+    const result = await repoStatus({ id: "req_001" }, deps);
+    expect(result.data.command).toBe("repo status");
+    expect(result.data.success).toBe(true);
+    const request = result.data.request as { id: string; status: string };
+    expect(request.id).toBe("req_001");
+    expect(request.status).toBe("active");
+    expect(result.data.identitySource).toBe("env_GITHUB_TOKEN");
+    expect(result.format).toContain("Status:       active");
+  });
+
+  it("throws UsageError on empty id", async () => {
+    const deps = mkDeps();
+    await expect(repoStatus({ id: "" }, deps)).rejects.toThrow(UsageError);
+  });
+
+  it("throws CredentialError when identity chain returns null", async () => {
+    const deps = mkDeps({
+      resolveIdentity: vi.fn().mockResolvedValue(null),
+    });
+    await expect(repoStatus({ id: "req_001" }, deps)).rejects.toThrow(CredentialError);
+  });
+
+  it("throws proxy errors directly", async () => {
+    const proxy = mkProxy();
+    proxy.getRepoRequest = vi
+      .fn()
+      .mockRejectedValue(new ProxyError(403, "user_unauthorized", "denied"));
+    const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
+    await expect(repoStatus({ id: "req_001" }, deps)).rejects.toThrow(ProxyError);
+  });
+});
+
+describe("repoStatusHandler", () => {
+  it("requires an id", async () => {
+    const exit = vi.fn().mockImplementation((_c: number) => {
+      throw new Error("__exit__");
+    });
+    const logError = vi.fn();
+    const deps = { ...mkDeps(), logError, exit };
+    await expect(repoStatusHandler({ json: false, id: "" }, deps)).rejects.toThrow("__exit__");
+    expect(exit).toHaveBeenCalledWith(10);
   });
 
   it("emits the row as a JSON envelope", async () => {
@@ -69,7 +104,7 @@ describe("repo status command", () => {
       return true;
     });
     const deps = mkDeps();
-    await status({ json: true, id: "req_001" }, deps);
+    await repoStatusHandler({ json: true, id: "req_001" }, deps);
     writeSpy.mockRestore();
 
     const env = JSON.parse(stdout.join("").trim());
@@ -88,8 +123,18 @@ describe("repo status command", () => {
     proxy.getRepoRequest = vi
       .fn()
       .mockRejectedValue(new ProxyError(403, "user_unauthorized", "denied"));
-    const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
-    await expect(status({ json: true, id: "req_001" }, deps)).rejects.toThrow("__exit__");
+    const exit = vi.fn().mockImplementation((_c: number) => {
+      throw new Error("__exit__");
+    });
+    const logError = vi.fn();
+    const deps = {
+      ...mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) }),
+      logError,
+      exit,
+    };
+    await expect(repoStatusHandler({ json: true, id: "req_001" }, deps)).rejects.toThrow(
+      "__exit__",
+    );
     writeSpy.mockRestore();
 
     const env = JSON.parse(stdout.join("").trim());
@@ -99,8 +144,9 @@ describe("repo status command", () => {
   });
 
   it("renders a human key/value block", async () => {
-    const deps = mkDeps();
-    await status({ json: false, id: "req_001" }, deps);
-    expect(deps.logMessage).toHaveBeenCalledWith(expect.stringContaining("Status:       active"));
+    const logMessage = vi.fn();
+    const deps = { ...mkDeps(), logMessage, logError: vi.fn() };
+    await repoStatusHandler({ json: false, id: "req_001" }, deps);
+    expect(logMessage).toHaveBeenCalledWith(expect.stringContaining("Status:       active"));
   });
 });

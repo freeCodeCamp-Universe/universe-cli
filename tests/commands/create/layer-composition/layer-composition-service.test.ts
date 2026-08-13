@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import type { CreateSelections } from "../../../../src/commands/create/prompt/prompt.port.js";
+import type { CreateSelections } from "../../../../src/commands/create/types.js";
 import { LayerCompositionService } from "../../../../src/commands/create/layer-composition/layer-composition-service.js";
 import { loadFromDir } from "../../../../src/commands/create/layer-composition/template-provider.js";
 import { resolve } from "node:path";

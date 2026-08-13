@@ -8,16 +8,19 @@ import {
   type ProxyClientConfig,
 } from "../../lib/proxy-client.js";
 
-export interface AuditCommandDeps {
+interface AuditSdkDeps {
   env?: NodeJS.ProcessEnv;
   resolveIdentity?: typeof defaultResolveIdentity;
   createProxyClient?: (cfg: ProxyClientConfig) => ProxyClient;
-  logMessage?: (msg: string) => void;
-  logError?: (msg: string) => void;
-  exit?: (code: number) => never;
 }
 
-export async function setupClient(deps: AuditCommandDeps): Promise<{
+interface AuditCommandDeps extends AuditSdkDeps {
+  logMessage?: (msg: string) => void;
+  logError?: (msg: string) => void;
+  exit?: (code: number) => void;
+}
+
+export async function setupClient(deps: AuditSdkDeps): Promise<{
   client: ProxyClient;
   identitySource: string;
 }> {
@@ -42,3 +45,4 @@ export async function setupClient(deps: AuditCommandDeps): Promise<{
 }
 
 export { UsageError };
+export type { AuditCommandDeps, AuditSdkDeps };

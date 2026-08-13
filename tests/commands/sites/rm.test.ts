@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { rm } from "../../../src/commands/sites/rm.js";
+import { sitesRm, sitesRmHandler } from "../../../src/commands/sites/rm.js";
+import { CredentialError } from "../../../src/errors.js";
+import { ProxyError } from "../../../src/lib/proxy-client.js";
 
 function mkProxy() {
   return {
@@ -25,30 +27,54 @@ function mkDeps(overrides: Record<string, unknown> = {}) {
       source: "env_GITHUB_TOKEN",
     }),
     createProxyClient: vi.fn().mockReturnValue(mkProxy()),
-    logSuccess: vi.fn(),
-    logError: vi.fn(),
-    exit: vi.fn().mockImplementation((_code: number) => {
-      throw new Error("__exit__");
-    }),
     ...overrides,
   };
 }
 
-describe("sites rm command", () => {
+describe("sitesRm SDK", () => {
   it("calls deleteSite with slug", async () => {
     const deps = mkDeps();
-    await rm({ json: false, slug: "blog" }, deps);
+    await sitesRm({ slug: "blog" }, deps);
     const proxy = deps.createProxyClient.mock.results[0]?.value;
     expect(proxy.deleteSite).toHaveBeenCalledWith({ slug: "blog" });
   });
 
-  it("rejects empty slug with EXIT_USAGE", async () => {
+  it("returns CommandResult with envelope and format", async () => {
     const deps = mkDeps();
-    await expect(rm({ json: false, slug: "" }, deps)).rejects.toThrow("__exit__");
-    expect(deps.exit).toHaveBeenCalledWith(10);
-    expect(deps.logError).toHaveBeenCalledWith(expect.stringMatching(/slug is required/i));
+    const result = await sitesRm({ slug: "blog" }, deps);
+    expect(result.data.command).toBe("sites rm");
+    expect(result.data.success).toBe(true);
+    expect(result.data.slug).toBe("blog");
+    expect(result.data.deleted).toBe(true);
+    expect(result.data.identitySource).toBe("env_GITHUB_TOKEN");
+    expect(result.format).toContain("Deleted blog");
   });
 
+  it("throws UsageError on empty slug", async () => {
+    const deps = mkDeps();
+    await expect(sitesRm({ slug: "" }, deps)).rejects.toThrow(/slug is required/i);
+  });
+
+  it("throws CredentialError when identity chain returns null", async () => {
+    const deps = mkDeps({
+      resolveIdentity: vi.fn().mockResolvedValue(null),
+    });
+    await expect(sitesRm({ slug: "blog" }, deps)).rejects.toThrow(CredentialError);
+  });
+
+  it("throws proxy errors directly", async () => {
+    const proxy = mkProxy();
+    proxy.deleteSite = vi
+      .fn()
+      .mockRejectedValue(new ProxyError(404, "not_found", "site is not registered"));
+    const deps = mkDeps({
+      createProxyClient: vi.fn().mockReturnValue(proxy),
+    });
+    await expect(sitesRm({ slug: "ghost" }, deps)).rejects.toThrow(ProxyError);
+  });
+});
+
+describe("sitesRmHandler", () => {
   it("emits success envelope in JSON mode", async () => {
     const stdout: string[] = [];
     const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
@@ -57,7 +83,7 @@ describe("sites rm command", () => {
     });
 
     const deps = mkDeps();
-    await rm({ json: true, slug: "blog" }, deps);
+    await sitesRmHandler({ json: true, slug: "blog" }, deps);
     writeSpy.mockRestore();
 
     const env = JSON.parse(stdout.join("").trim());
@@ -65,36 +91,62 @@ describe("sites rm command", () => {
     expect(env.success).toBe(true);
     expect(env.slug).toBe("blog");
     expect(env.deleted).toBe(true);
-    // identitySource is carried through to JSON envelope for parity
-    // with whoami/deploy/promote/rollback.
     expect(env.identitySource).toBe("env_GITHUB_TOKEN");
   });
 
+  it("calls logSuccess in text mode", async () => {
+    const logSuccess = vi.fn();
+    const deps = { ...mkDeps(), logSuccess, logError: vi.fn() };
+    await sitesRmHandler({ json: false, slug: "blog" }, deps);
+    expect(logSuccess).toHaveBeenCalledWith(expect.stringContaining("Deleted blog"));
+  });
+
+  it("rejects empty slug with EXIT_USAGE", async () => {
+    const exit = vi.fn().mockImplementation((_code: number) => {
+      throw new Error("__exit__");
+    });
+    const logError = vi.fn();
+    const deps = { ...mkDeps(), logError, exit };
+    await expect(sitesRmHandler({ json: false, slug: "" }, deps)).rejects.toThrow("__exit__");
+    expect(exit).toHaveBeenCalledWith(10);
+    expect(logError).toHaveBeenCalledWith(expect.stringMatching(/slug is required/i));
+  });
+
   it("maps proxy 404 not_found to surfaced code", async () => {
-    const { ProxyError } = await import("../../../src/lib/proxy-client.js");
     const proxy = mkProxy();
     proxy.deleteSite = vi
       .fn()
       .mockRejectedValue(new ProxyError(404, "not_found", "site is not registered"));
-    const deps = mkDeps({
-      createProxyClient: vi.fn().mockReturnValue(proxy),
+    const exit = vi.fn().mockImplementation((_code: number) => {
+      throw new Error("__exit__");
     });
-    await expect(rm({ json: false, slug: "ghost" }, deps)).rejects.toThrow("__exit__");
-    expect(deps.exit).toHaveBeenCalledWith(10);
-    expect(deps.logError).toHaveBeenCalledWith(expect.stringContaining("not_found"));
+    const logError = vi.fn();
+    const deps = {
+      ...mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) }),
+      logError,
+      exit,
+    };
+    await expect(sitesRmHandler({ json: false, slug: "ghost" }, deps)).rejects.toThrow("__exit__");
+    expect(exit).toHaveBeenCalledWith(10);
+    expect(logError).toHaveBeenCalledWith(expect.stringContaining("not_found"));
   });
 
   it("maps proxy 403 user_unauthorized to EXIT_CREDENTIALS", async () => {
-    const { ProxyError } = await import("../../../src/lib/proxy-client.js");
     const proxy = mkProxy();
     proxy.deleteSite = vi
       .fn()
       .mockRejectedValue(new ProxyError(403, "user_unauthorized", "not on staff team"));
-    const deps = mkDeps({
-      createProxyClient: vi.fn().mockReturnValue(proxy),
+    const exit = vi.fn().mockImplementation((_code: number) => {
+      throw new Error("__exit__");
     });
-    await expect(rm({ json: false, slug: "blog" }, deps)).rejects.toThrow("__exit__");
-    expect(deps.exit).toHaveBeenCalledWith(12);
-    expect(deps.logError).toHaveBeenCalledWith(expect.stringContaining("user_unauthorized"));
+    const logError = vi.fn();
+    const deps = {
+      ...mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) }),
+      logError,
+      exit,
+    };
+    await expect(sitesRmHandler({ json: false, slug: "blog" }, deps)).rejects.toThrow("__exit__");
+    expect(exit).toHaveBeenCalledWith(12);
+    expect(logError).toHaveBeenCalledWith(expect.stringContaining("user_unauthorized"));
   });
 });

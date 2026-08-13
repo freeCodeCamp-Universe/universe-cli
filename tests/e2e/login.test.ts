@@ -1,8 +1,11 @@
 import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { login } from "../../src/commands/login.js";
-import { runDeviceFlow as realRunDeviceFlow } from "../../src/lib/device-flow.js";
+import { loginHandler } from "../../src/commands/login.js";
+import {
+  requestDeviceCode as realRequestDeviceCode,
+  pollDeviceToken as realPollDeviceToken,
+} from "../../src/lib/device-flow.js";
 import { type CliEnv, makeCliEnv } from "./_helpers/cli-env.js";
 import { type FakeGithub, startFakeGithub } from "./_helpers/fake-github.js";
 
@@ -56,16 +59,20 @@ describe("login E2E (real device-flow loop, token persisted to tmp XDG)", () => 
     const fetchOverride = github.rewriteFetch();
 
     try {
-      await login(
+      await loginHandler(
         { json: true, force: false },
         {
           env: env.env,
           exit: makeExit(captured),
           logSuccess: vi.fn(),
-          logInfo: vi.fn(),
           logError: vi.fn(),
-          runDeviceFlow: (opts) =>
-            realRunDeviceFlow({
+          requestDeviceCode: (opts) =>
+            realRequestDeviceCode({
+              ...opts,
+              fetch: fetchOverride,
+            }),
+          pollDeviceToken: (opts) =>
+            realPollDeviceToken({
               ...opts,
               fetch: fetchOverride,
               sleep: fastSleep,
@@ -116,15 +123,15 @@ describe("login E2E (real device-flow loop, token persisted to tmp XDG)", () => 
     const captured: CapturedExit = {};
 
     try {
-      await login(
+      await loginHandler(
         { json: true, force: false },
         {
           env: env.env,
           exit: makeExit(captured),
           logSuccess: vi.fn(),
-          logInfo: vi.fn(),
           logError: vi.fn(),
-          runDeviceFlow: () => Promise.reject(new Error("device flow should not run")),
+          requestDeviceCode: () => Promise.reject(new Error("device flow should not run")),
+          pollDeviceToken: () => Promise.reject(new Error("device flow should not run")),
         },
       );
     } catch (err) {

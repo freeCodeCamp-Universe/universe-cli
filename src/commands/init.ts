@@ -1,16 +1,35 @@
 import { execSync } from "node:child_process";
 import { readFile, stat, writeFile } from "node:fs/promises";
 import { basename, resolve } from "node:path";
-import { confirm, isCancel, log, text } from "@clack/prompts";
+import { log } from "@clack/prompts";
 import { stringify as stringifyYaml } from "yaml";
-import { ConfigError, ConfirmError } from "../errors.js";
+import { ConfigError } from "../errors.js";
+import { clackDriver } from "../interaction/clack-driver.js";
+import { silentDrive } from "../interaction/silent-driver.js";
+import type { Step, StepResponse } from "../interaction/step.js";
 import { parsePlatformYaml } from "../lib/platform-yaml.js";
 import { SITE_NAME_PATTERN } from "../lib/platform-yaml.schema.js";
+import type { CommandResult } from "../output/command-result.js";
 import { buildEnvelope } from "../output/envelope.js";
 import { exitWithCode } from "../output/exit-codes.js";
 import { emitJson, outputError } from "../output/format.js";
 
-export interface InitOptions {
+interface InitOptions {
+  site?: string;
+  dir?: string;
+  force?: boolean;
+  yes?: boolean;
+}
+
+interface InitSdkDeps {
+  cwd?: string;
+  readFileText?: (path: string) => Promise<string>;
+  writeFileText?: (path: string, data: string) => Promise<void>;
+  pathExists?: (path: string) => Promise<boolean>;
+  detectGitRemote?: (cwd: string) => string | null;
+}
+
+interface InitHandlerOptions {
   json: boolean;
   site?: string;
   dir?: string;
@@ -18,25 +37,12 @@ export interface InitOptions {
   yes?: boolean;
 }
 
-export interface PromptTextOptions {
-  message: string;
-  defaultValue: string;
-  validate?: (value: string) => string | undefined;
-}
-
-export interface InitDeps {
-  cwd?: string;
-  readFileText?: (path: string) => Promise<string>;
-  writeFileText?: (path: string, data: string) => Promise<void>;
-  pathExists?: (path: string) => Promise<boolean>;
-  detectGitRemote?: (cwd: string) => string | null;
+interface InitHandlerDeps extends InitSdkDeps {
   isTTY?: boolean;
-  promptText?: (opts: PromptTextOptions) => Promise<string>;
-  promptConfirm?: (message: string, initial: boolean) => Promise<boolean>;
   logSuccess?: (msg: string) => void;
   logInfo?: (msg: string) => void;
   logError?: (msg: string) => void;
-  exit?: (code: number) => never;
+  exit?: (code: number) => void;
 }
 
 interface BuildBlock {
@@ -72,38 +78,20 @@ const defaultDetectGitRemote = (cwd: string): string | null => {
   }
 };
 
-const defaultPromptText = async (opts: PromptTextOptions): Promise<string> => {
-  const validate = opts.validate;
-  const r = await text({
-    message: opts.message,
-    placeholder: opts.defaultValue,
-    defaultValue: opts.defaultValue,
-    ...(validate ? { validate: (v: string | undefined) => validate(v ?? "") } : {}),
-  });
-  if (isCancel(r)) throw new ConfirmError("init cancelled");
-  return r.trim().length > 0 ? r.trim() : opts.defaultValue;
-};
-
-const defaultPromptConfirm = async (message: string, initial: boolean): Promise<boolean> => {
-  const r = await confirm({ message, initialValue: initial });
-  if (isCancel(r)) throw new ConfirmError("init cancelled");
-  return r === true;
-};
-
-export function sanitizeSite(raw: string): string {
+function sanitizeSite(raw: string): string {
   const slug = raw
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-+|-+$/g, "")
+    .replace(/[^a-z0-9]+/gu, "-")
+    .replace(/-+/gu, "-")
+    .replace(/^-+|-+$/gu, "")
     .slice(0, 63)
-    .replace(/-+$/g, "");
+    .replace(/-+$/gu, "");
   return SITE_NAME_PATTERN.test(slug) ? slug : "";
 }
 
-export function repoNameFromRemote(url: string): string {
-  const noSuffix = url.trim().replace(/\.git$/, "");
-  const segments = noSuffix.split(/[/:]/).filter((s) => s.length > 0);
+function repoNameFromRemote(url: string): string {
+  const noSuffix = url.trim().replace(/\.git$/u, "");
+  const segments = noSuffix.split(/[/:]/u).filter((s) => s.length > 0);
   return segments[segments.length - 1] ?? "";
 }
 
@@ -181,104 +169,149 @@ function renderYaml(site: string, build: BuildBlock | null): string {
   return header + stringifyYaml(doc);
 }
 
-export async function init(options: InitOptions, deps: InitDeps = {}): Promise<void> {
+/** Generate a `platform.yaml` config file. Yields text/confirm steps for interactive input. */
+async function* init(
+  options: InitOptions,
+  deps: InitSdkDeps = {},
+): AsyncGenerator<Step, CommandResult, StepResponse> {
   const cwd = deps.cwd ?? process.cwd();
   const readFileText = deps.readFileText ?? defaultReadFileText;
   const writeFileText = deps.writeFileText ?? defaultWriteFileText;
   const pathExists = deps.pathExists ?? defaultPathExists;
   const detectGitRemote = deps.detectGitRemote ?? defaultDetectGitRemote;
-  const isTTY = deps.isTTY ?? Boolean(process.stdin.isTTY);
-  const promptText = deps.promptText ?? defaultPromptText;
-  const promptConfirm = deps.promptConfirm ?? defaultPromptConfirm;
+
+  const target = resolve(cwd, "platform.yaml");
+  if ((await pathExists(target)) && !options.force) {
+    throw new ConfigError(`platform.yaml already exists in ${cwd}. Pass --force to overwrite.`);
+  }
+
+  const derivedSite = deriveSite(cwd, detectGitRemote(cwd));
+  const detectedCommand = await detectBuildCommand(cwd, readFileText, pathExists);
+
+  let site: string;
+  let build: BuildBlock | null = null;
+
+  if (!options.yes && !options.site) {
+    site = ((yield {
+      type: "text",
+      field: "site",
+      message: "Site slug (becomes <slug>.freecode.camp)",
+      placeholder: derivedSite,
+      default: derivedSite,
+      validate: siteValidator,
+    }) as string) || derivedSite;
+
+    const wantBuild = (yield {
+      type: "confirm",
+      field: "want-build",
+      message: "Does this project run a build command before deploy?",
+      default: detectedCommand !== null,
+    }) as boolean;
+
+    if (wantBuild) {
+      const command = ((yield {
+        type: "text",
+        field: "build-command",
+        message: "Build command",
+        default: detectedCommand ?? "npm run build",
+        validate: nonEmptyValidator,
+      }) as string) || (detectedCommand ?? "npm run build");
+
+      const output = ((yield {
+        type: "text",
+        field: "build-output",
+        message: "Build output directory (uploaded to the proxy)",
+        default: options.dir?.trim() || DEFAULT_OUTPUT,
+        validate: nonEmptyValidator,
+      }) as string) || (options.dir?.trim() || DEFAULT_OUTPUT);
+
+      build = { command, output };
+    } else {
+      const output = ((yield {
+        type: "text",
+        field: "output-dir",
+        message: "Directory with pre-built files to deploy",
+        default: options.dir?.trim() || DEFAULT_OUTPUT,
+        validate: nonEmptyValidator,
+      }) as string) || (options.dir?.trim() || DEFAULT_OUTPUT);
+
+      if (output !== DEFAULT_OUTPUT) build = { output };
+    }
+  } else {
+    site = options.site?.trim() || derivedSite;
+    const output = options.dir?.trim() || DEFAULT_OUTPUT;
+    if (detectedCommand) {
+      build = { command: detectedCommand, output };
+    } else if (output !== DEFAULT_OUTPUT) {
+      build = { output };
+    }
+  }
+
+  const content = renderYaml(site, build);
+
+  const parsed = parsePlatformYaml(content);
+  if (!parsed.ok) {
+    throw new ConfigError(`generated platform.yaml failed validation: ${parsed.error}`);
+  }
+
+  await writeFileText(target, content);
+
+  const lines = [`Created platform.yaml`, ``, `  Path:     ${target}`, `  Site:     ${site}`];
+  if (build?.command) lines.push(`  Build:    ${build.command}`);
+  lines.push(`  Output:   ${build?.output ?? DEFAULT_OUTPUT}`);
+  lines.push(``, `Next: universe static deploy`);
+
+  return {
+    data: buildEnvelope("init", true, {
+      path: target,
+      site,
+      build: build ? { command: build.command ?? null, output: build.output } : null,
+    }),
+    format: lines.join("\n"),
+  };
+}
+
+
+
+async function initHandler(
+  options: InitHandlerOptions,
+  deps: InitHandlerDeps = {},
+): Promise<void> {
   const success = deps.logSuccess ?? ((s: string) => log.success(s));
   const info = deps.logInfo ?? ((s: string) => log.info(s));
   const error = deps.logError ?? ((s: string) => log.error(s));
   const exit = deps.exit ?? exitWithCode;
-
+  const isTTY = deps.isTTY ?? Boolean(process.stdin.isTTY);
   const interactive = isTTY && !options.yes && !options.json;
 
+  const sdkOpts: InitOptions = {
+    site: options.site,
+    dir: options.dir,
+    force: options.force,
+    yes: !interactive,
+  };
+
+  let result: CommandResult;
   try {
-    const target = resolve(cwd, "platform.yaml");
-    if ((await pathExists(target)) && !options.force) {
-      throw new ConfigError(`platform.yaml already exists in ${cwd}. Pass --force to overwrite.`);
-    }
-
-    const derivedSite = deriveSite(cwd, detectGitRemote(cwd));
-    const detectedCommand = await detectBuildCommand(cwd, readFileText, pathExists);
-
-    let site = options.site?.trim() || derivedSite;
-    let build: BuildBlock | null = null;
-
     if (interactive) {
-      site = await promptText({
-        message: "Site slug (becomes <slug>.freecode.camp)",
-        defaultValue: derivedSite,
-        validate: siteValidator,
-      });
-
-      const wantBuild = await promptConfirm(
-        "Does this project run a build command before deploy?",
-        detectedCommand !== null,
-      );
-
-      if (wantBuild) {
-        const command = await promptText({
-          message: "Build command",
-          defaultValue: detectedCommand ?? "npm run build",
-          validate: nonEmptyValidator,
-        });
-        const output = await promptText({
-          message: "Build output directory (uploaded to the proxy)",
-          defaultValue: options.dir?.trim() || DEFAULT_OUTPUT,
-          validate: nonEmptyValidator,
-        });
-        build = { command, output };
-      } else {
-        const output = await promptText({
-          message: "Directory with pre-built files to deploy",
-          defaultValue: options.dir?.trim() || DEFAULT_OUTPUT,
-          validate: nonEmptyValidator,
-        });
-        if (output !== DEFAULT_OUTPUT) build = { output };
-      }
+      result = await clackDriver(init(sdkOpts, deps));
     } else {
-      const output = options.dir?.trim() || DEFAULT_OUTPUT;
-      if (detectedCommand) {
-        build = { command: detectedCommand, output };
-      } else if (output !== DEFAULT_OUTPUT) {
-        build = { output };
-      }
+      result = await silentDrive(init(sdkOpts, deps));
     }
-
-    const content = renderYaml(site, build);
-
-    const parsed = parsePlatformYaml(content);
-    if (!parsed.ok) {
-      throw new ConfigError(`generated platform.yaml failed validation: ${parsed.error}`);
-    }
-
-    await writeFileText(target, content);
-
-    if (options.json) {
-      emitJson(
-        buildEnvelope("init", true, {
-          path: target,
-          site,
-          build: build ? { command: build.command ?? null, output: build.output } : null,
-        }),
-      );
-      return;
-    }
-
-    if (!interactive) {
-      info(`Wrote platform.yaml for site '${site}'.`);
-    }
-    const lines = [`Created platform.yaml`, ``, `  Path:     ${target}`, `  Site:     ${site}`];
-    if (build?.command) lines.push(`  Build:    ${build.command}`);
-    lines.push(`  Output:   ${build?.output ?? DEFAULT_OUTPUT}`);
-    lines.push(``, `Next: universe static deploy`);
-    success(lines.join("\n"));
   } catch (err) {
     exit(outputError({ json: options.json, command: "init" }, err, { logError: error }));
+    return;
+  }
+
+  if (options.json) {
+    emitJson(result.data);
+  } else {
+    if (!interactive) {
+      info(`Wrote platform.yaml for site '${result.data.site}'.`);
+    }
+    success(result.format);
   }
 }
+
+export { init, initHandler, sanitizeSite, repoNameFromRemote };
+export type { InitOptions, InitSdkDeps, InitHandlerOptions, InitHandlerDeps };

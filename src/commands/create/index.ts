@@ -1,4 +1,8 @@
 import { existsSync } from "node:fs";
+import { log } from "@clack/prompts";
+import { clackDriver } from "../../interaction/clack-driver.js";
+import { silentDrive } from "../../interaction/silent-driver.js";
+import type { Step, StepResponse } from "../../interaction/step.js";
 import type { ProjectWriter } from "./io/project-writer.port.js";
 import {
   LayerCompositionService,
@@ -14,8 +18,7 @@ import {
   PlatformManifestService,
   type PlatformManifestGenerator,
 } from "./platform-manifest-service.js";
-import type { CreateSelections, Prompt } from "./prompt/prompt.port.js";
-import { ClackPrompt } from "./prompt/clack-prompt.js";
+import type { CreateSelections } from "./types.js";
 import type { DonationConfigWriter } from "./io/donation-config-writer.port.js";
 import { LocalDonationConfigWriter } from "./io/local-donation-config-writer.js";
 import type { RepoInitialiser } from "./io/repo-initialiser.port.js";
@@ -27,9 +30,11 @@ import {
   type CreateInputValidator,
 } from "./create-input-validation-service.js";
 import {
+  databaseOptions,
   recommendedFrameworkOptions,
   recommendedPackageManagerOptions,
   recommendedRuntimeOptions,
+  serviceOptions,
 } from "./layer-composition/allowed-configuration.js";
 import type {
   DatabaseOption,
@@ -37,10 +42,10 @@ import type {
   ServiceOption,
 } from "./layer-composition/schemas/layers.js";
 import { getLabel } from "./layer-composition/labels.js";
-import { clackLogger, silentLogger, type Logger } from "../../output/logger.js";
-import { clackSpinner, silentSpinner, type Spinner } from "../../output/spinner.js";
+import type { LabelCategory } from "./layer-composition/labels.js";
 import { exitWithCode } from "../../output/exit-codes.js";
 import { UsageError } from "../../errors.js";
+import type { CommandResult } from "../../output/command-result.js";
 import { buildEnvelope } from "../../output/envelope.js";
 import { emitJson, outputError } from "../../output/format.js";
 import { LocalProjectWriter } from "./io/local-project-writer.js";
@@ -52,14 +57,35 @@ import { resolveTemplateVersions, formatTemplateNotice } from "../../lib/templat
 import { isDisabled } from "../../lib/version-utils.js";
 import { isDockerAvailable } from "./docker-check.js";
 
-export interface HandlerResult {
-  exitCode: number;
-  meta?: Record<string, string>;
-}
-
+const PROJECT_NAME_PATTERN = /^[a-z][a-z0-9-]{2,49}$/;
 const defaultFilesystemWriter: ProjectWriter = new LocalProjectWriter();
 
-export interface CreateOptions {
+interface CreateOptions {
+  forceFetch?: boolean;
+  name?: string;
+  runtime?: string;
+  framework?: string;
+  databases?: string[];
+  services?: string[];
+  packageManager?: string;
+  yes?: boolean;
+}
+
+interface CreateDeps {
+  cwd?: string;
+  env?: NodeJS.ProcessEnv;
+  donationConfigWriter?: DonationConfigWriter;
+  filesystemWriter?: ProjectWriter;
+  layerResolver?: LayerComposer;
+  packageManager?: PackageManager;
+  platformManifestGenerator?: PlatformManifestGenerator;
+  repoInitialiser?: RepoInitialiser;
+  skillInstaller?: SkillInstaller;
+  loadLayersFn?: (dir: string) => Promise<TemplateData>;
+  validator?: CreateInputValidator;
+}
+
+interface CreateHandlerOptions {
   json: boolean;
   forceFetch?: boolean;
   yes?: boolean;
@@ -71,29 +97,31 @@ export interface CreateOptions {
   packageManager?: string;
 }
 
-export interface CreateDeps {
-  cwd?: string;
-  donationConfigWriter?: DonationConfigWriter;
-  exit?: (code: number) => void;
-  filesystemWriter?: ProjectWriter;
+interface CreateHandlerDeps extends CreateDeps {
   isTTY?: boolean;
-  layerResolver?: LayerComposer;
-  logger?: Logger;
-  packageManager?: PackageManager;
-  platformManifestGenerator?: PlatformManifestGenerator;
-  prompt?: Prompt;
-  repoInitialiser?: RepoInitialiser;
-  skillInstaller?: SkillInstaller;
-  spinner?: Spinner;
-  loadLayersFn?: (dir: string) => Promise<TemplateData>;
-  validator?: CreateInputValidator;
+  logError?: (msg: string) => void;
+  exit?: (code: number) => void;
 }
 
-export const create = async (options: CreateOptions, deps: CreateDeps = {}): Promise<void> => {
+function toOptions<T extends string>(
+  values: T[],
+  labels: Parameters<typeof getLabel>[0],
+  category: LabelCategory,
+): { value: T; label: string }[] {
+  return values.map((value) => ({
+    value,
+    label: getLabel(labels, category, value),
+  }));
+}
+
+/** Scaffold a new Constellation project. Yields select/multiselect/text/progress steps. */
+async function* create(
+  options: CreateOptions,
+  deps: CreateDeps = {},
+): AsyncGenerator<Step, CommandResult, StepResponse> {
   const cwd = deps.cwd ?? process.cwd();
-  const exit = deps.exit ?? exitWithCode;
+  const env = deps.env ?? process.env;
   const filesystemWriter = deps.filesystemWriter ?? defaultFilesystemWriter;
-  const logger = deps.logger ?? (options.json ? silentLogger : clackLogger);
   const packageManager =
     deps.packageManager ??
     new PackageManagerService({
@@ -104,32 +132,18 @@ export const create = async (options: CreateOptions, deps: CreateDeps = {}): Pro
   const donationConfigWriter = deps.donationConfigWriter ?? new LocalDonationConfigWriter();
   const repoInitialiser = deps.repoInitialiser ?? new GitRepoInitialiser();
   const skillInstaller = deps.skillInstaller ?? new NpxSkillInstaller();
-  const isTTY = process.stdin.isTTY;
-  const spinner = deps.spinner ?? (options.json || !isTTY ? silentSpinner() : clackSpinner());
 
   async function findTemplateVersion(range: string) {
     const { latest, latestCompatible } = await resolveTemplateVersions(range);
-
     if (!isDisabled() && latestCompatible !== latest) {
-      process.stderr.write(
-        formatTemplateNotice({
-          current: latestCompatible,
-          latest,
-        }),
-      );
+      templateVersionWarning = formatTemplateNotice({ current: latestCompatible, latest }, false);
     }
-
     return latestCompatible;
   }
 
   async function findTemplateConfig(envVersion?: string, envDir?: string) {
-    // if envDir is specified, we don't need the version (since the version is used to get the data and we have the data)
     if (envDir && envDir.length > 0)
-      return {
-        templateDir: envDir,
-        templateVersion: null,
-      };
-
+      return { templateDir: envDir, templateVersion: null };
     const version =
       envVersion && envVersion.length > 0
         ? envVersion
@@ -140,208 +154,305 @@ export const create = async (options: CreateOptions, deps: CreateDeps = {}): Pro
     };
   }
 
+  let templateVersionWarning: string | undefined;
+  const envDir = env["UNIVERSE_TEMPLATES_DIR"];
+  const envVersion = env["UNIVERSE_TEMPLATES_VERSION"];
+  const { templateDir, templateVersion } = await findTemplateConfig(envVersion, envDir);
+  if (templateVersionWarning) {
+    yield { type: "warning", message: templateVersionWarning };
+  }
+
+  const loadLayersFn = deps.loadLayersFn ?? loadFromDir;
+  const { labels, registry } = await loadLayersFn(templateDir);
+
+  const layerResolver = deps.layerResolver ?? new LayerCompositionService(labels, registry);
+  const validator =
+    deps.validator ??
+    new CreateInputValidationService((path) => existsSync(path), registry.runtime);
+
+  let selections: CreateSelections;
+
+  if (!options.yes) {
+    // Interactive: yield prompts for missing values
+    const name = ((yield {
+      type: "text",
+      field: "name",
+      message: "Enter project name",
+      placeholder: "my-project",
+      validate: (value: string) =>
+        PROJECT_NAME_PATTERN.test(value)
+          ? undefined
+          : "Name must be lowercase kebab-case, start with a letter, and be 3–50 characters long.",
+    }) as string);
+
+    const runtimes = recommendedRuntimeOptions(registry.runtime);
+    if (runtimes.length === 0) {
+      throw new UsageError("No recommended runtimes available — update your templates.");
+    }
+    let runtime: string;
+    if (runtimes.length === 1) {
+      runtime = runtimes[0];
+    } else {
+      runtime = (yield {
+        type: "select",
+        field: "runtime",
+        message: "Select runtime",
+        options: toOptions(runtimes, labels, "runtime"),
+      }) as string;
+    }
+
+    const frameworks = recommendedFrameworkOptions(registry.runtime, runtime, registry.frameworks);
+    if (frameworks.length === 0) {
+      throw new UsageError(`No recommended frameworks for runtime "${runtime}" — update your templates.`);
+    }
+    let framework: string;
+    if (frameworks.length === 1) {
+      framework = frameworks[0];
+    } else {
+      framework = (yield {
+        type: "select",
+        field: "framework",
+        message: "Select framework",
+        options: toOptions(frameworks, labels, "framework"),
+      }) as string;
+    }
+
+    const recPMs = recommendedPackageManagerOptions(
+      registry.runtime,
+      runtime,
+      registry["package-managers"],
+    );
+    if (recPMs.length === 0) {
+      throw new UsageError(`No recommended package managers for runtime "${runtime}" — update your templates.`);
+    }
+    let pm: PackageManagerOption | undefined;
+    if (recPMs.length === 1) {
+      pm = recPMs[0] as PackageManagerOption;
+    } else {
+      pm = (yield {
+        type: "select",
+        field: "packageManager",
+        message: "Select package manager",
+        options: toOptions(recPMs as PackageManagerOption[], labels, "packageManager"),
+      }) as PackageManagerOption;
+    }
+
+    const availableDatabases = databaseOptions(registry.runtime, runtime);
+    let databases: DatabaseOption[] = [];
+    if (availableDatabases.length > 0) {
+      databases = ((yield {
+        type: "multiselect",
+        field: "databases",
+        message: "Select 0 or more databases (space to select, enter to continue)",
+        options: toOptions(availableDatabases, labels, "database"),
+        required: false,
+      }) as string[]) as DatabaseOption[];
+    }
+
+    const availableServices = serviceOptions(registry.runtime, runtime);
+    let platformServices: ServiceOption[] = [];
+    if (availableServices.length > 0) {
+      platformServices = ((yield {
+        type: "multiselect",
+        field: "services",
+        message: "Select 0 or more platform services (space to select, enter to continue)",
+        options: toOptions(availableServices, labels, "service"),
+        required: false,
+      }) as string[]) as ServiceOption[];
+    }
+
+    // Summary info step
+    const summaryLines = [
+      `Creating project with:`,
+      `- Name: ${name}`,
+      `- Runtime: ${getLabel(labels, "runtime", runtime)}`,
+      `- Framework: ${getLabel(labels, "framework", framework)}`,
+    ];
+    if (pm !== undefined) {
+      summaryLines.push(`- Package manager: ${getLabel(labels, "packageManager", pm)}`);
+    }
+    if (databases.length > 0) {
+      summaryLines.push(`- Databases: ${databases.map((d) => getLabel(labels, "database", d)).join(", ")}`);
+    }
+    if (platformServices.length > 0) {
+      summaryLines.push(`- Platform services: ${platformServices.map((s) => getLabel(labels, "service", s)).join(", ")}`);
+    }
+    if (templateVersion) {
+      summaryLines.push(`- Templates version: ${templateVersion}`);
+    }
+    yield { type: "info", message: summaryLines.join("\n") };
+
+    selections = {
+      name,
+      runtime,
+      framework,
+      databases,
+      platformServices,
+      ...(pm !== undefined ? { packageManager: pm } : {}),
+    };
+  } else {
+    // Non-interactive: use provided options or defaults
+    if (!options.name) {
+      throw new UsageError("--name is required in non-interactive mode");
+    }
+
+    const recRuntimes = recommendedRuntimeOptions(registry.runtime);
+    const runtime = options.runtime ?? recRuntimes[0];
+    if (runtime === undefined) {
+      throw new UsageError("No recommended runtimes — specify --runtime explicitly or update templates.");
+    }
+
+    const recFrameworks = recommendedFrameworkOptions(registry.runtime, runtime, registry.frameworks);
+    const framework = options.framework ?? recFrameworks[0];
+    if (framework === undefined) {
+      throw new UsageError(`No recommended frameworks for runtime "${runtime}" — specify --framework explicitly or update templates.`);
+    }
+
+    const recPMs = recommendedPackageManagerOptions(
+      registry.runtime,
+      runtime,
+      registry["package-managers"],
+    );
+    const pm =
+      options.packageManager !== undefined
+        ? (options.packageManager as PackageManagerOption)
+        : recPMs.length > 0
+          ? (recPMs[0] as PackageManagerOption)
+          : undefined;
+    if (pm === undefined) {
+      throw new UsageError(`No recommended package managers for runtime "${runtime}" — specify --packageManager explicitly or update templates.`);
+    }
+
+    selections = {
+      name: options.name,
+      runtime,
+      framework,
+      databases: (options.databases ?? []) as DatabaseOption[],
+      platformServices: (options.services ?? []) as ServiceOption[],
+      ...(pm !== undefined ? { packageManager: pm } : {}),
+    };
+  }
+
+  yield { type: "progress", message: "Preparing your project" };
+
+  const validatedInput = validator.validateCreateInput(selections);
+
+  yield { type: "progress", message: "Composing project layers" };
+  const resolvedLayers = layerResolver.resolveLayers(validatedInput);
+  const targetDirectory = `${cwd}/${validatedInput.name}`;
+
+  yield { type: "progress", message: "Writing project files" };
+  await filesystemWriter.writeProject(targetDirectory, resolvedLayers.files);
+
+  if (Object.keys(resolvedLayers.symlinks).length > 0) {
+    yield { type: "progress", message: "Creating symlinks" };
+    await filesystemWriter.createSymlinks(targetDirectory, resolvedLayers.symlinks);
+  }
+
+  yield { type: "progress", message: "Writing platform manifest" };
+  await filesystemWriter.writeProject(targetDirectory, {
+    "platform.yaml": platformManifestGenerator.generatePlatformManifest(validatedInput),
+  });
+
+  yield { type: "progress", message: "Adding LICENSE" };
+  await filesystemWriter.writeProject(targetDirectory, {
+    LICENSE: bsd3ClauseLicense,
+  });
+
+  const manager = validatedInput.packageManager;
+  if (manager !== undefined) {
+    yield { type: "progress", message: `Pinning dependencies with ${manager}` };
+    await packageManager.specifyDeps({
+      manager,
+      pmVersion: registry["package-managers"][manager]?.pmVersion ?? "",
+      projectDirectory: targetDirectory,
+    });
+  }
+
+  const skills = registry.frameworks[validatedInput.framework]?.skills;
+  if (skills && skills.length > 0) {
+    yield { type: "progress", message: "Installing skills" };
+    try {
+      await skillInstaller.installSkills(skills, targetDirectory);
+    } catch (err) {
+      yield { type: "warning", message: err instanceof Error ? err.message : String(err) };
+    }
+  }
+
+  yield { type: "progress", message: "Writing donation config" };
+  await donationConfigWriter.write(targetDirectory);
+
+  yield { type: "progress", message: "Initialising git repository" };
+  await repoInitialiser.initialise(targetDirectory);
+
+  if (!isDockerAvailable()) {
+    yield {
+      type: "warning",
+      message: "docker daemon unavailable. Either restart the daemon or, if you aren't using docker, check the new project for a dev script",
+    };
+    yield {
+      type: "info",
+      message: "Once the daemon is available, `docker compose up --watch` will start the project. Otherwise check the project for a dev script.",
+    };
+  }
+
+  const format = `cd into ${validatedInput.name} and run \`docker compose up --watch\` to start the project`;
+
+  return {
+    data: buildEnvelope("create", true, {
+      path: targetDirectory,
+      name: validatedInput.name,
+      runtime: validatedInput.runtime,
+      framework: validatedInput.framework,
+      databases: validatedInput.databases,
+      platformServices: validatedInput.platformServices,
+      packageManager: validatedInput.packageManager ?? null,
+      templateVersion,
+    }),
+    format,
+  };
+}
+
+
+
+async function createHandler(
+  options: CreateHandlerOptions,
+  deps: CreateHandlerDeps = {},
+): Promise<void> {
+  const error = deps.logError ?? ((s: string) => log.error(s));
+  const exit = deps.exit ?? exitWithCode;
+  const isTTY = deps.isTTY ?? Boolean(process.stdin.isTTY);
+  const interactive = isTTY && !options.yes && !options.json;
+
+  const sdkOpts: CreateOptions = {
+    forceFetch: options.forceFetch,
+    name: options.name,
+    runtime: options.runtime,
+    framework: options.framework,
+    databases: options.databases,
+    services: options.services,
+    packageManager: options.packageManager,
+    yes: !interactive,
+  };
+
+  let result: CommandResult;
   try {
-    const envDir = process.env["UNIVERSE_TEMPLATES_DIR"];
-    const envVersion = process.env["UNIVERSE_TEMPLATES_VERSION"];
-
-    const { templateDir, templateVersion } = await findTemplateConfig(envVersion, envDir);
-
-    const loadLayersFn = deps.loadLayersFn ?? loadFromDir;
-    const { labels, registry } = await loadLayersFn(templateDir);
-
-    const isTTY = deps.isTTY ?? Boolean(process.stdin.isTTY);
-    const interactive = isTTY && !options.yes && !options.json;
-
-    const prompt =
-      deps.prompt ??
-      new ClackPrompt(registry.runtime, labels, registry.frameworks, registry["package-managers"]);
-    const layerResolver = deps.layerResolver ?? new LayerCompositionService(labels, registry);
-    const validator =
-      deps.validator ??
-      new CreateInputValidationService((path) => existsSync(path), registry.runtime);
-
-    let selections: CreateSelections;
-
     if (interactive) {
-      const promptResult = await prompt.promptForCreateInputs();
-
-      if (promptResult === null) {
-        throw new UsageError("Create cancelled.");
-      }
-
-      const summaryLines = [
-        `Creating project with:`,
-        `- Name: ${promptResult.name}`,
-        `- Runtime: ${getLabel(labels, "runtime", promptResult.runtime)}`,
-        `- Framework: ${getLabel(labels, "framework", promptResult.framework)}`,
-      ];
-
-      if (promptResult.packageManager !== undefined) {
-        summaryLines.push(
-          `- Package manager: ${getLabel(labels, "packageManager", promptResult.packageManager)}`,
-        );
-      }
-
-      if (promptResult.databases.length > 0) {
-        summaryLines.push(
-          `- Databases: ${promptResult.databases.map((d) => getLabel(labels, "database", d)).join(", ")}`,
-        );
-      }
-
-      if (promptResult.platformServices.length > 0) {
-        summaryLines.push(
-          `- Platform services: ${promptResult.platformServices.map((s) => getLabel(labels, "service", s)).join(", ")}`,
-        );
-      }
-
-      if (templateVersion) {
-        summaryLines.push(`- Templates version: ${templateVersion}`);
-      }
-
-      logger.info(summaryLines.join("\n"));
-
-      selections = promptResult;
+      result = await clackDriver(create(sdkOpts, deps));
     } else {
-      if (!options.name) {
-        throw new UsageError("--name is required in non-interactive mode");
-      }
-
-      const recRuntimes = recommendedRuntimeOptions(registry.runtime);
-      const runtime = options.runtime ?? recRuntimes[0];
-      if (runtime === undefined) {
-        throw new UsageError(
-          "No recommended runtimes — specify --runtime explicitly or update templates.",
-        );
-      }
-
-      const recFrameworks = recommendedFrameworkOptions(
-        registry.runtime,
-        runtime,
-        registry.frameworks,
-      );
-      const framework = options.framework ?? recFrameworks[0];
-      if (framework === undefined) {
-        throw new UsageError(
-          `No recommended frameworks for runtime "${runtime}" — specify --framework explicitly or update templates.`,
-        );
-      }
-
-      const recPMs = recommendedPackageManagerOptions(
-        registry.runtime,
-        runtime,
-        registry["package-managers"],
-      );
-      const pm =
-        options.packageManager !== undefined
-          ? (options.packageManager as PackageManagerOption)
-          : recPMs.length > 0
-            ? (recPMs[0] as PackageManagerOption)
-            : undefined;
-      if (pm === undefined) {
-        throw new UsageError(
-          `No recommended package managers for runtime "${runtime}" — specify --packageManager explicitly or update templates.`,
-        );
-      }
-
-      selections = {
-        name: options.name,
-        runtime,
-        framework,
-        databases: (options.databases ?? []) as DatabaseOption[],
-        platformServices: (options.services ?? []) as ServiceOption[],
-        ...(pm !== undefined ? { packageManager: pm } : {}),
-      };
-    }
-
-    spinner.start("Preparing your project");
-
-    const validatedInput = validator.validateCreateInput(selections);
-
-    spinner.message("Composing project layers");
-    const resolvedLayers = layerResolver.resolveLayers(validatedInput);
-    const targetDirectory = `${cwd}/${validatedInput.name}`;
-
-    spinner.message("Writing project files");
-    await filesystemWriter.writeProject(targetDirectory, resolvedLayers.files);
-
-    if (Object.keys(resolvedLayers.symlinks).length > 0) {
-      spinner.message("Creating symlinks");
-      await filesystemWriter.createSymlinks(targetDirectory, resolvedLayers.symlinks);
-    }
-
-    spinner.message("Writing platform manifest");
-    await filesystemWriter.writeProject(targetDirectory, {
-      "platform.yaml": platformManifestGenerator.generatePlatformManifest(validatedInput),
-    });
-
-    spinner.message("Adding LICENSE");
-    await filesystemWriter.writeProject(targetDirectory, {
-      LICENSE: bsd3ClauseLicense,
-    });
-
-    const manager = validatedInput.packageManager;
-
-    if (manager !== undefined) {
-      spinner.message(`Pinning dependencies with ${manager}`);
-      await packageManager.specifyDeps({
-        manager,
-        pmVersion: registry["package-managers"][manager]?.pmVersion ?? "",
-        projectDirectory: targetDirectory,
-      });
-    }
-
-    const skills = registry.frameworks[validatedInput.framework]?.skills;
-    if (skills && skills.length > 0) {
-      spinner.message("Installing skills");
-      try {
-        await skillInstaller.installSkills(skills, targetDirectory);
-      } catch (err) {
-        // Non-fatal: the project is already scaffolded. Route the failure to
-        // the logger (stderr / silent in --json mode) so it never lands on
-        // stdout and corrupts emitJson's envelope.
-        logger.error(err instanceof Error ? err.message : String(err));
-      }
-    }
-
-    spinner.message("Writing donation config");
-    await donationConfigWriter.write(targetDirectory);
-
-    spinner.message("Initialising git repository");
-    await repoInitialiser.initialise(targetDirectory);
-
-    spinner.stop("Project scaffolded");
-
-    if (!isDockerAvailable()) {
-      logger.warn(
-        "docker daemon unavailable. Either restart the daemon or, if you aren't using docker, check the new project for a dev script",
-      );
-      logger.info(
-        "Once the daemon is available, `docker compose up --watch` will start the project. Otherwise check the project for a dev script.",
-      );
-    } else {
-      logger.success(
-        `cd into ${validatedInput.name} and run ` +
-          "`docker compose up --watch` to start the project",
-      );
-    }
-
-    if (options.json) {
-      emitJson(
-        buildEnvelope("create", true, {
-          path: targetDirectory,
-          name: validatedInput.name,
-          runtime: validatedInput.runtime,
-          framework: validatedInput.framework,
-          databases: validatedInput.databases,
-          platformServices: validatedInput.platformServices,
-          packageManager: validatedInput.packageManager ?? null,
-          templateVersion,
-        }),
-      );
-      return;
+      result = await silentDrive(create(sdkOpts, deps));
     }
   } catch (err) {
-    spinner.error("Create failed");
-    exit(outputError({ json: options.json, command: "create" }, err, { logError: logger.error }));
+    exit(outputError({ json: options.json, command: "create" }, err, { logError: error }));
+    return;
   }
-};
+
+  if (options.json) {
+    emitJson(result.data);
+  } else {
+    log.success(result.format);
+  }
+}
+
+export { create, createHandler };
+export type { CreateOptions, CreateDeps, CreateHandlerOptions, CreateHandlerDeps };

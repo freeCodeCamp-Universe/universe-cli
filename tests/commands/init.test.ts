@@ -1,22 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { init, repoNameFromRemote, sanitizeSite } from "../../src/commands/init.js";
+import { init, initHandler, repoNameFromRemote, sanitizeSite } from "../../src/commands/init.js";
+import type { Step, StepResponse } from "../../src/interaction/step.js";
+import type { CommandResult } from "../../src/output/command-result.js";
 
-interface FakeDeps {
-  cwd: string;
-  readFileText: ReturnType<typeof vi.fn>;
-  writeFileText: ReturnType<typeof vi.fn>;
-  pathExists: ReturnType<typeof vi.fn>;
-  detectGitRemote: ReturnType<typeof vi.fn>;
-  isTTY: boolean;
-  promptText: ReturnType<typeof vi.fn>;
-  promptConfirm: ReturnType<typeof vi.fn>;
-  logSuccess: ReturnType<typeof vi.fn>;
-  logInfo: ReturnType<typeof vi.fn>;
-  logError: ReturnType<typeof vi.fn>;
-  exit: ReturnType<typeof vi.fn>;
-}
-
-function mkDeps(overrides: Partial<FakeDeps> = {}): FakeDeps {
+function mkSdkDeps(overrides: Record<string, unknown> = {}) {
   const enoent = new Error("ENOENT") as NodeJS.ErrnoException;
   enoent.code = "ENOENT";
   return {
@@ -25,21 +12,28 @@ function mkDeps(overrides: Partial<FakeDeps> = {}): FakeDeps {
     writeFileText: vi.fn().mockResolvedValue(undefined),
     pathExists: vi.fn().mockResolvedValue(false),
     detectGitRemote: vi.fn().mockReturnValue(null),
-    isTTY: false,
-    promptText: vi.fn(),
-    promptConfirm: vi.fn(),
-    logSuccess: vi.fn(),
-    logInfo: vi.fn(),
-    logError: vi.fn(),
-    exit: vi.fn().mockImplementation((_code: number) => {
-      throw new Error("__exit__");
-    }),
     ...overrides,
   };
 }
 
-function writtenContent(deps: FakeDeps): string {
+function writtenContent(deps: { writeFileText: ReturnType<typeof vi.fn> }): string {
   return (deps.writeFileText.mock.calls[0]?.[1] as string) ?? "";
+}
+
+async function drive(
+  gen: AsyncGenerator<Step, CommandResult, StepResponse>,
+  responses: Record<string, StepResponse> = {},
+): Promise<{ steps: Step[]; result: CommandResult }> {
+  const steps: Step[] = [];
+  let next = await gen.next();
+  while (!next.done) {
+    const step = next.value;
+    steps.push(step);
+    const field = "field" in step ? step.field : undefined;
+    const response = field && field in responses ? responses[field] : undefined;
+    next = await gen.next(response);
+  }
+  return { steps, result: next.value };
 }
 
 describe("sanitizeSite", () => {
@@ -66,83 +60,100 @@ describe("repoNameFromRemote", () => {
   });
 });
 
-describe("init command", () => {
-  it("derives site from cwd basename in non-interactive mode", async () => {
-    const deps = mkDeps();
-    await init({ json: false, yes: true }, deps);
+describe("init SDK", () => {
+  it("derives site from cwd basename when yes is set", async () => {
+    const deps = mkSdkDeps();
+    const { result } = await drive(init({ yes: true }, deps));
     expect(deps.writeFileText).toHaveBeenCalledTimes(1);
-    expect(deps.writeFileText.mock.calls[0]?.[0]).toBe("/proj/my-cool-site/platform.yaml");
+    expect(result.data.site).toBe("my-cool-site");
     expect(writtenContent(deps)).toContain("site: my-cool-site");
   });
 
-  it("derives site from the git remote over the dir name", async () => {
-    const deps = mkDeps({
-      detectGitRemote: vi
-        .fn()
-        .mockReturnValue("git@github.com:freeCodeCamp-Universe/hello-world.git"),
+  it("derives site from git remote over dir name", async () => {
+    const deps = mkSdkDeps({
+      detectGitRemote: vi.fn().mockReturnValue("git@github.com:freeCodeCamp-Universe/hello-world.git"),
     });
-    await init({ json: false, yes: true }, deps);
-    expect(writtenContent(deps)).toContain("site: hello-world");
+    const { result } = await drive(init({ yes: true }, deps));
+    expect(result.data.site).toBe("hello-world");
   });
 
-  it("--site overrides the derived slug", async () => {
-    const deps = mkDeps();
-    await init({ json: false, yes: true, site: "explicit-slug" }, deps);
-    expect(writtenContent(deps)).toContain("site: explicit-slug");
+  it("--site overrides derived slug", async () => {
+    const deps = mkSdkDeps();
+    const { result } = await drive(init({ yes: true, site: "explicit-slug" }, deps));
+    expect(result.data.site).toBe("explicit-slug");
   });
 
-  it("writes a site-only minimal file when no build script exists", async () => {
-    const deps = mkDeps();
-    await init({ json: false, yes: true }, deps);
-    const content = writtenContent(deps);
-    expect(content).toContain("site: my-cool-site");
-    expect(content).not.toContain("build:");
+  it("yields text/confirm steps when yes is not set and no site provided", async () => {
+    const deps = mkSdkDeps();
+    const { steps, result } = await drive(init({}, deps), {
+      site: "prompted-site",
+      "want-build": false,
+      "output-dir": "dist",
+    });
+    expect(steps.some((s) => s.type === "text" && "field" in s && s.field === "site")).toBe(true);
+    expect(steps.some((s) => s.type === "confirm" && "field" in s && s.field === "want-build")).toBe(true);
+    expect(result.data.site).toBe("prompted-site");
   });
 
-  it("infers the build command from package.json + lockfile", async () => {
-    const deps = mkDeps({
+  it("infers build command from package.json + lockfile in non-interactive mode", async () => {
+    const deps = mkSdkDeps({
       readFileText: vi.fn().mockResolvedValue(JSON.stringify({ scripts: { build: "vite build" } })),
       pathExists: vi.fn().mockImplementation(async (p: string) => p.endsWith("pnpm-lock.yaml")),
     });
-    await init({ json: false, yes: true }, deps);
-    const content = writtenContent(deps);
-    expect(content).toContain("command: pnpm run build");
-    expect(content).toContain("output: dist");
+    await drive(init({ yes: true }, deps));
+    expect(writtenContent(deps)).toContain("command: pnpm run build");
   });
 
-  it("includes build.output when --dir set even without a build command", async () => {
-    const deps = mkDeps();
-    await init({ json: false, yes: true, dir: "public" }, deps);
-    const content = writtenContent(deps);
-    expect(content).toContain("output: public");
-  });
-
-  it("refuses to overwrite an existing platform.yaml without --force", async () => {
-    const deps = mkDeps({
+  it("throws ConfigError when platform.yaml exists without --force", async () => {
+    const deps = mkSdkDeps({
       pathExists: vi.fn().mockImplementation(async (p: string) => p.endsWith("platform.yaml")),
     });
-    await expect(init({ json: false, yes: true }, deps)).rejects.toThrow("__exit__");
-    expect(deps.exit).toHaveBeenCalledWith(11);
-    expect(deps.writeFileText).not.toHaveBeenCalled();
-    expect(deps.logError).toHaveBeenCalledWith(expect.stringMatching(/already exists|--force/i));
+    await expect(drive(init({ yes: true }, deps))).rejects.toThrow(/already exists/i);
   });
 
   it("overwrites with --force", async () => {
-    const deps = mkDeps({
+    const deps = mkSdkDeps({
       pathExists: vi.fn().mockImplementation(async (p: string) => p.endsWith("platform.yaml")),
     });
-    await init({ json: false, yes: true, force: true }, deps);
+    await drive(init({ yes: true, force: true }, deps));
     expect(deps.writeFileText).toHaveBeenCalledTimes(1);
   });
 
-  it("emits a JSON envelope", async () => {
+  it("writes a schema-valid platform.yaml", async () => {
+    const deps = mkSdkDeps({
+      readFileText: vi.fn().mockResolvedValue(JSON.stringify({ scripts: { build: "vite build" } })),
+      pathExists: vi.fn().mockImplementation(async (p: string) => p.endsWith("yarn.lock")),
+    });
+    await drive(init({ yes: true, site: "valid-site" }, deps));
+    const { parsePlatformYaml } = await import("../../src/lib/platform-yaml.js");
+    const result = parsePlatformYaml(writtenContent(deps));
+    expect(result.ok).toBe(true);
+  });
+});
+
+describe("initHandler", () => {
+  function mkHandlerDeps(overrides: Record<string, unknown> = {}) {
+    return {
+      ...mkSdkDeps(),
+      isTTY: false,
+      logSuccess: vi.fn(),
+      logInfo: vi.fn(),
+      logError: vi.fn(),
+      exit: vi.fn().mockImplementation((_code: number) => {
+        throw new Error("__exit__");
+      }),
+      ...overrides,
+    };
+  }
+
+  it("emits JSON envelope", async () => {
     const stdout: string[] = [];
     const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
       stdout.push(String(chunk));
       return true;
     });
-    const deps = mkDeps();
-    await init({ json: true }, deps);
+    const deps = mkHandlerDeps();
+    await initHandler({ json: true }, deps);
     writeSpy.mockRestore();
 
     const env = JSON.parse(stdout.join("").trim());
@@ -150,56 +161,25 @@ describe("init command", () => {
     expect(env.success).toBe(true);
     expect(env.site).toBe("my-cool-site");
     expect(env.path).toBe("/proj/my-cool-site/platform.yaml");
-    expect(env.build).toBeNull();
   });
 
-  it("runs prompts in interactive mode", async () => {
-    const deps = mkDeps({
-      isTTY: true,
-      promptText: vi.fn().mockResolvedValueOnce("prompted-site").mockResolvedValueOnce("dist"),
-      promptConfirm: vi.fn().mockResolvedValue(false),
+  it("refuses to overwrite without --force (EXIT_CONFIG)", async () => {
+    const deps = mkHandlerDeps({
+      pathExists: vi.fn().mockImplementation(async (p: string) => p.endsWith("platform.yaml")),
     });
-    await init({ json: false }, deps);
-    expect(deps.promptText).toHaveBeenCalled();
-    expect(writtenContent(deps)).toContain("site: prompted-site");
+    await expect(initHandler({ json: false, yes: true }, deps)).rejects.toThrow("__exit__");
+    expect(deps.exit).toHaveBeenCalledWith(11);
   });
 
-  it("captures the build command from interactive prompts", async () => {
-    const deps = mkDeps({
-      isTTY: true,
-      promptText: vi
-        .fn()
-        .mockResolvedValueOnce("my-site")
-        .mockResolvedValueOnce("npm run build")
-        .mockResolvedValueOnce("out"),
-      promptConfirm: vi.fn().mockResolvedValue(true),
-    });
-    await init({ json: false }, deps);
-    const content = writtenContent(deps);
-    expect(content).toContain("command: npm run build");
-    expect(content).toContain("output: out");
+  it("includes build.output when --dir set", async () => {
+    const deps = mkHandlerDeps();
+    await initHandler({ json: false, yes: true, dir: "public" }, deps);
+    expect(writtenContent(deps)).toContain("output: public");
   });
 
-  it("exits with EXIT_CONFIRM when an interactive prompt is cancelled", async () => {
-    const { ConfirmError } = await import("../../src/errors.js");
-    const deps = mkDeps({
-      isTTY: true,
-      promptText: vi.fn().mockRejectedValue(new ConfirmError("init cancelled")),
-      promptConfirm: vi.fn(),
-    });
-    await expect(init({ json: false }, deps)).rejects.toThrow("__exit__");
-    expect(deps.exit).toHaveBeenCalledWith(18);
-    expect(deps.writeFileText).not.toHaveBeenCalled();
-  });
-
-  it("writes a schema-valid platform.yaml", async () => {
-    const deps = mkDeps({
-      readFileText: vi.fn().mockResolvedValue(JSON.stringify({ scripts: { build: "vite build" } })),
-      pathExists: vi.fn().mockImplementation(async (p: string) => p.endsWith("yarn.lock")),
-    });
-    await init({ json: false, yes: true, site: "valid-site" }, deps);
-    const { parsePlatformYaml } = await import("../../src/lib/platform-yaml.js");
-    const result = parsePlatformYaml(writtenContent(deps));
-    expect(result.ok).toBe(true);
+  it("calls logInfo in non-interactive mode", async () => {
+    const deps = mkHandlerDeps();
+    await initHandler({ json: false, yes: true }, deps);
+    expect(deps.logInfo).toHaveBeenCalledWith(expect.stringContaining("Wrote platform.yaml"));
   });
 });

@@ -8,13 +8,16 @@ import {
   type ProxyClientConfig,
 } from "../../lib/proxy-client.js";
 
-export interface SitesCommandDeps {
+interface SitesSdkDeps {
   env?: NodeJS.ProcessEnv;
   resolveIdentity?: typeof defaultResolveIdentity;
   createProxyClient?: (cfg: ProxyClientConfig) => ProxyClient;
+}
+
+interface SitesCommandDeps extends SitesSdkDeps {
   logSuccess?: (msg: string) => void;
   logError?: (msg: string) => void;
-  exit?: (code: number) => never;
+  exit?: (code: number) => void;
 }
 
 /**
@@ -23,7 +26,7 @@ export interface SitesCommandDeps {
  * (`--team=staff,news-editors`). Whitespace is trimmed; empty
  * fragments are dropped. Returns `[]` for nullish input.
  */
-export function parseTeamsFlag(raw: string | string[] | undefined): string[] {
+function parseTeamsFlag(raw: string | string[] | undefined): string[] {
   if (raw === undefined || raw === null) return [];
   const tokens = Array.isArray(raw) ? raw : [raw];
   return tokens
@@ -36,7 +39,7 @@ export function parseTeamsFlag(raw: string | string[] | undefined): string[] {
  * Resolve identity + construct a proxy client. Throws CredentialError
  * if no identity is available — the caller's `outputError` handles formatting.
  */
-export async function setupClient(deps: SitesCommandDeps): Promise<{
+async function setupClient(deps: SitesSdkDeps): Promise<{
   client: ProxyClient;
   identitySource: string;
 }> {
@@ -60,4 +63,5 @@ export async function setupClient(deps: SitesCommandDeps): Promise<{
   return { client, identitySource: identity.source };
 }
 
-export { UsageError };
+export { parseTeamsFlag, setupClient, UsageError };
+export type { SitesCommandDeps, SitesSdkDeps };

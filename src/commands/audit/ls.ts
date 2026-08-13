@@ -1,12 +1,21 @@
 import { log } from "@clack/prompts";
 import { UsageError } from "../../errors.js";
 import { type AuditRow } from "../../lib/proxy-client.js";
+import type { CommandResult } from "../../output/command-result.js";
 import { buildEnvelope } from "../../output/envelope.js";
 import { exitWithCode } from "../../output/exit-codes.js";
 import { emitJson, outputError } from "../../output/format.js";
-import { type AuditCommandDeps, setupClient } from "./_shared.js";
+import { type AuditCommandDeps, type AuditSdkDeps, setupClient } from "./_shared.js";
 
-export interface AuditLsOptions {
+interface AuditLsOptions {
+  site?: string;
+  actor?: string;
+  action?: string;
+  since?: string;
+  limit?: number;
+}
+
+interface AuditLsHandlerOptions {
   json: boolean;
   site?: string;
   actor?: string;
@@ -42,42 +51,63 @@ function targetOf(r: AuditRow): string {
   return r.site || r.deployId || targetFromDetail(r);
 }
 
-export async function ls(options: AuditLsOptions, deps: AuditCommandDeps = {}): Promise<void> {
-  const command = "audit ls";
-  const message = deps.logMessage ?? ((s: string) => log.message(s));
-  const error = deps.logError ?? ((s: string) => log.error(s));
-  const exit = deps.exit ?? exitWithCode;
-
-  let identitySource: string | undefined;
+/** Query the audit log, optionally filtered by site, actor, action, or time range. */
+async function auditLs(
+  options: AuditLsOptions,
+  deps: AuditSdkDeps = {},
+): Promise<CommandResult> {
+  if (options.limit !== undefined && (!Number.isInteger(options.limit) || options.limit < 0)) {
+    throw new UsageError("--limit must be a non-negative integer");
+  }
+  const setup = await setupClient(deps);
+  let rows;
   try {
-    if (options.limit !== undefined && (!Number.isInteger(options.limit) || options.limit < 0)) {
-      throw new UsageError("--limit must be a non-negative integer");
-    }
-    const setup = await setupClient(deps);
-    identitySource = setup.identitySource;
-    const rows = await setup.client.listAudit({
+    rows = await setup.client.listAudit({
       site: options.site,
       actor: options.actor,
       action: options.action,
       since: options.since,
       limit: options.limit,
     });
+  } catch (err) {
+    if (err instanceof Error) (err as Error & { identitySource?: string }).identitySource = setup.identitySource;
+    throw err;
+  }
+
+  return {
+    data: buildEnvelope("audit ls", true, {
+      count: rows.length,
+      events: rows,
+      identitySource: setup.identitySource,
+    }),
+    format: formatTable(rows),
+  };
+}
+
+async function auditLsHandler(
+  options: AuditLsHandlerOptions,
+  deps: AuditCommandDeps = {},
+): Promise<void> {
+  const message = deps.logMessage ?? ((s: string) => log.message(s));
+  const error = deps.logError ?? ((s: string) => log.error(s));
+  const exit = deps.exit ?? exitWithCode;
+
+  try {
+    const result = await auditLs(options, deps);
 
     if (options.json) {
-      emitJson(
-        buildEnvelope(command, true, {
-          count: rows.length,
-          events: rows,
-          identitySource,
-        }),
-      );
+      emitJson(result.data);
     } else {
-      message(formatTable(rows));
+      message(result.format);
     }
   } catch (err) {
-    exit(outputError({ json: options.json, command }, err, {
+    const identitySource = (err as { identitySource?: string }).identitySource;
+    exit(outputError({ json: options.json, command: "audit ls" }, err, {
       logError: error,
       extras: identitySource ? { identitySource } : undefined,
     }));
   }
 }
+
+export { auditLs, auditLsHandler };
+export type { AuditLsOptions, AuditLsHandlerOptions };

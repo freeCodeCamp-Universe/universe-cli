@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { rollback } from "../../src/commands/rollback.js";
+import { staticRollbackHandler } from "../../src/commands/rollback.js";
 import { type CliEnv, makeCliEnv } from "./_helpers/cli-env.js";
 import { type FakeArtemis, startFakeArtemis } from "./_helpers/fake-artemis.js";
 
@@ -40,7 +40,7 @@ async function runRollback(
   });
   const captured: CapturedExit = {};
   try {
-    await rollback(options, {
+    await staticRollbackHandler(options, {
       cwd,
       env,
       exit: makeExit(captured),

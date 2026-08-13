@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { deploy } from "../../src/commands/deploy.js";
+import { staticDeployHandler } from "../../src/commands/deploy.js";
 import { type CliEnv, makeCliEnv } from "./_helpers/cli-env.js";
 import { type FakeArtemis, startFakeArtemis } from "./_helpers/fake-artemis.js";
 
@@ -38,7 +38,7 @@ async function runDeployWithBuildStub(env: NodeJS.ProcessEnv, cwd: string): Prom
   const captured: CapturedExit = {};
   const buildStub = vi.fn().mockResolvedValue({ skipped: true, outputDir: join(cwd, "dist") });
   try {
-    await deploy(
+    await staticDeployHandler(
       { json: true, promote: false },
       {
         cwd,

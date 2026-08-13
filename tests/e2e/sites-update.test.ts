@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { update } from "../../src/commands/sites/update.js";
+import { sitesUpdateHandler } from "../../src/commands/sites/update.js";
 import { type CliEnv, makeCliEnv } from "./_helpers/cli-env.js";
 import { type FakeArtemis, startFakeArtemis } from "./_helpers/fake-artemis.js";
 
@@ -36,7 +36,7 @@ async function runUpdate(
   });
   const captured: CapturedExit = {};
   try {
-    await update(options, {
+    await sitesUpdateHandler(options, {
       env,
       exit: makeExit(captured),
       logSuccess: vi.fn(),

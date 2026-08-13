@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { promote } from "../../src/commands/promote.js";
+import { staticPromoteHandler } from "../../src/commands/promote.js";
 import { type CliEnv, makeCliEnv } from "./_helpers/cli-env.js";
 import { type FakeArtemis, startFakeArtemis } from "./_helpers/fake-artemis.js";
 
@@ -40,7 +40,7 @@ async function runPromote(
   });
   const captured: CapturedExit = {};
   try {
-    await promote(options, {
+    await staticPromoteHandler(options, {
       cwd,
       env,
       exit: makeExit(captured),
@@ -71,7 +71,7 @@ async function runPromoteText(
   const successes: string[] = [];
   const errors: string[] = [];
   try {
-    await promote(
+    await staticPromoteHandler(
       { json: false, ...options },
       {
         cwd,

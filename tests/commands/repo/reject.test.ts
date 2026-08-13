@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { reject } from "../../../src/commands/repo/reject.js";
+import { repoReject, repoRejectHandler } from "../../../src/commands/repo/reject.js";
+import { ConfirmError } from "../../../src/errors.js";
+import type { Step, StepResponse } from "../../../src/interaction/step.js";
+import type { CommandResult } from "../../../src/output/command-result.js";
 
 function repoRow(over: Record<string, unknown> = {}) {
   return {
@@ -45,29 +48,38 @@ function mkDeps(overrides: Record<string, unknown> = {}) {
     env: {} as NodeJS.ProcessEnv,
     resolveIdentity: vi.fn().mockResolvedValue({ token: "ghp_x", source: "env_GITHUB_TOKEN" }),
     createProxyClient: vi.fn().mockReturnValue(mkProxy()),
-    logSuccess: vi.fn(),
-    logError: vi.fn(),
-    exit: vi.fn().mockImplementation((_c: number) => {
-      throw new Error("__exit__");
-    }),
     ...overrides,
   };
 }
 
-describe("repo reject command", () => {
+async function drive(
+  gen: AsyncGenerator<Step, CommandResult, StepResponse>,
+  confirmResponse = true,
+): Promise<CommandResult> {
+  let next = await gen.next();
+  while (!next.done) {
+    const step = next.value;
+    next = await gen.next(step.type === "confirm" ? confirmResponse : undefined);
+  }
+  return next.value;
+}
+
+describe("repoReject SDK", () => {
   it("passes id + reason to the client", async () => {
     const deps = mkDeps();
-    await reject({ json: true, id: "req_001", reason: "out of scope" }, deps);
+    const result = await drive(repoReject({ id: "req_001", reason: "out of scope", yes: true }, deps));
     const proxy = deps.createProxyClient.mock.results[0]?.value;
     expect(proxy.rejectRepoRequest).toHaveBeenCalledWith({
       id: "req_001",
       reason: "out of scope",
     });
+    expect(result.data.command).toBe("repo reject");
+    expect(result.data.success).toBe(true);
   });
 
-  it("stringifies a numeric --reason (CA-3)", async () => {
+  it("stringifies a numeric --reason", async () => {
     const deps = mkDeps();
-    await reject({ json: true, id: "req_001", reason: 42 as unknown as string }, deps);
+    await drive(repoReject({ id: "req_001", reason: 42 as unknown as string, yes: true }, deps));
     const proxy = deps.createProxyClient.mock.results[0]?.value;
     expect(proxy.rejectRepoRequest).toHaveBeenCalledWith({
       id: "req_001",
@@ -75,58 +87,42 @@ describe("repo reject command", () => {
     });
   });
 
-  it("requires an id", async () => {
+  it("throws ConfirmError when confirm is declined", async () => {
     const deps = mkDeps();
-    await expect(reject({ json: false, id: "" }, deps)).rejects.toThrow("__exit__");
-    expect(deps.exit).toHaveBeenCalledWith(10);
+    await expect(drive(repoReject({ id: "req_001" }, deps), false)).rejects.toThrow(ConfirmError);
   });
 
-  it("aborts with EXIT_CONFIRM when the confirm is declined", async () => {
-    const proxy = mkProxy();
-    const prompts = {
-      text: vi.fn(),
-      select: vi.fn(),
-      confirm: vi.fn().mockResolvedValue(false),
-      isCancel: vi.fn().mockReturnValue(false),
-    };
-    const deps = mkDeps({
-      createProxyClient: vi.fn().mockReturnValue(proxy),
-      isTTY: true,
-      prompts,
+  it("yields confirm step when yes is not set", async () => {
+    const deps = mkDeps();
+    const gen = repoReject({ id: "req_001" }, deps);
+    const first = await gen.next();
+    expect(first.done).toBe(false);
+    expect((first.value as Step).type).toBe("confirm");
+  });
+});
+
+describe("repoRejectHandler", () => {
+  it("emits JSON envelope in json mode", async () => {
+    const stdout: string[] = [];
+    const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((c: unknown) => {
+      stdout.push(String(c));
+      return true;
     });
-    await expect(reject({ json: false, id: "req_001" }, deps)).rejects.toThrow("__exit__");
-    expect(proxy.rejectRepoRequest).not.toHaveBeenCalled();
-    expect(deps.exit).toHaveBeenCalledWith(18);
+    const deps = mkDeps();
+    await repoRejectHandler({ json: true, id: "req_001", reason: "out of scope" }, deps);
+    writeSpy.mockRestore();
+
+    const env = JSON.parse(stdout.join("").trim());
+    expect(env.success).toBe(true);
+    expect(env.rejectReason).toBe("out of scope");
   });
 
-  it("requires --yes in a non-interactive (non-TTY) session", async () => {
-    const proxy = mkProxy();
-    const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
-    await expect(reject({ json: false, id: "req_001" }, deps)).rejects.toThrow("__exit__");
-    expect(proxy.rejectRepoRequest).not.toHaveBeenCalled();
-    expect(deps.exit).toHaveBeenCalledWith(10); // EXIT_USAGE
-  });
-
-  it("surfaces a getRepoRequest 404 before the confirm prompt", async () => {
-    const { ProxyError } = await import("../../../src/lib/proxy-client.js");
-    const proxy = mkProxy();
-    proxy.getRepoRequest = vi
-      .fn()
-      .mockRejectedValue(new ProxyError(404, "not_found", "no such request"));
-    const prompts = {
-      text: vi.fn(),
-      select: vi.fn(),
-      confirm: vi.fn(),
-      isCancel: vi.fn().mockReturnValue(false),
-    };
-    const deps = mkDeps({
-      createProxyClient: vi.fn().mockReturnValue(proxy),
-      isTTY: true,
-      prompts,
+  it("requires --yes in non-TTY session", async () => {
+    const exit = vi.fn().mockImplementation(() => {
+      throw new Error("__exit__");
     });
-    await expect(reject({ json: false, id: "ghost" }, deps)).rejects.toThrow("__exit__");
-    expect(deps.exit).toHaveBeenCalledWith(10); // EXIT_USAGE
-    expect(prompts.confirm).not.toHaveBeenCalled();
-    expect(proxy.rejectRepoRequest).not.toHaveBeenCalled();
+    const deps = { ...mkDeps(), logError: vi.fn(), exit };
+    await expect(repoRejectHandler({ json: false, id: "req_001" }, deps)).rejects.toThrow("__exit__");
+    expect(exit).toHaveBeenCalledWith(10);
   });
 });

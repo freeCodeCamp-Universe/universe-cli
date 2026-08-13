@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { rm as sitesRm } from "../../src/commands/sites/rm.js";
+import { sitesRmHandler } from "../../src/commands/sites/rm.js";
 import { type CliEnv, makeCliEnv } from "./_helpers/cli-env.js";
 import { type FakeArtemis, startFakeArtemis } from "./_helpers/fake-artemis.js";
 
@@ -36,7 +36,7 @@ async function runRm(
   });
   const captured: CapturedExit = {};
   try {
-    await sitesRm(options, {
+    await sitesRmHandler(options, {
       env,
       exit: makeExit(captured),
       logSuccess: vi.fn(),

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ls as sitesLs } from "../../src/commands/sites/ls.js";
+import { sitesLsHandler } from "../../src/commands/sites/ls.js";
 import { type CliEnv, makeCliEnv } from "./_helpers/cli-env.js";
 import { type FakeArtemis, type SiteRow, startFakeArtemis } from "./_helpers/fake-artemis.js";
 
@@ -36,7 +36,7 @@ async function runSitesLs(
   });
   const captured: CapturedExit = {};
   try {
-    await sitesLs(options, {
+    await sitesLsHandler(options, {
       env,
       exit: makeExit(captured),
       logSuccess: vi.fn(),

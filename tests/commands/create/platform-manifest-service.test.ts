@@ -1,4 +1,4 @@
-import type { CreateSelections } from "../../../src/commands/create/prompt/prompt.port.js";
+import type { CreateSelections } from "../../../src/commands/create/types.js";
 import { PlatformManifestService } from "../../../src/commands/create/platform-manifest-service.js";
 import { parsePlatformYaml } from "../../../src/lib/platform-yaml.js";
 import { describe, expect, it } from "vitest";

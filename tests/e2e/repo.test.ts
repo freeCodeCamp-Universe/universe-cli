@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { approve } from "../../src/commands/repo/approve.js";
-import { create } from "../../src/commands/repo/create.js";
-import { ls } from "../../src/commands/repo/ls.js";
-import { reject } from "../../src/commands/repo/reject.js";
-import { rm } from "../../src/commands/repo/rm.js";
-import { status } from "../../src/commands/repo/status.js";
+import { repoApproveHandler } from "../../src/commands/repo/approve.js";
+import { repoCreateHandler } from "../../src/commands/repo/create.js";
+import { repoLsHandler } from "../../src/commands/repo/ls.js";
+import { repoRejectHandler } from "../../src/commands/repo/reject.js";
+import { repoRmHandler } from "../../src/commands/repo/rm.js";
+import { repoStatusHandler } from "../../src/commands/repo/status.js";
 import { type CliEnv, makeCliEnv } from "./_helpers/cli-env.js";
 import { type FakeArtemis, startFakeArtemis } from "./_helpers/fake-artemis.js";
 
@@ -74,7 +74,7 @@ describe("repo E2E (real proxy-client + real identity chain)", () => {
 
   it("runs the create → ls → approve → status lifecycle", async () => {
     const created = await run(
-      create as never,
+      repoCreateHandler as never,
       { json: true, name: "learn-python-rpg", visibility: "private" },
       env.env,
     );
@@ -83,19 +83,19 @@ describe("repo E2E (real proxy-client + real identity chain)", () => {
     const id = created.envelope!["id"] as string;
     expect(id).toMatch(/^req_/);
 
-    const listed = await run(ls as never, { json: true }, env.env);
+    const listed = await run(repoLsHandler as never, { json: true }, env.env);
     expect(listed.envelope!["count"]).toBe(1);
     expect(listed.envelope!["status"]).toBe("pending");
     const requests = listed.envelope!["requests"] as Array<{ name: string }>;
     expect(requests[0].name).toBe("learn-python-rpg");
 
-    const approved = await run(approve as never, { json: true, id }, env.env);
+    const approved = await run(repoApproveHandler as never, { json: true, id }, env.env);
     expect(approved.captured.code).toBeUndefined();
     expect(approved.envelope!["outcome"]).toBe("ok");
     const reqRow = approved.envelope!["repo"];
     expect(reqRow).toBe("freeCodeCamp-Universe/learn-python-rpg");
 
-    const got = await run(status as never, { json: true, id }, env.env);
+    const got = await run(repoStatusHandler as never, { json: true, id }, env.env);
     const request = got.envelope!["request"] as { status: string; url: string };
     expect(request.status).toBe("active");
     expect(request.url).toContain("learn-python-rpg");
@@ -103,11 +103,11 @@ describe("repo E2E (real proxy-client + real identity chain)", () => {
   });
 
   it("rejects a pending request with a reason", async () => {
-    const created = await run(create as never, { json: true, name: "scratch" }, env.env);
+    const created = await run(repoCreateHandler as never, { json: true, name: "scratch" }, env.env);
     const id = created.envelope!["id"] as string;
 
     const rejected = await run(
-      reject as never,
+      repoRejectHandler as never,
       { json: true, id, reason: "out of scope" },
       env.env,
     );
@@ -117,37 +117,37 @@ describe("repo E2E (real proxy-client + real identity chain)", () => {
   });
 
   it("dedupes repo names case-insensitively (EXIT_USAGE on the dup)", async () => {
-    const first = await run(create as never, { json: true, name: "MyRepo" }, env.env);
+    const first = await run(repoCreateHandler as never, { json: true, name: "MyRepo" }, env.env);
     expect(first.captured.code).toBeUndefined();
 
-    const dup = await run(create as never, { json: true, name: "myrepo" }, env.env);
+    const dup = await run(repoCreateHandler as never, { json: true, name: "myrepo" }, env.env);
     expect(dup.captured.code).toBe(10); // EXIT_USAGE
     const errorBlock = dup.envelope!["error"] as { message: string };
     expect(errorBlock.message).toContain("already_exists");
   });
 
   it("deletes a request, freeing the name to re-create", async () => {
-    const created = await run(create as never, { json: true, name: "tmp-del" }, env.env);
+    const created = await run(repoCreateHandler as never, { json: true, name: "tmp-del" }, env.env);
     const id = created.envelope!["id"] as string;
 
-    const removed = await run(rm as never, { json: true, id }, env.env);
+    const removed = await run(repoRmHandler as never, { json: true, id }, env.env);
     expect(removed.captured.code).toBeUndefined();
     expect(removed.envelope!["deleted"]).toBe(true);
     expect(server.state.repoRequests.has(id)).toBe(false);
 
-    const again = await run(create as never, { json: true, name: "tmp-del" }, env.env);
+    const again = await run(repoCreateHandler as never, { json: true, name: "tmp-del" }, env.env);
     expect(again.captured.code).toBeUndefined();
     expect(again.envelope!["status"]).toBe("pending");
   });
 
   it("returns 409 already_resolved on a double approval (EXIT_USAGE)", async () => {
-    const created = await run(create as never, { json: true, name: "raced" }, env.env);
+    const created = await run(repoCreateHandler as never, { json: true, name: "raced" }, env.env);
     const id = created.envelope!["id"] as string;
 
-    const first = await run(approve as never, { json: true, id }, env.env);
+    const first = await run(repoApproveHandler as never, { json: true, id }, env.env);
     expect(first.captured.code).toBeUndefined();
 
-    const second = await run(approve as never, { json: true, id }, env.env);
+    const second = await run(repoApproveHandler as never, { json: true, id }, env.env);
     expect(second.captured.code).toBe(10);
     const errorBlock = second.envelope!["error"] as { message: string };
     expect(errorBlock.message).toContain("already_resolved");

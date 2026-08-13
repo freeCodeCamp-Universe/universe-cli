@@ -112,3 +112,71 @@ artemis validates every bearer with `GET /user` and authorizes via `GET /user/te
 | `XDG_CONFIG_HOME`           | `~/.config`                     | login/logout | Base dir for the token store (`<base>/universe-cli/token`).        |
 
 The baked-in client id is **public** — the device flow uses no `client_secret`, so embedding it leaks nothing. No setting is ever read from a `.env` file.
+
+## Programmatic API
+
+The package exports every command as a typed function:
+
+```ts
+import { staticLs, staticDeploy, clackDriver } from "@freecodecamp/universe-cli";
+```
+
+### `CommandResult`
+
+Every SDK function returns (or resolves to) a `CommandResult`:
+
+```ts
+interface CommandResult {
+  data: Envelope; // structured JSON (same as --json output)
+  format: string; // human-readable string
+}
+```
+
+### Plain commands
+
+Commands that need no user interaction return `Promise<CommandResult>`:
+
+```ts
+const result = await staticLs({ site: "my-site" }, { cwd: "/project" });
+console.log(result.format);      // table of deploys
+console.log(result.data.count);  // structured field
+```
+
+### Interactive commands (generators)
+
+Commands that need user input or report progress are async generators. They yield `Step` values describing prompts, progress, warnings, or info. Drive them with a loop or a provided driver:
+
+```ts
+// clackDriver maps Steps to @clack/prompts for a terminal UI
+const result = await clackDriver(staticDeploy({ promote: true }));
+
+// silentDrive auto-responds (useful for automation / JSON mode)
+import { silentDrive } from "@freecodecamp/universe-cli";
+const result = await silentDrive(staticDeploy({ promote: true }));
+
+// Custom driver — render Steps however you like
+const gen = create({ name: "my-app" });
+let next = await gen.next();
+while (!next.done) {
+  const step = next.value;
+  // Render step.type (text, select, multiselect, confirm, progress, warning, info)
+  next = await gen.next(yourResponse);
+}
+const result = next.value; // CommandResult
+```
+
+### Step types
+
+| Type          | Fields                                          | Consumer action                |
+| ------------- | ----------------------------------------------- | ------------------------------ |
+| `text`        | `field`, `message`, `placeholder?`, `validate?` | Respond with `string`          |
+| `select`      | `field`, `message`, `options`                   | Respond with `string`          |
+| `multiselect` | `field`, `message`, `options`, `required?`       | Respond with `string[]`        |
+| `confirm`     | `field`, `message`, `default?`                  | Respond with `boolean`         |
+| `progress`    | `message`                                       | Fire-and-forget (`undefined`)  |
+| `warning`     | `message`                                       | Fire-and-forget (`undefined`)  |
+| `info`        | `message`                                       | Fire-and-forget (`undefined`)  |
+
+### Error handling
+
+SDK functions throw on error (`CliError`, `ProxyError`, etc.). They never call `process.exit`. Catch and inspect `error.exitCode` for the numeric code.

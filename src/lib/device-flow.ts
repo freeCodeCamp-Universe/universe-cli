@@ -34,7 +34,7 @@ export interface RunDeviceFlowOptions {
   sleep?: (ms: number) => Promise<void>;
 }
 
-interface DeviceCodeResponse {
+export interface DeviceCodeResponse {
   device_code: string;
   user_code: string;
   verification_uri: string;
@@ -62,11 +62,17 @@ function isAccessTokenSuccess(body: AccessTokenResponse): body is AccessTokenSuc
 const defaultSleep = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
-export async function runDeviceFlow(opts: RunDeviceFlowOptions): Promise<string> {
-  const fetchImpl = opts.fetch ?? globalThis.fetch.bind(globalThis);
-  const sleep = opts.sleep ?? defaultSleep;
+export interface RequestDeviceCodeOptions {
+  clientId: string;
+  scope?: string;
+  fetch?: typeof globalThis.fetch;
+}
 
-  // Step 1 — request device code.
+export async function requestDeviceCode(
+  opts: RequestDeviceCodeOptions,
+): Promise<DeviceCodeResponse & DeviceFlowPrompt> {
+  const fetchImpl = opts.fetch ?? globalThis.fetch.bind(globalThis);
+
   const startResp = await fetchImpl(DEVICE_CODE_URL, {
     method: "POST",
     headers: {
@@ -82,18 +88,27 @@ export async function runDeviceFlow(opts: RunDeviceFlowOptions): Promise<string>
     throw new Error(`device code request failed: HTTP ${startResp.status}`);
   }
   const start = (await startResp.json()) as DeviceCodeResponse;
-
-  await opts.onPrompt({
+  return {
+    ...start,
     userCode: start.user_code,
     verificationUri: start.verification_uri,
     expiresIn: start.expires_in,
-  });
+  };
+}
 
-  // Step 2/3 — poll for access token.
-  let intervalSec = start.interval > 0 ? start.interval : 5;
+export interface PollDeviceTokenOptions {
+  clientId: string;
+  deviceCode: string;
+  interval: number;
+  fetch?: typeof globalThis.fetch;
+  sleep?: (ms: number) => Promise<void>;
+}
 
-  // Loop until terminal state. Bounded by the server's expires_in via
-  // expired_token error response.
+export async function pollDeviceToken(opts: PollDeviceTokenOptions): Promise<string> {
+  const fetchImpl = opts.fetch ?? globalThis.fetch.bind(globalThis);
+  const sleep = opts.sleep ?? defaultSleep;
+  let intervalSec = opts.interval > 0 ? opts.interval : 5;
+
   // eslint-disable-next-line no-constant-condition
   while (true) {
     await sleep(intervalSec * 1_000);
@@ -106,7 +121,7 @@ export async function runDeviceFlow(opts: RunDeviceFlowOptions): Promise<string>
       },
       body: JSON.stringify({
         client_id: opts.clientId,
-        device_code: start.device_code,
+        device_code: opts.deviceCode,
         grant_type: DEVICE_CODE_GRANT,
       }),
     });
@@ -137,4 +152,26 @@ export async function runDeviceFlow(opts: RunDeviceFlowOptions): Promise<string>
         );
     }
   }
+}
+
+export async function runDeviceFlow(opts: RunDeviceFlowOptions): Promise<string> {
+  const start = await requestDeviceCode({
+    clientId: opts.clientId,
+    scope: opts.scope,
+    fetch: opts.fetch,
+  });
+
+  await opts.onPrompt({
+    userCode: start.userCode,
+    verificationUri: start.verificationUri,
+    expiresIn: start.expiresIn,
+  });
+
+  return pollDeviceToken({
+    clientId: opts.clientId,
+    deviceCode: start.device_code,
+    interval: start.interval,
+    fetch: opts.fetch,
+    sleep: opts.sleep,
+  });
 }

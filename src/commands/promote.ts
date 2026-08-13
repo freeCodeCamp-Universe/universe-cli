@@ -1,10 +1,11 @@
-import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
-import { confirm, isCancel, log } from "@clack/prompts";
+import { log } from "@clack/prompts";
 import { ConfigError, CredentialError } from "../errors.js";
+import { clackDriver } from "../interaction/clack-driver.js";
+import { silentDrive } from "../interaction/silent-driver.js";
+import type { Step, StepResponse } from "../interaction/step.js";
 import { DEFAULT_PROXY_URL } from "../lib/constants.js";
 import { resolveIdentity as defaultResolveIdentity } from "../lib/identity.js";
-import { parsePlatformYaml, type PlatformYamlV2 } from "../lib/platform-yaml.js";
+import { defaultReadPlatformYaml, readAndParseConfig } from "../lib/read-platform-config.js";
 import {
   AliasDriftError,
   createProxyClient as defaultCreateProxyClient,
@@ -12,186 +13,181 @@ import {
   type ProxyClient,
   type ProxyClientConfig,
 } from "../lib/proxy-client.js";
+import type { CommandResult } from "../output/command-result.js";
 import { buildEnvelope } from "../output/envelope.js";
 import { exitWithCode } from "../output/exit-codes.js";
 import { emitJson, outputError } from "../output/format.js";
 
-export interface PromoteOptions {
-  json: boolean;
-  /** Promote a specific deploy id instead of the current preview alias. */
+interface StaticPromoteOptions {
   from?: string;
 }
 
-export interface PromoteDeps {
+interface StaticPromoteSdkDeps {
   cwd?: string;
   env?: NodeJS.ProcessEnv;
   readPlatformYaml?: (cwd: string) => Promise<string>;
   resolveIdentity?: typeof defaultResolveIdentity;
   createProxyClient?: (cfg: ProxyClientConfig) => ProxyClient;
+}
+
+interface StaticPromoteHandlerOptions {
+  json: boolean;
+  from?: string;
+}
+
+interface StaticPromoteHandlerDeps extends StaticPromoteSdkDeps {
   logSuccess?: (msg: string) => void;
   logError?: (msg: string) => void;
-  exit?: (code: number) => never;
-  promptConfirm?: (msg: string) => Promise<boolean>;
+  exit?: (code: number) => void;
 }
 
-const defaultPromptConfirm = async (msg: string): Promise<boolean> => {
-  const r = await confirm({ message: msg, initialValue: false });
-  if (isCancel(r)) return false;
-  return r === true;
-};
-
-const defaultReadPlatformYaml = async (cwd: string): Promise<string> => {
-  return readFile(resolve(cwd, "platform.yaml"), "utf-8");
-};
-
-async function readAndParseConfig(
-  cwd: string,
-  read: (cwd: string) => Promise<string>,
-): Promise<PlatformYamlV2> {
-  let raw: string;
-  try {
-    raw = await read(cwd);
-  } catch (err) {
-    if (err instanceof Error && (err as NodeJS.ErrnoException).code === "ENOENT") {
-      throw new ConfigError(`platform.yaml not found in ${cwd}. See docs/platform-yaml.md.`);
-    }
-    throw err;
-  }
-  const r = parsePlatformYaml(raw);
-  if (!r.ok) throw new ConfigError(r.error);
-  return r.value;
-}
-
-export async function promote(options: PromoteOptions, deps: PromoteDeps = {}): Promise<void> {
+/** Promote the current preview deploy to production. Yields confirm on alias drift. */
+async function* staticPromote(
+  options: StaticPromoteOptions,
+  deps: StaticPromoteSdkDeps = {},
+): AsyncGenerator<Step, CommandResult, StepResponse> {
   const cwd = deps.cwd ?? process.cwd();
   const env = deps.env ?? process.env;
   const readYaml = deps.readPlatformYaml ?? defaultReadPlatformYaml;
   const resolveId = deps.resolveIdentity ?? defaultResolveIdentity;
   const mkClient = deps.createProxyClient ?? defaultCreateProxyClient;
+
+  const identity = await resolveId({ env });
+  if (!identity) {
+    throw new CredentialError(
+      "No GitHub identity available. Run `universe login`, set $GITHUB_TOKEN, or install the gh CLI.",
+    );
+  }
+
+  const config = await readAndParseConfig(cwd, readYaml);
+
+  const baseUrl = env["UNIVERSE_PROXY_URL"] ?? DEFAULT_PROXY_URL;
+  const client = mkClient({
+    baseUrl,
+    getAuthToken: () => identity.token,
+    timeoutMs: parseFetchTimeoutMs(env),
+  });
+
+  let result: { url: string; deployId: string };
+  if (options.from) {
+    const prod = await client.getAlias({
+      site: config.site,
+      mode: "production",
+    });
+    const initialExpected = prod?.deployId ?? "";
+    try {
+      result = await client.siteRollback({
+        site: config.site,
+        to: options.from,
+        expectedCurrent: initialExpected,
+      });
+    } catch (err) {
+      if (!(err instanceof AliasDriftError)) throw err;
+      yield { type: "warning", message: `drift: production moved to ${err.current}, expected ${initialExpected}` };
+      const retry = (yield {
+        type: "confirm",
+        field: "drift-retry",
+        message: `Retry promote --from with expectedCurrent='${err.current}'?`,
+      }) as boolean;
+      if (!retry) throw err;
+      result = await client.siteRollback({
+        site: config.site,
+        to: options.from,
+        expectedCurrent: err.current,
+      });
+    }
+  } else {
+    const preview = await client.getAlias({
+      site: config.site,
+      mode: "preview",
+    });
+    if (preview === null) {
+      throw new ConfigError("no preview alias to promote — run `universe static deploy` first");
+    }
+    const prod = await client.getAlias({
+      site: config.site,
+      mode: "production",
+    });
+    yield { type: "info", message: `Promoting ${preview.deployId} → ${prod?.deployId ?? "<none>"}` };
+    const initialExpected = prod?.deployId ?? "";
+    try {
+      result = await client.sitePromote({
+        site: config.site,
+        deployId: preview.deployId,
+        expectedCurrent: initialExpected,
+      });
+    } catch (err) {
+      if (!(err instanceof AliasDriftError)) throw err;
+      yield { type: "warning", message: `drift: production moved to ${err.current}, expected ${initialExpected}` };
+      const retry = (yield {
+        type: "confirm",
+        field: "drift-retry",
+        message: `Retry promote with expectedCurrent='${err.current}'?`,
+      }) as boolean;
+      if (!retry) throw err;
+      result = await client.sitePromote({
+        site: config.site,
+        deployId: preview.deployId,
+        expectedCurrent: err.current,
+      });
+    }
+  }
+
+  const lines = [
+    `Promoted ${result.deployId} to production`,
+    ``,
+    `  Site:        ${config.site}`,
+    `  Deploy:      ${result.deployId}`,
+    `  Production:  ${result.url}`,
+  ];
+  if (options.from) {
+    lines.push(``, "Preview alias unchanged.");
+  }
+
+  return {
+    data: buildEnvelope("promote", true, {
+      deployId: result.deployId,
+      url: result.url,
+      site: config.site,
+      identitySource: identity.source,
+    }),
+    format: lines.join("\n"),
+  };
+}
+
+async function staticPromoteHandler(
+  options: StaticPromoteHandlerOptions,
+  deps: StaticPromoteHandlerDeps = {},
+): Promise<void> {
   const success = deps.logSuccess ?? ((s: string) => log.success(s));
   const error = deps.logError ?? ((s: string) => log.error(s));
   const exit = deps.exit ?? exitWithCode;
-  const promptConfirm = deps.promptConfirm ?? defaultPromptConfirm;
+
+  const sdkOpts: StaticPromoteOptions = { from: options.from };
 
   try {
-    const identity = await resolveId({ env });
-    if (!identity) {
-      throw new CredentialError(
-        "No GitHub identity available. Run `universe login`, set $GITHUB_TOKEN, or install the gh CLI.",
-      );
-    }
-
-    const config = await readAndParseConfig(cwd, readYaml);
-
-    const baseUrl = env["UNIVERSE_PROXY_URL"] ?? DEFAULT_PROXY_URL;
-    const client = mkClient({
-      baseUrl,
-      getAuthToken: () => identity.token,
-      timeoutMs: parseFetchTimeoutMs(env),
-    });
-
-    let result: { url: string; deployId: string };
-    if (options.from) {
-      // Per ADR-016: artemis promote endpoint copies preview alias to
-      // production. To promote a *specific* prior deploy id, the alias
-      // must be rewritten directly — the rollback endpoint is the
-      // server-side primitive for that. Same atomic single-PUT.
-      // V7: CAS body-pin even on --from to keep zero bare callsites.
-      const prod = await client.getAlias({
-        site: config.site,
-        mode: "production",
-      });
-      const initialExpected = prod?.deployId ?? "";
-      try {
-        result = await client.siteRollback({
-          site: config.site,
-          to: options.from,
-          expectedCurrent: initialExpected,
-        });
-      } catch (err) {
-        if (!(err instanceof AliasDriftError)) throw err;
-        if (options.json) throw err;
-        error(`drift: production moved to ${err.current}, expected ${initialExpected}`);
-        const ok = await promptConfirm(
-          `Retry promote --from with expectedCurrent='${err.current}'?`,
-        );
-        if (!ok) throw err;
-        result = await client.siteRollback({
-          site: config.site,
-          to: options.from,
-          expectedCurrent: err.current,
-        });
-      }
+    let result: CommandResult;
+    if (options.json) {
+      result = await silentDrive(staticPromote(sdkOpts, deps));
     } else {
-      // G3 CAS body-pin: read both aliases first, then POST with
-      // {deployId, expectedCurrent}. expectedCurrent === "" is the
-      // documented "assert no prod yet" idiom for first-promote.
-      const preview = await client.getAlias({
-        site: config.site,
-        mode: "preview",
-      });
-      if (preview === null) {
-        throw new ConfigError("no preview alias to promote — run `universe static deploy` first");
-      }
-      const prod = await client.getAlias({
-        site: config.site,
-        mode: "production",
-      });
-      if (!options.json) {
-        // Pre-promote echo (RFC §G Phase 1 row 1).
-        success(`Promoting ${preview.deployId} → ${prod?.deployId ?? "<none>"}`);
-      }
-      const initialExpected = prod?.deployId ?? "";
-      try {
-        result = await client.sitePromote({
-          site: config.site,
-          deployId: preview.deployId,
-          expectedCurrent: initialExpected,
-        });
-      } catch (err) {
-        if (!(err instanceof AliasDriftError)) throw err;
-        // V4: single-shot retry on non-JSON only. JSON path falls through
-        // to outer catch which renders the envelope with `current`.
-        if (options.json) throw err;
-        error(`drift: production moved to ${err.current}, expected ${initialExpected}`);
-        const ok = await promptConfirm(`Retry promote with expectedCurrent='${err.current}'?`);
-        if (!ok) throw err;
-        result = await client.sitePromote({
-          site: config.site,
-          deployId: preview.deployId,
-          expectedCurrent: err.current,
-        });
-      }
+      result = await clackDriver(staticPromote(sdkOpts, deps));
     }
 
     if (options.json) {
-      emitJson(
-        buildEnvelope("promote", true, {
-          deployId: result.deployId,
-          url: result.url,
-          site: config.site,
-          identitySource: identity.source,
-        }),
-      );
+      emitJson(result.data);
     } else {
-      const lines = [
-        `Promoted ${result.deployId} to production`,
-        ``,
-        `  Site:        ${config.site}`,
-        `  Deploy:      ${result.deployId}`,
-        `  Production:  ${result.url}`,
-      ];
-      if (options.from) {
-        // --from routes through siteRollback, which rewrites only the
-        // production alias; preview body is whatever the last
-        // finalize(preview) wrote. Surface the divergence so the
-        // operator knows preview is now lagging prod.
-        lines.push(``, "Preview alias unchanged.");
-      }
-      success(lines.join("\n"));
+      success(result.format);
     }
   } catch (err) {
     const extras = err instanceof AliasDriftError ? { current: err.current } : undefined;
     exit(outputError({ json: options.json, command: "promote" }, err, { logError: error, extras }));
   }
 }
+
+export { staticPromote, staticPromoteHandler };
+export type {
+  StaticPromoteOptions,
+  StaticPromoteSdkDeps,
+  StaticPromoteHandlerOptions,
+  StaticPromoteHandlerDeps,
+};

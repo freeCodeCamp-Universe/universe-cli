@@ -122,43 +122,43 @@ describe("top-level CLI", () => {
 });
 
 vi.mock("../src/commands/deploy.js", () => ({
-  deploy: vi.fn(),
+  staticDeployHandler: vi.fn(),
 }));
 vi.mock("../src/commands/promote.js", () => ({
-  promote: vi.fn(),
+  staticPromoteHandler: vi.fn(),
 }));
 vi.mock("../src/commands/rollback.js", () => ({
-  rollback: vi.fn(),
+  staticRollbackHandler: vi.fn(),
 }));
 vi.mock("../src/commands/login.js", () => ({
-  login: vi.fn(),
+  loginHandler: vi.fn(),
 }));
 vi.mock("../src/commands/logout.js", () => ({
-  logout: vi.fn(),
+  logoutHandler: vi.fn(),
 }));
 vi.mock("../src/commands/whoami.js", () => ({
-  whoami: vi.fn(),
+  whoamiHandler: vi.fn(),
 }));
-vi.mock("../src/commands/repo/create.js", () => ({ create: vi.fn() }));
-vi.mock("../src/commands/repo/ls.js", () => ({ ls: vi.fn() }));
-vi.mock("../src/commands/repo/approve.js", () => ({ approve: vi.fn() }));
-vi.mock("../src/commands/repo/reject.js", () => ({ reject: vi.fn() }));
-vi.mock("../src/commands/repo/status.js", () => ({ status: vi.fn() }));
+vi.mock("../src/commands/repo/create.js", () => ({ repoCreateHandler: vi.fn() }));
+vi.mock("../src/commands/repo/ls.js", () => ({ repoLsHandler: vi.fn() }));
+vi.mock("../src/commands/repo/approve.js", () => ({ repoApproveHandler: vi.fn() }));
+vi.mock("../src/commands/repo/reject.js", () => ({ repoRejectHandler: vi.fn() }));
+vi.mock("../src/commands/repo/status.js", () => ({ repoStatusHandler: vi.fn() }));
 
-import { deploy } from "../src/commands/deploy.js";
-import { login } from "../src/commands/login.js";
-import { logout } from "../src/commands/logout.js";
-import { whoami } from "../src/commands/whoami.js";
-import { create as repoCreate } from "../src/commands/repo/create.js";
-import { ls as repoLs } from "../src/commands/repo/ls.js";
-import { approve as repoApprove } from "../src/commands/repo/approve.js";
-const mockDeploy = vi.mocked(deploy);
-const mockLogin = vi.mocked(login);
-const mockLogout = vi.mocked(logout);
-const mockWhoami = vi.mocked(whoami);
-const mockRepoCreate = vi.mocked(repoCreate);
-const mockRepoLs = vi.mocked(repoLs);
-const mockRepoApprove = vi.mocked(repoApprove);
+import { staticDeployHandler } from "../src/commands/deploy.js";
+import { loginHandler } from "../src/commands/login.js";
+import { logoutHandler } from "../src/commands/logout.js";
+import { whoamiHandler } from "../src/commands/whoami.js";
+import { repoCreateHandler } from "../src/commands/repo/create.js";
+import { repoLsHandler } from "../src/commands/repo/ls.js";
+import { repoApproveHandler } from "../src/commands/repo/approve.js";
+const mockDeploy = vi.mocked(staticDeployHandler);
+const mockLogin = vi.mocked(loginHandler);
+const mockLogout = vi.mocked(logoutHandler);
+const mockWhoami = vi.mocked(whoamiHandler);
+const mockRepoCreate = vi.mocked(repoCreateHandler);
+const mockRepoLs = vi.mocked(repoLsHandler);
+const mockRepoApprove = vi.mocked(repoApproveHandler);
 
 describe("top-level error handling", () => {
   beforeEach(() => {

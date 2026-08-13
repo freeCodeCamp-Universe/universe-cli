@@ -1,37 +1,23 @@
 import { describe, expect, it, vi } from "vitest";
-import { deploy } from "../../src/commands/deploy.js";
+import { staticDeploy, staticDeployHandler } from "../../src/commands/deploy.js";
+import type { StaticDeploySdkDeps, StaticDeployHandlerDeps } from "../../src/commands/deploy.js";
 import { ProxyError } from "../../src/lib/proxy-client.js";
+import type { Step, StepResponse } from "../../src/interaction/step.js";
 
-interface FakeDeps {
-  cwd: string;
-  env: NodeJS.ProcessEnv;
-  readPlatformYaml: ReturnType<typeof vi.fn>;
-  resolveIdentity: ReturnType<typeof vi.fn>;
-  createProxyClient: ReturnType<typeof vi.fn>;
-  getGitState: ReturnType<typeof vi.fn>;
-  runBuild: ReturnType<typeof vi.fn>;
-  walkFiles: ReturnType<typeof vi.fn>;
-  uploadFiles: ReturnType<typeof vi.fn>;
-  createSpinner: ReturnType<typeof vi.fn>;
-  logSuccess: ReturnType<typeof vi.fn>;
-  logInfo: ReturnType<typeof vi.fn>;
-  logWarn: ReturnType<typeof vi.fn>;
-  logError: ReturnType<typeof vi.fn>;
-  exit: ReturnType<typeof vi.fn>;
-}
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
-function mkSpinner(): {
-  start: ReturnType<typeof vi.fn>;
-  message: ReturnType<typeof vi.fn>;
-  stop: ReturnType<typeof vi.fn>;
-  error: ReturnType<typeof vi.fn>;
-} {
-  return {
-    start: vi.fn(),
-    message: vi.fn(),
-    stop: vi.fn(),
-    error: vi.fn(),
-  };
+async function driveToEnd<T>(
+  gen: AsyncGenerator<Step, T, StepResponse>,
+): Promise<{ steps: Step[]; result: T }> {
+  const steps: Step[] = [];
+  let next = await gen.next();
+  while (!next.done) {
+    steps.push(next.value);
+    next = await gen.next(next.value.type === "confirm" ? false : undefined);
+  }
+  return { steps, result: next.value };
 }
 
 const VALID_YAML = `site: my-site
@@ -77,7 +63,7 @@ function mkProxy(): {
   };
 }
 
-function mkDeps(overrides: Partial<FakeDeps> = {}): FakeDeps {
+function mkSdkDeps(overrides: Partial<StaticDeploySdkDeps> = {}): StaticDeploySdkDeps {
   const proxy = mkProxy();
   return {
     cwd: "/proj",
@@ -106,10 +92,21 @@ function mkDeps(overrides: Partial<FakeDeps> = {}): FakeDeps {
       uploaded: ["index.html", "main.js"],
       errors: [],
     }),
-    createSpinner: vi.fn().mockImplementation(() => mkSpinner()),
+    ...overrides,
+  };
+}
+
+interface FakeHandlerDeps extends StaticDeployHandlerDeps {
+  logSuccess: ReturnType<typeof vi.fn>;
+  logError: ReturnType<typeof vi.fn>;
+  exit: ReturnType<typeof vi.fn>;
+}
+
+function mkHandlerDeps(overrides: Partial<StaticDeployHandlerDeps> = {}): FakeHandlerDeps {
+  const sdkDeps = mkSdkDeps(overrides);
+  return {
+    ...sdkDeps,
     logSuccess: vi.fn(),
-    logInfo: vi.fn(),
-    logWarn: vi.fn(),
     logError: vi.fn(),
     exit: vi.fn().mockImplementation((_code: number) => {
       throw new Error("__exit__");
@@ -118,16 +115,20 @@ function mkDeps(overrides: Partial<FakeDeps> = {}): FakeDeps {
   };
 }
 
-describe("deploy command (proxy plane)", () => {
+// ---------------------------------------------------------------------------
+// SDK generator tests
+// ---------------------------------------------------------------------------
+
+describe("staticDeploy SDK generator", () => {
   describe("happy path", () => {
-    it("walks identity → init → build → upload → finalize", async () => {
-      const deps = mkDeps();
-      await deploy({ json: false }, deps);
+    it("walks identity -> init -> build -> upload -> finalize and returns CommandResult", async () => {
+      const deps = mkSdkDeps();
+      const { steps, result } = await driveToEnd(staticDeploy({}, deps));
 
       expect(deps.resolveIdentity).toHaveBeenCalledTimes(1);
       expect(deps.runBuild).toHaveBeenCalledTimes(1);
       expect(deps.walkFiles).toHaveBeenCalledWith("/proj/dist");
-      const proxy = deps.createProxyClient.mock.results[0]?.value as ReturnType<typeof mkProxy>;
+      const proxy = (deps.createProxyClient as ReturnType<typeof vi.fn>).mock.results[0]?.value as ReturnType<typeof mkProxy>;
       expect(proxy.deployInit).toHaveBeenCalledWith(
         expect.objectContaining({
           site: "my-site",
@@ -143,42 +144,27 @@ describe("deploy command (proxy plane)", () => {
           mode: "preview",
         }),
       );
-    });
 
-    it("emits success envelope in JSON mode", async () => {
-      const stdout: string[] = [];
-      const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
-        stdout.push(String(chunk));
-        return true;
-      });
+      // Should have yielded progress steps for upload
+      const progressSteps = steps.filter((s) => s.type === "progress");
+      expect(progressSteps.length).toBeGreaterThanOrEqual(2);
 
-      const deps = mkDeps();
-      await deploy({ json: true }, deps);
-      writeSpy.mockRestore();
-
-      const env = JSON.parse(stdout.join("").trim());
-      expect(env.command).toBe("deploy");
-      expect(env.success).toBe(true);
-      expect(env.deployId).toBe("20260427-abc1234");
-      expect(env.url).toBe("https://my-site.preview.freecode.camp");
-      expect(env.mode).toBe("preview");
-      expect(env.fileCount).toBe(2);
-    });
-
-    it("prints summary in text mode (deploy id + preview url)", async () => {
-      const deps = mkDeps();
-      await deploy({ json: false }, deps);
-      const msg = deps.logSuccess.mock.calls[0]?.[0] ?? "";
-      expect(msg).toContain("20260427-abc1234");
-      expect(msg).toContain("https://my-site.preview.freecode.camp");
+      // CommandResult should contain deploy data
+      expect(result.data.command).toBe("deploy");
+      expect(result.data.success).toBe(true);
+      expect(result.data.deployId).toBe("20260427-abc1234");
+      expect(result.data.url).toBe("https://my-site.preview.freecode.camp");
+      expect(result.data.mode).toBe("preview");
+      expect(result.format).toContain("20260427-abc1234");
+      expect(result.format).toContain("https://my-site.preview.freecode.camp");
     });
   });
 
   describe("--promote flag", () => {
     it("forwards mode=production to finalize", async () => {
-      const deps = mkDeps();
-      await deploy({ json: false, promote: true }, deps);
-      const proxy = deps.createProxyClient.mock.results[0]?.value as ReturnType<typeof mkProxy>;
+      const deps = mkSdkDeps();
+      await driveToEnd(staticDeploy({ promote: true }, deps));
+      const proxy = (deps.createProxyClient as ReturnType<typeof vi.fn>).mock.results[0]?.value as ReturnType<typeof mkProxy>;
       const finalizeArg = proxy.deployFinalize.mock.calls[0]?.[0] as {
         mode: string;
       };
@@ -188,59 +174,51 @@ describe("deploy command (proxy plane)", () => {
 
   describe("--dir flag", () => {
     it("overrides build output directory", async () => {
-      const deps = mkDeps({
+      const deps = mkSdkDeps({
         runBuild: vi.fn().mockResolvedValue({
           skipped: false,
           outputDir: "/proj/build-out",
         }),
       });
-      await deploy({ json: false, dir: "build-out" }, deps);
-      const arg = deps.runBuild.mock.calls[0]?.[0] as { outputDir: string };
+      await driveToEnd(staticDeploy({ dir: "build-out" }, deps));
+      const arg = (deps.runBuild as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as { outputDir: string };
       expect(arg.outputDir).toBe("build-out");
       expect(deps.walkFiles).toHaveBeenCalledWith("/proj/build-out");
     });
   });
 
   describe("identity / config errors", () => {
-    it("errors with EXIT_CREDENTIALS when identity chain returns null", async () => {
-      const deps = mkDeps({
+    it("throws CredentialError when identity chain returns null", async () => {
+      const deps = mkSdkDeps({
         resolveIdentity: vi.fn().mockResolvedValue(null),
       });
-      await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
+      await expect(driveToEnd(staticDeploy({}, deps))).rejects.toThrow(/login|identity/i);
       expect(deps.runBuild).not.toHaveBeenCalled();
-      expect(deps.exit).toHaveBeenCalledWith(12);
-      expect(deps.logError).toHaveBeenCalledWith(expect.stringMatching(/login|identity/i));
     });
 
-    it("errors with EXIT_CONFIG when platform.yaml is missing", async () => {
+    it("throws ConfigError when platform.yaml is missing", async () => {
       const err = new Error("ENOENT") as NodeJS.ErrnoException;
       err.code = "ENOENT";
-      const deps = mkDeps({
+      const deps = mkSdkDeps({
         readPlatformYaml: vi.fn().mockRejectedValue(err),
       });
-      await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
-      expect(deps.exit).toHaveBeenCalledWith(11);
-      expect(deps.logError).toHaveBeenCalledWith(expect.stringMatching(/platform\.yaml/i));
+      await expect(driveToEnd(staticDeploy({}, deps))).rejects.toThrow(/platform\.yaml/i);
     });
 
-    it("errors with EXIT_CONFIG on v1 platform.yaml fragment", async () => {
+    it("throws ConfigError on v1 platform.yaml fragment", async () => {
       const v1 = "name: my-site\nr2:\n  bucket: x\n";
-      const deps = mkDeps({
+      const deps = mkSdkDeps({
         readPlatformYaml: vi.fn().mockResolvedValue(v1),
       });
-      await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
-      expect(deps.exit).toHaveBeenCalledWith(11);
-      expect(deps.logError).toHaveBeenCalledWith(expect.stringMatching(/v1|migration/i));
+      await expect(driveToEnd(staticDeploy({}, deps))).rejects.toThrow(/v1|migration/i);
     });
 
-    it("errors with EXIT_CONFIG on invalid site name", async () => {
+    it("throws ConfigError on invalid site name", async () => {
       const bad = "site: BAD-Name\n";
-      const deps = mkDeps({
+      const deps = mkSdkDeps({
         readPlatformYaml: vi.fn().mockResolvedValue(bad),
       });
-      await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
-      expect(deps.exit).toHaveBeenCalledWith(11);
-      expect(deps.logError).toHaveBeenCalledWith(expect.any(String));
+      await expect(driveToEnd(staticDeploy({}, deps))).rejects.toThrow();
     });
   });
 
@@ -251,28 +229,24 @@ describe("deploy command (proxy plane)", () => {
         login: "freeCodeCamp-bot",
         authorizedSites: ["other-site", "another-site"],
       });
-      const deps = mkDeps({
+      const deps = mkSdkDeps({
         createProxyClient: vi.fn().mockReturnValue(proxy),
       });
-      await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
+      const err = await driveToEnd(staticDeploy({}, deps)).catch((e) => e);
+      expect(err).toBeDefined();
+      expect(err.message).toContain("my-site");
+      expect(err.message).toContain("freeCodeCamp-bot");
+      expect(err.message).toContain("Your authorized sites (2)");
+      expect(err.message).toContain("- another-site");
+      expect(err.message).toContain("- other-site");
+      expect(err.message).not.toContain("universe sites ls --mine");
+      expect(err.message).toContain("universe sites register my-site");
+      expect(err.message).not.toContain("docs/runbooks");
+      expect(err.message).not.toContain("https://github.com/freeCodeCamp/infra");
+      expect(err.message).not.toContain("sites.yaml");
       expect(proxy.whoami).toHaveBeenCalledTimes(1);
       expect(deps.runBuild).not.toHaveBeenCalled();
       expect(proxy.deployInit).not.toHaveBeenCalled();
-      expect(deps.exit).toHaveBeenCalledWith(12);
-      const errMsg = (deps.logError.mock.calls[0]?.[0] as string) ?? "";
-      expect(errMsg).toContain("my-site");
-      expect(errMsg).toContain("freeCodeCamp-bot");
-      // Inline authorized list — no redirect to a second command.
-      expect(errMsg).toContain("Your authorized sites (2)");
-      expect(errMsg).toContain("- another-site");
-      expect(errMsg).toContain("- other-site");
-      expect(errMsg).not.toContain("universe sites ls --mine");
-      // Registry-CLI remediation shown inline (replaces sites.yaml PR flow).
-      expect(errMsg).toContain("universe sites register my-site");
-      // Self-contained — no runbook URL, no reference to the retired yaml.
-      expect(errMsg).not.toContain("docs/runbooks");
-      expect(errMsg).not.toContain("https://github.com/freeCodeCamp/infra");
-      expect(errMsg).not.toContain("sites.yaml");
     });
 
     it("includes a did-you-mean hint when the typo is close to a registered slug", async () => {
@@ -281,13 +255,12 @@ describe("deploy command (proxy plane)", () => {
         login: "raisedadead",
         authorizedSites: ["hello-universe", "gomoku", "test"],
       });
-      const deps = mkDeps({
+      const deps = mkSdkDeps({
         readPlatformYaml: vi.fn().mockResolvedValue("site: hello-universe-1\n"),
         createProxyClient: vi.fn().mockReturnValue(proxy),
       });
-      await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
-      const errMsg = (deps.logError.mock.calls[0]?.[0] as string) ?? "";
-      expect(errMsg).toContain("Did you mean: hello-universe?");
+      const err = await driveToEnd(staticDeploy({}, deps)).catch((e) => e);
+      expect(err.message).toContain("Did you mean: hello-universe?");
     });
 
     it("omits did-you-mean when no candidate is close enough", async () => {
@@ -296,13 +269,12 @@ describe("deploy command (proxy plane)", () => {
         login: "raisedadead",
         authorizedSites: ["gomoku", "test"],
       });
-      const deps = mkDeps({
+      const deps = mkSdkDeps({
         readPlatformYaml: vi.fn().mockResolvedValue("site: forum\n"),
         createProxyClient: vi.fn().mockReturnValue(proxy),
       });
-      await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
-      const errMsg = (deps.logError.mock.calls[0]?.[0] as string) ?? "";
-      expect(errMsg).not.toContain("Did you mean");
+      const err = await driveToEnd(staticDeploy({}, deps)).catch((e) => e);
+      expect(err.message).not.toContain("Did you mean");
     });
 
     it("handles empty authorized-sites list with a distinct message", async () => {
@@ -311,63 +283,54 @@ describe("deploy command (proxy plane)", () => {
         login: "newhire",
         authorizedSites: [],
       });
-      const deps = mkDeps({
+      const deps = mkSdkDeps({
         createProxyClient: vi.fn().mockReturnValue(proxy),
       });
-      await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
-      const errMsg = (deps.logError.mock.calls[0]?.[0] as string) ?? "";
-      expect(errMsg).toContain("authorized for no sites");
-      expect(errMsg).not.toContain("Did you mean");
-      expect(errMsg).not.toContain("Your authorized sites (0)");
+      const err = await driveToEnd(staticDeploy({}, deps)).catch((e) => e);
+      expect(err.message).toContain("authorized for no sites");
+      expect(err.message).not.toContain("Did you mean");
+      expect(err.message).not.toContain("Your authorized sites (0)");
     });
 
     it("suppresses the inline list above the scale threshold (>10 entries)", async () => {
-      // Staff member belongs to a team granting access to dozens of sites
-      // (the production reality at fCC scale). Dumping the full list
-      // produces a wall of text. Cap at 10 inline; redirect for the rest.
       const big = Array.from({ length: 25 }, (_, i) => `site-${i}`);
       const proxy = mkProxy();
       proxy.whoami.mockResolvedValue({
         login: "raisedadead",
         authorizedSites: big,
       });
-      const deps = mkDeps({
+      const deps = mkSdkDeps({
         readPlatformYaml: vi.fn().mockResolvedValue("site: typo-slug\n"),
         createProxyClient: vi.fn().mockReturnValue(proxy),
       });
-      await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
-      const errMsg = (deps.logError.mock.calls[0]?.[0] as string) ?? "";
-      // Count + redirect surfaced; no individual entries dumped.
-      expect(errMsg).toContain("25 authorized sites");
-      expect(errMsg).toContain("universe sites ls --mine");
-      expect(errMsg).not.toContain("- site-0");
-      expect(errMsg).not.toContain("- site-24");
+      const err = await driveToEnd(staticDeploy({}, deps)).catch((e) => e);
+      expect(err.message).toContain("25 authorized sites");
+      expect(err.message).toContain("universe sites ls --mine");
+      expect(err.message).not.toContain("- site-0");
+      expect(err.message).not.toContain("- site-24");
     });
 
     it("still shows a did-you-mean hint when the list is suppressed", async () => {
-      // Scale should not blunt the typo-recovery surface: did-you-mean
-      // is the primary fix path and stays inline regardless of size.
       const big = ["hello-universe", ...Array.from({ length: 24 }, (_, i) => `noise-${i}`)];
       const proxy = mkProxy();
       proxy.whoami.mockResolvedValue({
         login: "raisedadead",
         authorizedSites: big,
       });
-      const deps = mkDeps({
+      const deps = mkSdkDeps({
         readPlatformYaml: vi.fn().mockResolvedValue("site: hello-universe-1\n"),
         createProxyClient: vi.fn().mockReturnValue(proxy),
       });
-      await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
-      const errMsg = (deps.logError.mock.calls[0]?.[0] as string) ?? "";
-      expect(errMsg).toContain("Did you mean: hello-universe?");
-      expect(errMsg).toContain("universe sites ls --mine");
-      expect(errMsg).not.toContain("- noise-0");
+      const err = await driveToEnd(staticDeploy({}, deps)).catch((e) => e);
+      expect(err.message).toContain("Did you mean: hello-universe?");
+      expect(err.message).toContain("universe sites ls --mine");
+      expect(err.message).not.toContain("- noise-0");
     });
 
     it("proceeds when site IS in authorizedSites (default happy fixture)", async () => {
-      const deps = mkDeps();
-      await deploy({ json: false }, deps);
-      const proxy = deps.createProxyClient.mock.results[0]?.value as ReturnType<typeof mkProxy>;
+      const deps = mkSdkDeps();
+      await driveToEnd(staticDeploy({}, deps));
+      const proxy = (deps.createProxyClient as ReturnType<typeof vi.fn>).mock.results[0]?.value as ReturnType<typeof mkProxy>;
       expect(proxy.whoami).toHaveBeenCalledTimes(1);
       expect(deps.runBuild).toHaveBeenCalledTimes(1);
       expect(proxy.deployInit).toHaveBeenCalledTimes(1);
@@ -375,22 +338,24 @@ describe("deploy command (proxy plane)", () => {
   });
 
   describe("git state", () => {
-    it("warns but proceeds when working tree is dirty", async () => {
-      const deps = mkDeps({
+    it("yields warning and proceeds when working tree is dirty", async () => {
+      const deps = mkSdkDeps({
         getGitState: vi.fn().mockReturnValue({ hash: "abcdef0", dirty: true }),
       });
-      await deploy({ json: false }, deps);
-      expect(deps.logWarn).toHaveBeenCalled();
-      const proxy = deps.createProxyClient.mock.results[0]?.value as ReturnType<typeof mkProxy>;
+      const { steps } = await driveToEnd(staticDeploy({}, deps));
+      const warnings = steps.filter((s) => s.type === "warning");
+      expect(warnings.length).toBeGreaterThanOrEqual(1);
+      expect(warnings[0].message).toContain("dirty");
+      const proxy = (deps.createProxyClient as ReturnType<typeof vi.fn>).mock.results[0]?.value as ReturnType<typeof mkProxy>;
       expect(proxy.deployInit).toHaveBeenCalled();
     });
 
     it("falls back to a synthetic sha when no git state", async () => {
-      const deps = mkDeps({
+      const deps = mkSdkDeps({
         getGitState: vi.fn().mockReturnValue({ hash: null, dirty: false, error: "no git" }),
       });
-      await deploy({ json: false }, deps);
-      const proxy = deps.createProxyClient.mock.results[0]?.value as ReturnType<typeof mkProxy>;
+      await driveToEnd(staticDeploy({}, deps));
+      const proxy = (deps.createProxyClient as ReturnType<typeof vi.fn>).mock.results[0]?.value as ReturnType<typeof mkProxy>;
       const initArg = proxy.deployInit.mock.calls[0]?.[0] as { sha: string };
       expect(initArg.sha).toMatch(/^nogit-/);
     });
@@ -398,20 +363,20 @@ describe("deploy command (proxy plane)", () => {
 
   describe("ignore filter", () => {
     it("excludes files matching deploy.ignore patterns", async () => {
-      const deps = mkDeps({
+      const deps = mkSdkDeps({
         walkFiles: vi.fn().mockReturnValue([
           { relPath: "index.html", absPath: "/p/index.html" },
           { relPath: "main.js.map", absPath: "/p/main.js.map" },
           { relPath: "main.js", absPath: "/p/main.js" },
         ]),
       });
-      await deploy({ json: false }, deps);
-      const proxy = deps.createProxyClient.mock.results[0]?.value as ReturnType<typeof mkProxy>;
+      await driveToEnd(staticDeploy({}, deps));
+      const proxy = (deps.createProxyClient as ReturnType<typeof vi.fn>).mock.results[0]?.value as ReturnType<typeof mkProxy>;
       const initArg = proxy.deployInit.mock.calls[0]?.[0] as {
         files: string[];
       };
       expect(initArg.files).toEqual(["index.html", "main.js"]);
-      const uploadArg = deps.uploadFiles.mock.calls[0]?.[0] as {
+      const uploadArg = (deps.uploadFiles as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as {
         files: { relPath: string }[];
       };
       expect(uploadArg.files.map((f) => f.relPath)).toEqual(["index.html", "main.js"]);
@@ -419,8 +384,8 @@ describe("deploy command (proxy plane)", () => {
   });
 
   describe("upload errors", () => {
-    it("aborts with EXIT_PARTIAL when uploadFiles surfaces errors", async () => {
-      const deps = mkDeps({
+    it("throws PartialUploadError when uploadFiles surfaces errors", async () => {
+      const deps = mkSdkDeps({
         uploadFiles: vi.fn().mockResolvedValue({
           fileCount: 1,
           totalSize: 100,
@@ -428,123 +393,84 @@ describe("deploy command (proxy plane)", () => {
           errors: ["b.html: 503"],
         }),
       });
-      await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
-      expect(deps.exit).toHaveBeenCalledWith(19);
-      expect(deps.logError).toHaveBeenCalledWith(expect.stringMatching(/partial|failed/i));
-      const proxy = deps.createProxyClient.mock.results[0]?.value as ReturnType<typeof mkProxy>;
+      await expect(driveToEnd(staticDeploy({}, deps))).rejects.toThrow(/partial|failed/i);
+      const proxy = (deps.createProxyClient as ReturnType<typeof vi.fn>).mock.results[0]?.value as ReturnType<typeof mkProxy>;
       expect(proxy.deployFinalize).not.toHaveBeenCalled();
     });
   });
 
   describe("proxy errors", () => {
-    it("propagates ProxyError from deployInit", async () => {
+    it("throws ProxyError from deployInit", async () => {
       const proxy = mkProxy();
       proxy.deployInit.mockRejectedValue(new ProxyError(403, "site_unauthorized", "no team"));
-      const deps = mkDeps({
+      const deps = mkSdkDeps({
         createProxyClient: vi.fn().mockReturnValue(proxy),
       });
-      await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
-      expect(deps.exit).toHaveBeenCalledWith(12);
-      expect(deps.logError).toHaveBeenCalledWith(expect.stringContaining("no team"));
+      await expect(driveToEnd(staticDeploy({}, deps))).rejects.toThrow(/no team/);
     });
 
-    it("surfaces user_unauthorized hint", async () => {
-      const proxy = mkProxy();
-      proxy.deployInit.mockRejectedValue(
-        new ProxyError(403, "user_unauthorized", "caller is not on the required team", "req-42", "check SSO"),
-      );
-      const deps = mkDeps({
-        createProxyClient: vi.fn().mockReturnValue(proxy),
-      });
-      await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
-      expect(deps.exit).toHaveBeenCalledWith(12);
-      const msg = (deps.logError.mock.calls[0]?.[0] as string) ?? "";
-      expect(msg).toContain("deploy failed (user_unauthorized)");
-      expect(msg).toContain("deploy init failed:");
-      expect(msg).toContain("read:org");
-    });
-
-    it("propagates ProxyError from deployFinalize", async () => {
+    it("throws ProxyError from deployFinalize", async () => {
       const proxy = mkProxy();
       proxy.deployFinalize.mockRejectedValue(new ProxyError(422, "verify_failed", "missing"));
-      const deps = mkDeps({
+      const deps = mkSdkDeps({
         createProxyClient: vi.fn().mockReturnValue(proxy),
       });
-      await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
-      expect(deps.exit).toHaveBeenCalledWith(13);
-      expect(deps.logError).toHaveBeenCalledWith(expect.stringContaining("missing"));
+      await expect(driveToEnd(staticDeploy({}, deps))).rejects.toThrow(/missing/);
     });
   });
 
   describe("baseUrl resolution", () => {
     it("uses default https://uploads.freecode.camp", async () => {
-      const deps = mkDeps();
-      await deploy({ json: false }, deps);
-      const cfg = deps.createProxyClient.mock.calls[0]?.[0] as {
+      const deps = mkSdkDeps();
+      await driveToEnd(staticDeploy({}, deps));
+      const cfg = (deps.createProxyClient as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as {
         baseUrl: string;
       };
       expect(cfg.baseUrl).toBe("https://uploads.freecode.camp");
     });
 
     it("respects $UNIVERSE_PROXY_URL env override", async () => {
-      const deps = mkDeps({
+      const deps = mkSdkDeps({
         env: { UNIVERSE_PROXY_URL: "https://staging.example" },
       });
-      await deploy({ json: false }, deps);
-      const cfg = deps.createProxyClient.mock.calls[0]?.[0] as {
+      await driveToEnd(staticDeploy({}, deps));
+      const cfg = (deps.createProxyClient as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as {
         baseUrl: string;
       };
       expect(cfg.baseUrl).toBe("https://staging.example");
     });
   });
 
-  // clack info()/warn() printed to stdout pollute the JSON envelope in
-  // --json mode, breaking machine consumers that parse stdout as one
-  // JSON document. info()/warn() must be silent under --json.
-  describe("--json mode silences info/warn", () => {
-    it("does not call logInfo when build is skipped under --json", async () => {
-      const deps = mkDeps({
+  describe("SDK always yields warnings/info (no json gating)", () => {
+    it("yields info when build is skipped", async () => {
+      const deps = mkSdkDeps({
         runBuild: vi.fn().mockResolvedValue({
           skipped: true,
           outputDir: "/proj/dist",
         }),
       });
-      await deploy({ json: true }, deps);
-      expect(deps.logInfo).not.toHaveBeenCalled();
+      const { steps } = await driveToEnd(staticDeploy({}, deps));
+      const infoSteps = steps.filter((s) => s.type === "info");
+      expect(infoSteps.length).toBeGreaterThanOrEqual(1);
+      expect(infoSteps.some((s) => s.message.includes("build.command not set"))).toBe(true);
     });
 
-    it("does not call logWarn when git is dirty under --json", async () => {
-      const deps = mkDeps({
+    it("yields warning when git is dirty", async () => {
+      const deps = mkSdkDeps({
         getGitState: vi.fn().mockReturnValue({
           hash: "abc1234567",
           dirty: true,
         }),
       });
-      await deploy({ json: true }, deps);
-      expect(deps.logWarn).not.toHaveBeenCalled();
-    });
-
-    it("still calls logWarn when git is dirty under non-JSON mode", async () => {
-      const deps = mkDeps({
-        getGitState: vi.fn().mockReturnValue({
-          hash: "abc1234567",
-          dirty: true,
-        }),
-      });
-      await deploy({ json: false }, deps);
-      expect(deps.logWarn).toHaveBeenCalledTimes(1);
+      const { steps } = await driveToEnd(staticDeploy({}, deps));
+      const warnings = steps.filter((s) => s.type === "warning");
+      expect(warnings.some((s) => s.message.includes("dirty"))).toBe(true);
     });
   });
 
-  // Multi-MB / multi-hundred-file sites upload silently — operator-visible
-  // only when finalize succeeds/fails. uploadFiles already exposes
-  // `onProgress`, but deploy.ts did not wire it. T25 plumbs it through a
-  // clack `spinner()` gated on `!options.json` so machine consumers stay
-  // clean.
-  describe("upload progress (T25)", () => {
-    it("invokes createSpinner in non-JSON mode and wires onProgress", async () => {
-      const spin = mkSpinner();
-      const createSpinner = vi.fn().mockReturnValue(spin);
+  describe("upload progress (onProgress callback)", () => {
+    it("passes onProgress to uploadFiles when provided", async () => {
+      const onProgress = vi.fn();
       const fakeUpload = vi
         .fn()
         .mockImplementation(
@@ -569,103 +495,28 @@ describe("deploy command (proxy plane)", () => {
             };
           },
         );
-      const deps = mkDeps({ createSpinner, uploadFiles: fakeUpload });
+      const deps = mkSdkDeps({ uploadFiles: fakeUpload, onProgress });
+      await driveToEnd(staticDeploy({}, deps));
 
-      await deploy({ json: false }, deps);
-
-      expect(createSpinner).toHaveBeenCalledTimes(1);
-      expect(spin.start).toHaveBeenCalledTimes(1);
-      expect(spin.start.mock.calls[0]?.[0]).toEqual(expect.stringContaining("0/2"));
-      expect(spin.message).toHaveBeenCalledTimes(2);
-      expect(spin.message.mock.calls[0]?.[0]).toEqual(expect.stringContaining("1/2"));
-      expect(spin.message.mock.calls[1]?.[0]).toEqual(expect.stringContaining("2/2"));
-      expect(spin.stop).toHaveBeenCalledTimes(1);
-      expect(spin.error).not.toHaveBeenCalled();
+      expect(onProgress).toHaveBeenCalledTimes(2);
+      expect(onProgress).toHaveBeenCalledWith(
+        expect.objectContaining({ uploaded: 1, total: 2, current: "index.html" }),
+      );
+      expect(onProgress).toHaveBeenCalledWith(
+        expect.objectContaining({ uploaded: 2, total: 2, current: "main.js" }),
+      );
     });
 
-    it("does NOT create a spinner in --json mode", async () => {
-      const createSpinner = vi.fn();
-      const deps = mkDeps({ createSpinner });
-      await deploy({ json: true }, deps);
-      expect(createSpinner).not.toHaveBeenCalled();
-      const uploadCall = deps.uploadFiles.mock.calls[0]?.[0] as {
-        onProgress?: unknown;
-      };
-      expect(uploadCall?.onProgress).toBeUndefined();
-    });
-
-    it("calls spinner.error when uploadFiles reports per-file errors", async () => {
-      const spin = mkSpinner();
-      const createSpinner = vi.fn().mockReturnValue(spin);
-      const deps = mkDeps({
-        createSpinner,
-        uploadFiles: vi.fn().mockResolvedValue({
-          fileCount: 1,
-          totalSize: 1024,
-          uploaded: ["index.html"],
-          errors: ["main.js: 500"],
-        }),
-      });
-      try {
-        await deploy({ json: false }, deps);
-      } catch {
-        // exit() throws __exit__ in fixture.
-      }
-      expect(spin.error).toHaveBeenCalledTimes(1);
-      expect(spin.error.mock.calls[0]?.[0]).toEqual(expect.stringContaining("1"));
-      expect(spin.stop).not.toHaveBeenCalled();
-    });
-
-    it("handles single-file deploy spinner transitions 0/1 -> 1/1", async () => {
-      const spin = mkSpinner();
-      const createSpinner = vi.fn().mockReturnValue(spin);
-      const fakeUpload = vi
-        .fn()
-        .mockImplementation(
-          async (opts: {
-            onProgress?: (p: { uploaded: number; total: number; current: string }) => void;
-          }) => {
-            opts.onProgress?.({
-              uploaded: 1,
-              total: 1,
-              current: "index.html",
-            });
-            return {
-              fileCount: 1,
-              totalSize: 512,
-              uploaded: ["index.html"],
-              errors: [],
-            };
-          },
-        );
-      const walkFiles = vi
-        .fn()
-        .mockReturnValue([{ relPath: "index.html", absPath: "/proj/dist/index.html" }]);
-      const deps = mkDeps({
-        createSpinner,
-        uploadFiles: fakeUpload,
-        walkFiles,
-      });
-
-      await deploy({ json: false }, deps);
-
-      expect(createSpinner).toHaveBeenCalledTimes(1);
-      expect(spin.start).toHaveBeenCalledTimes(1);
-      expect(spin.start.mock.calls[0]?.[0]).toEqual(expect.stringContaining("0/1"));
-      expect(spin.message).toHaveBeenCalledTimes(1);
-      expect(spin.message.mock.calls[0]?.[0]).toEqual(expect.stringContaining("1/1"));
-      expect(spin.stop).toHaveBeenCalledTimes(1);
-      expect(spin.error).not.toHaveBeenCalled();
+    it("does not crash when onProgress is not provided", async () => {
+      const deps = mkSdkDeps();
+      // No onProgress in deps
+      const { result } = await driveToEnd(staticDeploy({}, deps));
+      expect(result.data.success).toBe(true);
     });
   });
 
-  // `universe static deploy --promote` writes a new deploy AND repoints
-  // production to it. Preview alias is left pointing at whatever ran
-  // through preview before. Operators who eyeball preview URL after a
-  // promote-deploy can be surprised that it shows an older build. T26
-  // probes preview post-finalize and warns when it diverges.
-  describe("preview-divergence warn on --promote (T26)", () => {
-    it("warns when preview alias points to a prior deploy id", async () => {
+  describe("preview-divergence warn on --promote", () => {
+    it("yields warning when preview alias points to a prior deploy id", async () => {
       const proxy = mkProxy();
       proxy.deployFinalize.mockResolvedValue({
         url: "https://my-site.freecode.camp",
@@ -676,19 +527,19 @@ describe("deploy command (proxy plane)", () => {
         url: "https://my-site.preview.freecode.camp",
         deployId: "20260425-old00000",
       });
-      const deps = mkDeps({
+      const deps = mkSdkDeps({
         createProxyClient: vi.fn().mockReturnValue(proxy),
       });
-      await deploy({ json: false, promote: true }, deps);
+      const { steps } = await driveToEnd(staticDeploy({ promote: true }, deps));
       expect(proxy.getAlias).toHaveBeenCalledWith({
         site: "my-site",
         mode: "preview",
       });
-      expect(deps.logWarn).toHaveBeenCalledTimes(1);
-      expect(deps.logWarn.mock.calls[0]?.[0]).toEqual(expect.stringContaining("20260425-old00000"));
+      const warnings = steps.filter((s) => s.type === "warning");
+      expect(warnings.some((s) => s.message.includes("20260425-old00000"))).toBe(true);
     });
 
-    it("does NOT warn when preview alias matches the new deploy id", async () => {
+    it("does NOT yield warning when preview alias matches the new deploy id", async () => {
       const proxy = mkProxy();
       proxy.deployFinalize.mockResolvedValue({
         url: "https://my-site.freecode.camp",
@@ -699,14 +550,15 @@ describe("deploy command (proxy plane)", () => {
         url: "https://my-site.preview.freecode.camp",
         deployId: "20260427-abc1234",
       });
-      const deps = mkDeps({
+      const deps = mkSdkDeps({
         createProxyClient: vi.fn().mockReturnValue(proxy),
       });
-      await deploy({ json: false, promote: true }, deps);
-      expect(deps.logWarn).not.toHaveBeenCalled();
+      const { steps } = await driveToEnd(staticDeploy({ promote: true }, deps));
+      const warnings = steps.filter((s) => s.type === "warning");
+      expect(warnings.every((s) => !s.message.includes("Preview alias still points"))).toBe(true);
     });
 
-    it("does NOT warn when no preview alias exists", async () => {
+    it("does NOT yield warning when no preview alias exists", async () => {
       const proxy = mkProxy();
       proxy.deployFinalize.mockResolvedValue({
         url: "https://my-site.freecode.camp",
@@ -714,42 +566,21 @@ describe("deploy command (proxy plane)", () => {
         mode: "production",
       });
       proxy.getAlias.mockResolvedValue(null);
-      const deps = mkDeps({
+      const deps = mkSdkDeps({
         createProxyClient: vi.fn().mockReturnValue(proxy),
       });
-      await deploy({ json: false, promote: true }, deps);
-      expect(deps.logWarn).not.toHaveBeenCalled();
-    });
-
-    it("skips the post-finalize divergence warn in --json mode", async () => {
-      const proxy = mkProxy();
-      proxy.deployFinalize.mockResolvedValue({
-        url: "https://my-site.freecode.camp",
-        deployId: "20260427-abc1234",
-        mode: "production",
-      });
-      proxy.getAlias.mockResolvedValue({
-        url: "https://my-site.preview.freecode.camp",
-        deployId: "20260425-old00000",
-      });
-      const deps = mkDeps({
-        createProxyClient: vi.fn().mockReturnValue(proxy),
-      });
-      await deploy({ json: true, promote: true }, deps);
-      expect(proxy.deployFinalize).toHaveBeenCalledWith(
-        expect.objectContaining({ mode: "production" }),
-      );
-      expect(deps.logWarn).not.toHaveBeenCalled();
+      const { steps } = await driveToEnd(staticDeploy({ promote: true }, deps));
+      const warnings = steps.filter((s) => s.type === "warning");
+      expect(warnings.every((s) => !s.message.includes("Preview alias still points"))).toBe(true);
     });
 
     it("skips the side-call on a regular (non-promote) preview deploy", async () => {
       const proxy = mkProxy();
-      const deps = mkDeps({
+      const deps = mkSdkDeps({
         createProxyClient: vi.fn().mockReturnValue(proxy),
       });
-      await deploy({ json: false }, deps);
+      await driveToEnd(staticDeploy({}, deps));
       expect(proxy.getAlias).not.toHaveBeenCalled();
-      expect(deps.logWarn).not.toHaveBeenCalled();
     });
 
     it("does not crash if getAlias itself fails", async () => {
@@ -760,12 +591,11 @@ describe("deploy command (proxy plane)", () => {
         mode: "production",
       });
       proxy.getAlias.mockRejectedValue(new Error("network glitch"));
-      const deps = mkDeps({
+      const deps = mkSdkDeps({
         createProxyClient: vi.fn().mockReturnValue(proxy),
       });
-      await deploy({ json: false, promote: true }, deps);
-      expect(deps.logSuccess).toHaveBeenCalled();
-      expect(deps.exit).not.toHaveBeenCalled();
+      const { result } = await driveToEnd(staticDeploy({ promote: true }, deps));
+      expect(result.data.success).toBe(true);
     });
   });
 
@@ -780,10 +610,10 @@ describe("deploy command (proxy plane)", () => {
         url: "https://my-site.freecode.camp",
         deployId: "20260512-120000-abc1234",
       });
-      const deps = mkDeps({
+      const deps = mkSdkDeps({
         createProxyClient: vi.fn().mockReturnValue(proxy),
       });
-      await deploy({ json: false, promote: true }, deps);
+      const { steps, result } = await driveToEnd(staticDeploy({ promote: true }, deps));
       expect(proxy.getAlias).toHaveBeenCalledWith({
         site: "my-site",
         mode: "preview",
@@ -795,38 +625,15 @@ describe("deploy command (proxy plane)", () => {
         site: "my-site",
         deployId: "20260512-120000-abc1234",
       });
-      const msg = deps.logSuccess.mock.calls[0]?.[0] ?? "";
-      expect(msg).toContain("20260512-120000-abc1234");
-      expect(msg).toContain("production");
-    });
-
-    it("emits reusedPreview in the JSON envelope", async () => {
-      const proxy = mkProxy();
-      proxy.getAlias.mockResolvedValue({
-        url: "https://my-site.preview.freecode.camp",
-        deployId: "20260512-120000-abc1234",
-      });
-      proxy.sitePromote.mockResolvedValue({
-        url: "https://my-site.freecode.camp",
-        deployId: "20260512-120000-abc1234",
-      });
-      const deps = mkDeps({
-        createProxyClient: vi.fn().mockReturnValue(proxy),
-      });
-      const stdout: string[] = [];
-      const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
-        stdout.push(String(chunk));
-        return true;
-      });
-      await deploy({ json: true, promote: true }, deps);
-      writeSpy.mockRestore();
-
-      const env = JSON.parse(stdout.join("").trim());
-      expect(env.command).toBe("deploy");
-      expect(env.reusedPreview).toBe(true);
-      expect(env.mode).toBe("production");
-      expect(env.deployId).toBe("20260512-120000-abc1234");
-      expect(deps.runBuild).not.toHaveBeenCalled();
+      // Should have yielded an info step
+      const infoSteps = steps.filter((s) => s.type === "info");
+      expect(infoSteps.some((s) => s.message.includes("already at this commit"))).toBe(true);
+      // Result data should include reusedPreview
+      expect(result.data.reusedPreview).toBe(true);
+      expect(result.data.mode).toBe("production");
+      expect(result.data.deployId).toBe("20260512-120000-abc1234");
+      expect(result.format).toContain("20260512-120000-abc1234");
+      expect(result.format).toContain("production");
     });
 
     it("does NOT dedup when the working tree is dirty", async () => {
@@ -835,11 +642,11 @@ describe("deploy command (proxy plane)", () => {
         url: "https://my-site.preview.freecode.camp",
         deployId: "20260512-120000-abc1234",
       });
-      const deps = mkDeps({
+      const deps = mkSdkDeps({
         getGitState: vi.fn().mockReturnValue({ hash: "abc1234567", dirty: true }),
         createProxyClient: vi.fn().mockReturnValue(proxy),
       });
-      await deploy({ json: false, promote: true }, deps);
+      await driveToEnd(staticDeploy({ promote: true }, deps));
       expect(deps.runBuild).toHaveBeenCalled();
       expect(proxy.sitePromote).not.toHaveBeenCalled();
     });
@@ -850,19 +657,19 @@ describe("deploy command (proxy plane)", () => {
         url: "https://my-site.preview.freecode.camp",
         deployId: "20260512-120000-zzz9999",
       });
-      const deps = mkDeps({
+      const deps = mkSdkDeps({
         createProxyClient: vi.fn().mockReturnValue(proxy),
       });
-      await deploy({ json: false, promote: true }, deps);
+      await driveToEnd(staticDeploy({ promote: true }, deps));
       expect(deps.runBuild).toHaveBeenCalled();
       expect(proxy.sitePromote).not.toHaveBeenCalled();
     });
   });
 
   describe("root index.html preflight", () => {
-    it("fails with EXIT_STORAGE and never uploads when index.html is missing", async () => {
+    it("throws when index.html is missing and never uploads", async () => {
       const proxy = mkProxy();
-      const deps = mkDeps({
+      const deps = mkSdkDeps({
         createProxyClient: vi.fn().mockReturnValue(proxy),
         walkFiles: vi.fn().mockReturnValue([
           { relPath: "main.js", absPath: "/proj/dist/main.js" },
@@ -872,16 +679,14 @@ describe("deploy command (proxy plane)", () => {
           },
         ]),
       });
-      await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
-      expect(deps.exit).toHaveBeenCalledWith(13);
+      await expect(driveToEnd(staticDeploy({}, deps))).rejects.toThrow(/index\.html/i);
       expect(proxy.deployInit).not.toHaveBeenCalled();
       expect(deps.uploadFiles).not.toHaveBeenCalled();
-      expect(deps.logError).toHaveBeenCalledWith(expect.stringMatching(/index\.html/i));
     });
 
     it("surfaces the static-export hint for a framework build directory", async () => {
       const proxy = mkProxy();
-      const deps = mkDeps({
+      const deps = mkSdkDeps({
         createProxyClient: vi.fn().mockReturnValue(proxy),
         walkFiles: vi.fn().mockReturnValue([
           { relPath: "BUILD_ID", absPath: "/proj/dist/BUILD_ID" },
@@ -892,9 +697,149 @@ describe("deploy command (proxy plane)", () => {
           { relPath: "server/app.js", absPath: "/proj/dist/server/app.js" },
         ]),
       });
-      await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
+      await expect(driveToEnd(staticDeploy({}, deps))).rejects.toThrow(/static export/);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Handler tests
+// ---------------------------------------------------------------------------
+
+describe("staticDeployHandler", () => {
+  describe("happy path", () => {
+    it("emits success envelope in JSON mode", async () => {
+      const stdout: string[] = [];
+      const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+        stdout.push(String(chunk));
+        return true;
+      });
+
+      const deps = mkHandlerDeps();
+      await staticDeployHandler({ json: true }, deps);
+      writeSpy.mockRestore();
+
+      const env = JSON.parse(stdout.join("").trim());
+      expect(env.command).toBe("deploy");
+      expect(env.success).toBe(true);
+      expect(env.deployId).toBe("20260427-abc1234");
+      expect(env.url).toBe("https://my-site.preview.freecode.camp");
+      expect(env.mode).toBe("preview");
+      expect(env.fileCount).toBe(2);
+    });
+
+    it("calls logSuccess with deploy info in non-JSON mode", async () => {
+      const deps = mkHandlerDeps();
+      await staticDeployHandler({ json: false }, deps);
+      const msg = deps.logSuccess.mock.calls[0]?.[0] ?? "";
+      expect(msg).toContain("20260427-abc1234");
+      expect(msg).toContain("https://my-site.preview.freecode.camp");
+    });
+  });
+
+  describe("error handling", () => {
+    it("calls exit with EXIT_CREDENTIALS when identity chain returns null", async () => {
+      const deps = mkHandlerDeps({
+        resolveIdentity: vi.fn().mockResolvedValue(null),
+      });
+      await expect(staticDeployHandler({ json: false }, deps)).rejects.toThrow("__exit__");
+      expect(deps.runBuild).not.toHaveBeenCalled();
+      expect(deps.exit).toHaveBeenCalledWith(12);
+      expect(deps.logError).toHaveBeenCalledWith(expect.stringMatching(/login|identity/i));
+    });
+
+    it("calls exit with EXIT_CONFIG when platform.yaml is missing", async () => {
+      const err = new Error("ENOENT") as NodeJS.ErrnoException;
+      err.code = "ENOENT";
+      const deps = mkHandlerDeps({
+        readPlatformYaml: vi.fn().mockRejectedValue(err),
+      });
+      await expect(staticDeployHandler({ json: false }, deps)).rejects.toThrow("__exit__");
+      expect(deps.exit).toHaveBeenCalledWith(11);
+      expect(deps.logError).toHaveBeenCalledWith(expect.stringMatching(/platform\.yaml/i));
+    });
+
+    it("calls exit with EXIT_PARTIAL when uploadFiles surfaces errors", async () => {
+      const deps = mkHandlerDeps({
+        uploadFiles: vi.fn().mockResolvedValue({
+          fileCount: 1,
+          totalSize: 100,
+          uploaded: ["a.html"],
+          errors: ["b.html: 503"],
+        }),
+      });
+      await expect(staticDeployHandler({ json: false }, deps)).rejects.toThrow("__exit__");
+      expect(deps.exit).toHaveBeenCalledWith(19);
+      expect(deps.logError).toHaveBeenCalledWith(expect.stringMatching(/partial|failed/i));
+    });
+
+    it("propagates ProxyError from deployInit", async () => {
+      const proxy = mkProxy();
+      proxy.deployInit.mockRejectedValue(new ProxyError(403, "site_unauthorized", "no team"));
+      const deps = mkHandlerDeps({
+        createProxyClient: vi.fn().mockReturnValue(proxy),
+      });
+      await expect(staticDeployHandler({ json: false }, deps)).rejects.toThrow("__exit__");
+      expect(deps.exit).toHaveBeenCalledWith(12);
+      expect(deps.logError).toHaveBeenCalledWith(expect.stringContaining("no team"));
+    });
+
+    it("surfaces user_unauthorized hint", async () => {
+      const proxy = mkProxy();
+      proxy.deployInit.mockRejectedValue(
+        new ProxyError(403, "user_unauthorized", "caller is not on the required team", "req-42", "check SSO"),
+      );
+      const deps = mkHandlerDeps({
+        createProxyClient: vi.fn().mockReturnValue(proxy),
+      });
+      await expect(staticDeployHandler({ json: false }, deps)).rejects.toThrow("__exit__");
+      expect(deps.exit).toHaveBeenCalledWith(12);
+      const msg = (deps.logError.mock.calls[0]?.[0] as string) ?? "";
+      expect(msg).toContain("deploy failed (user_unauthorized)");
+      expect(msg).toContain("deploy init failed:");
+      expect(msg).toContain("read:org");
+    });
+
+    it("propagates ProxyError from deployFinalize", async () => {
+      const proxy = mkProxy();
+      proxy.deployFinalize.mockRejectedValue(new ProxyError(422, "verify_failed", "missing"));
+      const deps = mkHandlerDeps({
+        createProxyClient: vi.fn().mockReturnValue(proxy),
+      });
+      await expect(staticDeployHandler({ json: false }, deps)).rejects.toThrow("__exit__");
       expect(deps.exit).toHaveBeenCalledWith(13);
-      expect(deps.logError).toHaveBeenCalledWith(expect.stringContaining("static export"));
+      expect(deps.logError).toHaveBeenCalledWith(expect.stringContaining("missing"));
+    });
+  });
+
+  describe("promote dedup in JSON mode", () => {
+    it("emits reusedPreview in the JSON envelope", async () => {
+      const proxy = mkProxy();
+      proxy.getAlias.mockResolvedValue({
+        url: "https://my-site.preview.freecode.camp",
+        deployId: "20260512-120000-abc1234",
+      });
+      proxy.sitePromote.mockResolvedValue({
+        url: "https://my-site.freecode.camp",
+        deployId: "20260512-120000-abc1234",
+      });
+      const deps = mkHandlerDeps({
+        createProxyClient: vi.fn().mockReturnValue(proxy),
+      });
+      const stdout: string[] = [];
+      const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+        stdout.push(String(chunk));
+        return true;
+      });
+      await staticDeployHandler({ json: true, promote: true }, deps);
+      writeSpy.mockRestore();
+
+      const env = JSON.parse(stdout.join("").trim());
+      expect(env.command).toBe("deploy");
+      expect(env.reusedPreview).toBe(true);
+      expect(env.mode).toBe("production");
+      expect(env.deployId).toBe("20260512-120000-abc1234");
+      expect(deps.runBuild).not.toHaveBeenCalled();
     });
   });
 });

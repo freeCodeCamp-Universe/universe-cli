@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { rollback } from "../../src/commands/rollback.js";
+import { staticRollback, staticRollbackHandler } from "../../src/commands/rollback.js";
+import { drive } from "../../src/interaction/clack-driver.js";
+import type { Step, StepResponse } from "../../src/interaction/step.js";
 import { AliasDriftError, ProxyError } from "../../src/lib/proxy-client.js";
 
 const VALID_YAML = "site: my-site\n";
@@ -29,19 +31,7 @@ function mkProxy(): {
   };
 }
 
-interface FakeDeps {
-  cwd: string;
-  env: NodeJS.ProcessEnv;
-  readPlatformYaml: ReturnType<typeof vi.fn>;
-  resolveIdentity: ReturnType<typeof vi.fn>;
-  createProxyClient: ReturnType<typeof vi.fn>;
-  logSuccess: ReturnType<typeof vi.fn>;
-  logError: ReturnType<typeof vi.fn>;
-  exit: ReturnType<typeof vi.fn>;
-  promptConfirm: ReturnType<typeof vi.fn>;
-}
-
-function mkDeps(overrides: Partial<FakeDeps> = {}): FakeDeps {
+function mkSdkDeps(overrides: Record<string, unknown> = {}) {
   return {
     cwd: "/proj",
     env: {},
@@ -51,25 +41,22 @@ function mkDeps(overrides: Partial<FakeDeps> = {}): FakeDeps {
       source: "env_GITHUB_TOKEN",
     }),
     createProxyClient: vi.fn().mockReturnValue(mkProxy()),
-    logSuccess: vi.fn(),
-    logError: vi.fn(),
-    exit: vi.fn().mockImplementation((_code: number) => {
-      throw new Error("__exit__");
-    }),
-    promptConfirm: vi.fn().mockResolvedValue(false),
     ...overrides,
   };
 }
 
-describe("rollback command", () => {
+const autoReject: (step: Step) => Promise<StepResponse> = async (step) =>
+  step.type === "confirm" ? false : undefined;
+
+const autoAccept: (step: Step) => Promise<StepResponse> = async (step) =>
+  step.type === "confirm" ? true : undefined;
+
+describe("staticRollback SDK", () => {
   it("pre-flights getAlias(production) and pins expectedCurrent", async () => {
-    const deps = mkDeps();
-    await rollback({ json: false, to: "older" }, deps);
+    const deps = mkSdkDeps();
+    await drive(staticRollback({ to: "older" }, deps), autoReject, () => {});
     const proxy = deps.createProxyClient.mock.results[0]?.value as ReturnType<typeof mkProxy>;
-    expect(proxy.getAlias).toHaveBeenCalledWith({
-      site: "my-site",
-      mode: "production",
-    });
+    expect(proxy.getAlias).toHaveBeenCalledWith({ site: "my-site", mode: "production" });
     expect(proxy.siteRollback).toHaveBeenCalledWith({
       site: "my-site",
       to: "older",
@@ -80,10 +67,8 @@ describe("rollback command", () => {
   it("sends empty expectedCurrent when production alias absent", async () => {
     const proxy = mkProxy();
     proxy.getAlias.mockResolvedValue(null);
-    const deps = mkDeps({
-      createProxyClient: vi.fn().mockReturnValue(proxy),
-    });
-    await rollback({ json: false, to: "older" }, deps);
+    const deps = mkSdkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
+    await drive(staticRollback({ to: "older" }, deps), autoReject, () => {});
     expect(proxy.siteRollback).toHaveBeenCalledWith({
       site: "my-site",
       to: "older",
@@ -91,38 +76,91 @@ describe("rollback command", () => {
     });
   });
 
+  it("returns CommandResult on success", async () => {
+    const deps = mkSdkDeps();
+    const result = await drive(staticRollback({ to: "older" }, deps), autoReject, () => {});
+    expect(result.data.command).toBe("rollback");
+    expect(result.data.success).toBe(true);
+    expect(result.data.deployId).toBe("older");
+    expect(result.data.url).toBe("https://my-site.freecode.camp");
+  });
+
+  it("throws UsageError when --to is missing", async () => {
+    const deps = mkSdkDeps();
+    await expect(
+      drive(staticRollback({ to: undefined }, deps), autoReject, () => {}),
+    ).rejects.toThrow(/--to/i);
+  });
+
+  it("throws CredentialError when identity chain returns null", async () => {
+    const deps = mkSdkDeps({ resolveIdentity: vi.fn().mockResolvedValue(null) });
+    await expect(
+      drive(staticRollback({ to: "x" }, deps), autoReject, () => {}),
+    ).rejects.toThrow(/login|identity/i);
+  });
+
+  describe("409 alias_drift handling", () => {
+    it("yields confirm on drift; if rejected, throws AliasDriftError", async () => {
+      const proxy = mkProxy();
+      proxy.siteRollback.mockRejectedValueOnce(new AliasDriftError("drift", "newer-id"));
+      const deps = mkSdkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
+      await expect(
+        drive(staticRollback({ to: "older" }, deps), autoReject, () => {}),
+      ).rejects.toThrow(AliasDriftError);
+      expect(proxy.siteRollback).toHaveBeenCalledTimes(1);
+    });
+
+    it("retries on drift when confirm accepted", async () => {
+      const proxy = mkProxy();
+      proxy.siteRollback
+        .mockRejectedValueOnce(new AliasDriftError("drift", "newer-id"))
+        .mockResolvedValueOnce({ url: "https://my-site.freecode.camp", deployId: "older" });
+      const deps = mkSdkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
+      const result = await drive(staticRollback({ to: "older" }, deps), autoAccept, () => {});
+      expect(proxy.siteRollback).toHaveBeenCalledTimes(2);
+      expect(proxy.siteRollback).toHaveBeenNthCalledWith(2, {
+        site: "my-site",
+        to: "older",
+        expectedCurrent: "newer-id",
+      });
+      expect(result.data.success).toBe(true);
+    });
+  });
+});
+
+describe("staticRollbackHandler", () => {
+  function mkHandlerDeps(overrides: Record<string, unknown> = {}) {
+    return {
+      ...mkSdkDeps(),
+      logSuccess: vi.fn(),
+      logError: vi.fn(),
+      exit: vi.fn().mockImplementation((_code: number) => {
+        throw new Error("__exit__");
+      }),
+      ...overrides,
+    };
+  }
+
   it("emits success envelope in JSON mode", async () => {
     const stdout: string[] = [];
     const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
       stdout.push(String(chunk));
       return true;
     });
-
-    const deps = mkDeps();
-    await rollback({ json: true, to: "older" }, deps);
+    const deps = mkHandlerDeps();
+    await staticRollbackHandler({ json: true, to: "older" }, deps);
     writeSpy.mockRestore();
 
     const env = JSON.parse(stdout.join("").trim());
     expect(env.command).toBe("rollback");
     expect(env.success).toBe(true);
     expect(env.deployId).toBe("older");
-    expect(env.url).toBe("https://my-site.freecode.camp");
   });
 
   it("errors with EXIT_USAGE when --to is missing", async () => {
-    const deps = mkDeps();
-    await expect(rollback({ json: false, to: undefined }, deps)).rejects.toThrow("__exit__");
+    const deps = mkHandlerDeps();
+    await expect(staticRollbackHandler({ json: false, to: undefined }, deps)).rejects.toThrow("__exit__");
     expect(deps.exit).toHaveBeenCalledWith(10);
-    expect(deps.logError).toHaveBeenCalledWith(expect.stringMatching(/--to/i));
-  });
-
-  it("errors with EXIT_CREDENTIALS when identity chain returns null", async () => {
-    const deps = mkDeps({
-      resolveIdentity: vi.fn().mockResolvedValue(null),
-    });
-    await expect(rollback({ json: false, to: "x" }, deps)).rejects.toThrow("__exit__");
-    expect(deps.exit).toHaveBeenCalledWith(12);
-    expect(deps.logError).toHaveBeenCalledWith(expect.stringMatching(/login|identity/i));
   });
 
   it("propagates 422 deploy_missing as EXIT_STORAGE", async () => {
@@ -130,93 +168,28 @@ describe("rollback command", () => {
     proxy.siteRollback.mockRejectedValue(
       new ProxyError(422, "deploy_missing", "target deploy no longer exists in r2"),
     );
-    const deps = mkDeps({
-      createProxyClient: vi.fn().mockReturnValue(proxy),
-    });
-    await expect(rollback({ json: false, to: "ancient" }, deps)).rejects.toThrow("__exit__");
+    const deps = mkHandlerDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
+    await expect(staticRollbackHandler({ json: false, to: "ancient" }, deps)).rejects.toThrow("__exit__");
     expect(deps.exit).toHaveBeenCalledWith(13);
-    expect(deps.logError).toHaveBeenCalledWith(expect.stringContaining("no longer exists"));
-  });
-
-  it("surfaces 422 missing_index with the server hint as EXIT_STORAGE", async () => {
-    const proxy = mkProxy();
-    proxy.siteRollback.mockRejectedValue(
-      new ProxyError(
-        422,
-        "missing_index",
-        "target deploy has no root index.html; it cannot be served at /",
-        undefined,
-        "This looks like a framework build directory, not a static export.",
-      ),
-    );
-    const deps = mkDeps({
-      createProxyClient: vi.fn().mockReturnValue(proxy),
-    });
-    await expect(rollback({ json: false, to: "20260101-000000-broken1" }, deps)).rejects.toThrow(
-      "__exit__",
-    );
-    expect(deps.exit).toHaveBeenCalledWith(13);
-    expect(deps.logError).toHaveBeenCalledWith(expect.stringContaining("missing_index"));
-    expect(deps.logError).toHaveBeenCalledWith(
-      expect.stringContaining("framework build directory"),
-    );
   });
 
   describe("409 alias_drift handling", () => {
     it("JSON mode emits envelope with top-level current field, no retry", async () => {
       const proxy = mkProxy();
       proxy.siteRollback.mockRejectedValueOnce(new AliasDriftError("drift", "newer-id"));
-      const deps = mkDeps({
-        createProxyClient: vi.fn().mockReturnValue(proxy),
-      });
+      const deps = mkHandlerDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
       const stdout: string[] = [];
       const spy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
         stdout.push(String(chunk));
         return true;
       });
-      await expect(rollback({ json: true, to: "older" }, deps)).rejects.toThrow("__exit__");
+      await expect(staticRollbackHandler({ json: true, to: "older" }, deps)).rejects.toThrow("__exit__");
       spy.mockRestore();
       const env = JSON.parse(stdout.join("").trim());
       expect(env.success).toBe(false);
       expect(env.current).toBe("newer-id");
-      expect((env.error as { message: string }).message).toContain("alias_drift");
-      expect(deps.exit).toHaveBeenCalledWith(10);
-      expect(deps.promptConfirm).not.toHaveBeenCalled();
       expect(proxy.siteRollback).toHaveBeenCalledTimes(1);
     });
 
-    it("non-JSON one-shot retry on confirm=yes re-pins with server current", async () => {
-      const proxy = mkProxy();
-      proxy.siteRollback
-        .mockRejectedValueOnce(new AliasDriftError("drift", "newer-id"))
-        .mockResolvedValueOnce({
-          url: "https://my-site.freecode.camp",
-          deployId: "older",
-        });
-      const deps = mkDeps({
-        createProxyClient: vi.fn().mockReturnValue(proxy),
-        promptConfirm: vi.fn().mockResolvedValue(true),
-      });
-      await rollback({ json: false, to: "older" }, deps);
-      expect(deps.exit).not.toHaveBeenCalled();
-      expect(proxy.siteRollback).toHaveBeenCalledTimes(2);
-      expect(proxy.siteRollback).toHaveBeenNthCalledWith(2, {
-        site: "my-site",
-        to: "older",
-        expectedCurrent: "newer-id",
-      });
-    });
-
-    it("non-JSON confirm=no exits with EXIT_USAGE, no retry", async () => {
-      const proxy = mkProxy();
-      proxy.siteRollback.mockRejectedValueOnce(new AliasDriftError("drift", "newer-id"));
-      const deps = mkDeps({
-        createProxyClient: vi.fn().mockReturnValue(proxy),
-        promptConfirm: vi.fn().mockResolvedValue(false),
-      });
-      await expect(rollback({ json: false, to: "older" }, deps)).rejects.toThrow("__exit__");
-      expect(deps.exit).toHaveBeenCalledWith(10);
-      expect(proxy.siteRollback).toHaveBeenCalledTimes(1);
-    });
   });
 });

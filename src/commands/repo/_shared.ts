@@ -1,9 +1,3 @@
-import {
-  confirm as clackConfirm,
-  isCancel as clackIsCancel,
-  select as clackSelect,
-  text as clackText,
-} from "@clack/prompts";
 import { CredentialError, UsageError } from "../../errors.js";
 import { DEFAULT_PROXY_URL } from "../../lib/constants.js";
 import { resolveIdentity as defaultResolveIdentity } from "../../lib/identity.js";
@@ -15,44 +9,21 @@ import {
   type RepoRow,
 } from "../../lib/proxy-client.js";
 
-/**
- * Prompt seam injected into the interactive commands (create / approve /
- * reject) so tests can drive the flow without a TTY. Defaults wrap the
- * real `@clack/prompts` primitives.
- */
-export interface RepoPrompts {
-  text: typeof clackText;
-  select: typeof clackSelect;
-  confirm: typeof clackConfirm;
-  isCancel: (value: unknown) => boolean;
-}
-
-export const defaultRepoPrompts: RepoPrompts = {
-  text: clackText,
-  select: clackSelect,
-  confirm: clackConfirm,
-  isCancel: clackIsCancel,
-};
-
-export interface RepoCommandDeps {
+interface RepoSdkDeps {
   env?: NodeJS.ProcessEnv;
   resolveIdentity?: typeof defaultResolveIdentity;
   createProxyClient?: (cfg: ProxyClientConfig) => ProxyClient;
+}
+
+interface RepoCommandDeps extends RepoSdkDeps {
   logSuccess?: (msg: string) => void;
   logError?: (msg: string) => void;
   logMessage?: (msg: string) => void;
-  exit?: (code: number) => never;
-  /** Prompt seam (interactive create/approve/reject). */
-  prompts?: RepoPrompts;
-  /** Whether the session is interactive. Defaults to process.stdout.isTTY. */
+  exit?: (code: number) => void;
   isTTY?: boolean;
 }
 
-/**
- * Resolve identity + construct a proxy client. Throws CredentialError
- * when no identity is available — the caller's `outputError` handles formatting.
- */
-export async function setupClient(deps: RepoCommandDeps): Promise<{
+async function setupClient(deps: RepoSdkDeps): Promise<{
   client: ProxyClient;
   identitySource: string;
 }> {
@@ -77,10 +48,6 @@ export async function setupClient(deps: RepoCommandDeps): Promise<{
   return { client, identitySource: identity.source };
 }
 
-/**
- * Render repo-request rows as an aligned text table. Returns `emptyMsg`
- * when there are no rows (the caller passes a status-specific phrase).
- */
 function humanizeDuration(ms: number): string {
   const s = Math.floor(ms / 1000);
   if (s < 60) return `${s}s`;
@@ -101,7 +68,7 @@ function resolveLatency(r: RepoRow): string {
   return humanizeDuration(ms);
 }
 
-export function formatRepoTable(rows: RepoRow[], emptyMsg = "No repo requests."): string {
+function formatRepoTable(rows: RepoRow[], emptyMsg = "No repo requests."): string {
   if (rows.length === 0) return emptyMsg;
   const headers = [
     "ID",
@@ -130,4 +97,5 @@ export function formatRepoTable(rows: RepoRow[], emptyMsg = "No repo requests.")
   return [fmt(headers), ...cells.map(fmt)].join("\n");
 }
 
-export { UsageError };
+export { formatRepoTable, setupClient, UsageError };
+export type { RepoCommandDeps, RepoSdkDeps };

@@ -1,8 +1,5 @@
-import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
-import { log, spinner } from "@clack/prompts";
+import { log } from "@clack/prompts";
 import {
-  ConfigError,
   CredentialError,
   GitError,
   PartialUploadError,
@@ -10,12 +7,15 @@ import {
 } from "../errors.js";
 import { getGitState as defaultGetGitState, type GitState } from "../deploy/git.js";
 import { hasRootIndex, missingRootIndexMessage } from "../deploy/index-check.js";
+import { clackDriver } from "../interaction/clack-driver.js";
+import { silentDrive } from "../interaction/silent-driver.js";
+import type { Step, StepResponse } from "../interaction/step.js";
 import { walkFiles as defaultWalkFiles } from "../deploy/walk.js";
 import { runBuild as defaultRunBuild } from "../lib/build.js";
 import { DEFAULT_PROXY_URL } from "../lib/constants.js";
 import { resolveIdentity as defaultResolveIdentity } from "../lib/identity.js";
 import { createIgnoreFilter } from "../lib/ignore.js";
-import { parsePlatformYaml, type PlatformYamlV2 } from "../lib/platform-yaml.js";
+import { defaultReadPlatformYaml, readAndParseConfig } from "../lib/read-platform-config.js";
 import { suggest } from "../lib/similarity.js";
 import {
   createProxyClient as defaultCreateProxyClient,
@@ -25,30 +25,18 @@ import {
   type ProxyClientConfig,
 } from "../lib/proxy-client.js";
 import { uploadFiles as defaultUploadFiles } from "../lib/upload.js";
+import type { CommandResult } from "../output/command-result.js";
 import { buildEnvelope } from "../output/envelope.js";
 import { exitWithCode } from "../output/exit-codes.js";
 import { emitJson, outputError } from "../output/format.js";
 
-export interface DeployOptions {
-  json: boolean;
+interface StaticDeployOptions {
   promote?: boolean;
   /** Override `build.output` from platform.yaml (matches `--dir` flag). */
   dir?: string;
 }
 
-/**
- * Minimal subset of `@clack/prompts` `SpinnerResult` the deploy command
- * relies on. Kept narrow so unit tests can inject a vi.fn() quad without
- * stubbing the full clack surface.
- */
-export interface SpinnerLike {
-  start(msg?: string): void;
-  message(msg?: string): void;
-  stop(msg?: string): void;
-  error(msg?: string): void;
-}
-
-export interface DeployDeps {
+interface StaticDeploySdkDeps {
   cwd?: string;
   env?: NodeJS.ProcessEnv;
   readPlatformYaml?: (cwd: string) => Promise<string>;
@@ -58,34 +46,20 @@ export interface DeployDeps {
   runBuild?: typeof defaultRunBuild;
   walkFiles?: typeof defaultWalkFiles;
   uploadFiles?: typeof defaultUploadFiles;
-  createSpinner?: () => SpinnerLike;
-  logSuccess?: (msg: string) => void;
-  logInfo?: (msg: string) => void;
-  logWarn?: (msg: string) => void;
-  logError?: (msg: string) => void;
-  exit?: (code: number) => never;
+  onProgress?: (progress: { uploaded: number; total: number; current: string }) => void;
 }
 
-const defaultReadPlatformYaml = async (cwd: string): Promise<string> => {
-  return readFile(resolve(cwd, "platform.yaml"), "utf-8");
-};
+interface StaticDeployHandlerOptions {
+  json: boolean;
+  promote?: boolean;
+  /** Override `build.output` from platform.yaml (matches `--dir` flag). */
+  dir?: string;
+}
 
-async function readAndParseConfig(
-  cwd: string,
-  read: (cwd: string) => Promise<string>,
-): Promise<PlatformYamlV2> {
-  let raw: string;
-  try {
-    raw = await read(cwd);
-  } catch (err) {
-    if (err instanceof Error && (err as NodeJS.ErrnoException).code === "ENOENT") {
-      throw new ConfigError(`platform.yaml not found in ${cwd}. See docs/platform-yaml.md.`);
-    }
-    throw err;
-  }
-  const r = parsePlatformYaml(raw);
-  if (!r.ok) throw new ConfigError(r.error);
-  return r.value;
+interface StaticDeployHandlerDeps extends StaticDeploySdkDeps {
+  logSuccess?: (msg: string) => void;
+  logError?: (msg: string) => void;
+  exit?: (code: number) => void;
 }
 
 function syntheticSha(): string {
@@ -131,11 +105,11 @@ const PREFLIGHT_INLINE_LIST_CAP = 10;
  *
  * Body shape:
  *   - Did-you-mean hint when the attempted slug is close to an
- *     authorized one (substring / Damerau-Levenshtein ≤ 2). Always
+ *     authorized one (substring / Damerau-Levenshtein <= 2). Always
  *     inline; it's the primary recovery surface for typos.
  *   - Three likely-cause lines naming the registry-CLI remediation
- *     (`universe sites register/update …`), staff-gated.
- *   - Authorized set: inline list when count ≤ `PREFLIGHT_INLINE_LIST_CAP`,
+ *     (`universe sites register/update ...`), staff-gated.
+ *   - Authorized set: inline list when count <= `PREFLIGHT_INLINE_LIST_CAP`,
  *     otherwise count + `universe sites ls --mine` redirect.
  *
  * No external runbook redirect. Empty `authorized` collapses to a
@@ -197,7 +171,13 @@ function formatUnauthorizedSiteError(a: {
   return lines.join("\n");
 }
 
-export async function deploy(options: DeployOptions, deps: DeployDeps = {}): Promise<void> {
+
+
+/** Build, upload, and finalize a static site deploy. Yields progress/warning/info steps. */
+async function* staticDeploy(
+  options: StaticDeployOptions,
+  deps: StaticDeploySdkDeps = {},
+): AsyncGenerator<Step, CommandResult, StepResponse> {
   const cwd = deps.cwd ?? process.cwd();
   const env = deps.env ?? process.env;
   const readYaml = deps.readPlatformYaml ?? defaultReadPlatformYaml;
@@ -207,243 +187,259 @@ export async function deploy(options: DeployOptions, deps: DeployDeps = {}): Pro
   const build = deps.runBuild ?? defaultRunBuild;
   const walk = deps.walkFiles ?? defaultWalkFiles;
   const upload = deps.uploadFiles ?? defaultUploadFiles;
-  const mkSpinner = deps.createSpinner ?? (() => spinner() as SpinnerLike);
+
+  const identity = await resolveId({ env });
+  if (!identity) {
+    throw new CredentialError(
+      "No GitHub identity available. Run `universe login`, set $GITHUB_TOKEN, or install the gh CLI.",
+    );
+  }
+
+  const config = await readAndParseConfig(cwd, readYaml);
+
+  // Proxy client built early so preflight can run before the slow build.
+  const baseUrl = env["UNIVERSE_PROXY_URL"] ?? DEFAULT_PROXY_URL;
+  const client = mkClient({
+    baseUrl,
+    getAuthToken: () => identity.token,
+    timeoutMs: parseFetchTimeoutMs(env),
+  });
+
+  // Preflight authorization. Catches the most common staff-side
+  // failure (`site_unauthorized`) BEFORE running the build, and
+  // surfaces the registry-CLI remediation inline (typo hint +
+  // authorized list + `universe sites register/update` commands).
+  // One GET; cheap.
+  let me;
+  try {
+    me = await client.whoami();
+  } catch (err) {
+    rethrowProxy("whoami preflight failed", err);
+  }
+  if (!me.authorizedSites.includes(config.site)) {
+    throw new CredentialError(
+      formatUnauthorizedSiteError({
+        attempted: config.site,
+        login: me.login,
+        authorized: me.authorizedSites,
+      }),
+    );
+  }
+
+  const git = gitState();
+  if (git.dirty) {
+    yield { type: "warning", message: "git working tree is dirty — uncommitted changes will not be reflected." };
+  }
+  const sha = git.hash ?? syntheticSha();
+
+  if (options.promote && !git.dirty && git.hash) {
+    let preview: { deployId: string } | null = null;
+    try {
+      preview = await client.getAlias({
+        site: config.site,
+        mode: "preview",
+      });
+    } catch {
+      preview = null;
+    }
+    const previewSha = preview ? deployIdSha(preview.deployId) : null;
+    if (preview && previewSha && git.hash.startsWith(previewSha)) {
+      let promoted;
+      try {
+        promoted = await client.sitePromote({
+          site: config.site,
+          deployId: preview.deployId,
+        });
+      } catch (err) {
+        rethrowProxy("promote existing preview failed", err);
+      }
+
+      yield {
+        type: "info",
+        message: `Preview was already at this commit (${previewSha}); skipped rebuild and re-upload.`,
+      };
+
+      return {
+        data: buildEnvelope("deploy", true, {
+          deployId: promoted.deployId,
+          url: promoted.url,
+          mode: "production",
+          site: config.site,
+          sha,
+          reusedPreview: true,
+          identitySource: identity.source,
+        }),
+        format: [
+          `Promoted existing preview ${promoted.deployId} to production`,
+          ``,
+          `  Site:        ${config.site}`,
+          `  Deploy:      ${promoted.deployId}`,
+          `  Production:  ${promoted.url}`,
+          ``,
+          `Preview was already at this commit (${previewSha}); skipped rebuild and re-upload.`,
+        ].join("\n"),
+      };
+    }
+  }
+
+  const outputDir = options.dir ?? config.build.output;
+  const buildResult = await build({
+    command: config.build.command,
+    cwd,
+    outputDir,
+  });
+  if (buildResult.skipped) {
+    yield { type: "info", message: "build.command not set — using pre-built output." };
+  }
+  const resolvedOutputDir = buildResult.outputDir;
+
+  const walked = walk(resolvedOutputDir);
+  const ignore = createIgnoreFilter(config.deploy.ignore);
+  const filtered = walked.filter((f) => !ignore(f.relPath));
+  if (filtered.length === 0) {
+    throw new GitError(`No files to deploy under ${resolvedOutputDir}.`);
+  }
+  const fileList = filtered.map((f) => f.relPath);
+  if (!hasRootIndex(fileList)) {
+    throw new StorageError(missingRootIndexMessage(fileList, resolvedOutputDir));
+  }
+
+  let initResult;
+  try {
+    initResult = await client.deployInit({
+      site: config.site,
+      sha,
+      files: fileList,
+    });
+  } catch (err) {
+    rethrowProxy("deploy init failed", err);
+  }
+
+  yield { type: "progress", message: `Uploading 0/${filtered.length} files` };
+  const uploadResult = await upload({
+    client,
+    deployId: initResult.deployId,
+    jwt: initResult.jwt,
+    files: filtered,
+    onProgress: deps.onProgress,
+  });
+  if (uploadResult.errors.length > 0) {
+    const message = `Upload partially failed: ${uploadResult.errors.length} file(s) failed:\n  - ${uploadResult.errors.join("\n  - ")}`;
+    throw new PartialUploadError(message);
+  }
+  yield { type: "progress", message: `Uploaded ${uploadResult.fileCount} files` };
+
+  const mode: "preview" | "production" = options.promote ? "production" : "preview";
+  let finalizeResult;
+  try {
+    finalizeResult = await client.deployFinalize({
+      deployId: initResult.deployId,
+      jwt: initResult.jwt,
+      mode,
+      files: fileList,
+    });
+  } catch (err) {
+    rethrowProxy("deploy finalize failed", err);
+  }
+
+  // `--promote` writes a new deploy AND repoints production to it, but
+  // does NOT touch the preview alias — operators eyeballing the
+  // preview URL after a promote-deploy can be surprised to see an
+  // older build. Probe the preview alias and surface the divergence.
+  // getAlias failure is non-fatal — the deploy itself succeeded.
+  if (options.promote) {
+    try {
+      const preview = await client.getAlias({
+        site: config.site,
+        mode: "preview",
+      });
+      if (preview && preview.deployId !== finalizeResult.deployId) {
+        yield {
+          type: "warning",
+          message: `Preview alias still points to ${preview.deployId}; it will not auto-update. Run \`universe static deploy\` (without --promote) to refresh preview.`,
+        };
+      }
+    } catch (err) {
+      // Surface credential-rotation errors loudly even though the
+      // probe itself is best-effort; deploy already succeeded, so
+      // the next `universe` call may fail with no obvious context
+      // unless the operator sees this now. Transient network errors
+      // (timeouts, DNS hiccups) stay swallowed.
+      if (err instanceof ProxyError && (err.status === 401 || err.status === 403)) {
+        yield {
+          type: "warning",
+          message: `Preview alias probe got ${err.status} (${err.code}) — token may need rotation: ${err.message}`,
+        };
+      }
+    }
+  }
+
+  const sizeKB = (uploadResult.totalSize / 1024).toFixed(1);
+  const nextLine =
+    mode === "preview"
+      ? `Next: universe static promote --from ${finalizeResult.deployId}`
+      : "Promoted to production.\nPreview alias unchanged.";
+
+  return {
+    data: buildEnvelope("deploy", true, {
+      deployId: finalizeResult.deployId,
+      url: finalizeResult.url,
+      mode: finalizeResult.mode,
+      site: config.site,
+      sha,
+      fileCount: uploadResult.fileCount,
+      totalSize: uploadResult.totalSize,
+      identitySource: identity.source,
+    }),
+    format: [
+      `Deployed ${finalizeResult.deployId}`,
+      ``,
+      `  Site:     ${config.site}`,
+      `  Files:    ${uploadResult.fileCount}`,
+      `  Size:     ${sizeKB} KB`,
+      `  Mode:     ${mode}`,
+      `  URL:      ${finalizeResult.url}`,
+      ``,
+      nextLine,
+    ].join("\n"),
+  };
+}
+
+async function staticDeployHandler(
+  options: StaticDeployHandlerOptions,
+  deps: StaticDeployHandlerDeps = {},
+): Promise<void> {
   const success = deps.logSuccess ?? ((s: string) => log.success(s));
-  const info = deps.logInfo ?? ((s: string) => log.info(s));
-  const warn = deps.logWarn ?? ((s: string) => log.warn(s));
   const error = deps.logError ?? ((s: string) => log.error(s));
   const exit = deps.exit ?? exitWithCode;
 
+  const sdkOpts: StaticDeployOptions = {
+    promote: options.promote,
+    dir: options.dir,
+  };
+
   try {
-    const identity = await resolveId({ env });
-    if (!identity) {
-      throw new CredentialError(
-        "No GitHub identity available. Run `universe login`, set $GITHUB_TOKEN, or install the gh CLI.",
-      );
-    }
-
-    const config = await readAndParseConfig(cwd, readYaml);
-
-    // Proxy client built early so preflight can run before the slow build.
-    const baseUrl = env["UNIVERSE_PROXY_URL"] ?? DEFAULT_PROXY_URL;
-    const client = mkClient({
-      baseUrl,
-      getAuthToken: () => identity.token,
-      timeoutMs: parseFetchTimeoutMs(env),
-    });
-
-    // Preflight authorization. Catches the most common staff-side
-    // failure (`site_unauthorized`) BEFORE running the build, and
-    // surfaces the registry-CLI remediation inline (typo hint +
-    // authorized list + `universe sites register/update` commands).
-    // One GET; cheap.
-    let me;
-    try {
-      me = await client.whoami();
-    } catch (err) {
-      rethrowProxy("whoami preflight failed", err);
-    }
-    if (!me.authorizedSites.includes(config.site)) {
-      throw new CredentialError(
-        formatUnauthorizedSiteError({
-          attempted: config.site,
-          login: me.login,
-          authorized: me.authorizedSites,
-        }),
-      );
-    }
-
-    const git = gitState();
-    if (git.dirty && !options.json) {
-      warn("git working tree is dirty — uncommitted changes will not be reflected.");
-    }
-    const sha = git.hash ?? syntheticSha();
-
-    if (options.promote && !git.dirty && git.hash) {
-      let preview: { deployId: string } | null = null;
-      try {
-        preview = await client.getAlias({
-          site: config.site,
-          mode: "preview",
-        });
-      } catch {
-        preview = null;
-      }
-      const previewSha = preview ? deployIdSha(preview.deployId) : null;
-      if (preview && previewSha && git.hash.startsWith(previewSha)) {
-        let promoted;
-        try {
-          promoted = await client.sitePromote({
-            site: config.site,
-            deployId: preview.deployId,
-          });
-        } catch (err) {
-          rethrowProxy("promote existing preview failed", err);
-        }
-        if (options.json) {
-          emitJson(
-            buildEnvelope("deploy", true, {
-              deployId: promoted.deployId,
-              url: promoted.url,
-              mode: "production",
-              site: config.site,
-              sha,
-              reusedPreview: true,
-              identitySource: identity.source,
-            }),
-          );
-        } else {
-          success(
-            [
-              `Promoted existing preview ${promoted.deployId} to production`,
-              ``,
-              `  Site:        ${config.site}`,
-              `  Deploy:      ${promoted.deployId}`,
-              `  Production:  ${promoted.url}`,
-              ``,
-              `Preview was already at this commit (${previewSha}); skipped rebuild and re-upload.`,
-            ].join("\n"),
-          );
-        }
-        return;
-      }
-    }
-
-    const outputDir = options.dir ?? config.build.output;
-    const buildResult = await build({
-      command: config.build.command,
-      cwd,
-      outputDir,
-    });
-    if (buildResult.skipped && !options.json) {
-      info("build.command not set — using pre-built output.");
-    }
-    const resolvedOutputDir = buildResult.outputDir;
-
-    const walked = walk(resolvedOutputDir);
-    const ignore = createIgnoreFilter(config.deploy.ignore);
-    const filtered = walked.filter((f) => !ignore(f.relPath));
-    if (filtered.length === 0) {
-      throw new GitError(`No files to deploy under ${resolvedOutputDir}.`);
-    }
-    const fileList = filtered.map((f) => f.relPath);
-    if (!hasRootIndex(fileList)) {
-      throw new StorageError(missingRootIndexMessage(fileList, resolvedOutputDir));
-    }
-
-    let initResult;
-    try {
-      initResult = await client.deployInit({
-        site: config.site,
-        sha,
-        files: fileList,
-      });
-    } catch (err) {
-      rethrowProxy("deploy init failed", err);
-    }
-
-    // Spinner is created only in non-JSON mode so machine consumers
-    // see a single JSON envelope on stdout. onProgress passes the
-    // per-file callback through to `uploadFiles` — multi-MB /
-    // multi-hundred-file sites previously uploaded silently.
-    const spin = options.json ? null : mkSpinner();
-    spin?.start(`Uploading 0/${filtered.length} files`);
-    const uploadResult = await upload({
-      client,
-      deployId: initResult.deployId,
-      jwt: initResult.jwt,
-      files: filtered,
-      onProgress: spin
-        ? (p) => spin.message(`Uploading ${p.uploaded}/${p.total} — ${p.current}`)
-        : undefined,
-    });
-    if (uploadResult.errors.length > 0) {
-      spin?.error(`Upload failed: ${uploadResult.errors.length} file(s)`);
-      const message = `Upload partially failed: ${uploadResult.errors.length} file(s) failed:\n  - ${uploadResult.errors.join("\n  - ")}`;
-      // EXIT_PARTIAL is dedicated; throw a CliError that maps to it.
-      throw new PartialUploadError(message);
-    }
-    spin?.stop(`Uploaded ${uploadResult.fileCount} files`);
-
-    const mode: "preview" | "production" = options.promote ? "production" : "preview";
-    let finalizeResult;
-    try {
-      finalizeResult = await client.deployFinalize({
-        deployId: initResult.deployId,
-        jwt: initResult.jwt,
-        mode,
-        files: fileList,
-      });
-    } catch (err) {
-      rethrowProxy("deploy finalize failed", err);
-    }
-
-    // `--promote` writes a new deploy AND repoints production to it, but
-    // does NOT touch the preview alias — operators eyeballing the
-    // preview URL after a promote-deploy can be surprised to see an
-    // older build. Probe the preview alias and surface the divergence.
-    // JSON mode skips: machine consumers parse `mode` themselves and the
-    // single-envelope contract excludes side-band warns. getAlias
-    // failure is non-fatal — the deploy itself succeeded.
-    if (options.promote && !options.json) {
-      try {
-        const preview = await client.getAlias({
-          site: config.site,
-          mode: "preview",
-        });
-        if (preview && preview.deployId !== finalizeResult.deployId) {
-          warn(
-            `Preview alias still points to ${preview.deployId}; it will not auto-update. Run \`universe static deploy\` (without --promote) to refresh preview.`,
-          );
-        }
-      } catch (err) {
-        // Surface credential-rotation errors loudly even though the
-        // probe itself is best-effort; deploy already succeeded, so
-        // the next `universe` call may fail with no obvious context
-        // unless the operator sees this now. Transient network errors
-        // (timeouts, DNS hiccups) stay swallowed.
-        if (err instanceof ProxyError && (err.status === 401 || err.status === 403)) {
-          warn(
-            `Preview alias probe got ${err.status} (${err.code}) — token may need rotation: ${err.message}`,
-          );
-        }
-      }
+    let result: CommandResult;
+    if (options.json) {
+      result = await silentDrive(staticDeploy(sdkOpts, deps));
+    } else {
+      result = await clackDriver(staticDeploy(sdkOpts, deps));
     }
 
     if (options.json) {
-      emitJson(
-        buildEnvelope("deploy", true, {
-          deployId: finalizeResult.deployId,
-          url: finalizeResult.url,
-          mode: finalizeResult.mode,
-          site: config.site,
-          sha,
-          fileCount: uploadResult.fileCount,
-          totalSize: uploadResult.totalSize,
-          identitySource: identity.source,
-        }),
-      );
+      emitJson(result.data);
     } else {
-      const sizeKB = (uploadResult.totalSize / 1024).toFixed(1);
-      const nextLine =
-        mode === "preview"
-          ? `Next: universe static promote --from ${finalizeResult.deployId}`
-          : "Promoted to production.\nPreview alias unchanged.";
-      success(
-        [
-          `Deployed ${finalizeResult.deployId}`,
-          ``,
-          `  Site:     ${config.site}`,
-          `  Files:    ${uploadResult.fileCount}`,
-          `  Size:     ${sizeKB} KB`,
-          `  Mode:     ${mode}`,
-          `  URL:      ${finalizeResult.url}`,
-          ``,
-          nextLine,
-        ].join("\n"),
-      );
+      success(result.format);
     }
   } catch (err) {
     exit(outputError({ json: options.json, command: "deploy" }, err, { logError: error }));
   }
 }
+
+export { staticDeploy, staticDeployHandler };
+export type {
+  StaticDeployOptions,
+  StaticDeploySdkDeps,
+  StaticDeployHandlerOptions,
+  StaticDeployHandlerDeps,
+};
