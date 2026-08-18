@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { staticPromote, staticPromoteHandler } from "../../src/commands/promote.js";
-import { drive } from "../../src/interaction/clack-driver.js";
+import { drive } from "../../src/interaction/driver.js";
 import type { Step, StepResponse } from "../../src/interaction/step.js";
 import { AliasDriftError, ProxyError } from "../../src/lib/proxy-client.js";
 

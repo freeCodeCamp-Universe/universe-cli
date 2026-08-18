@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { staticRollback, staticRollbackHandler } from "../../src/commands/rollback.js";
-import { drive } from "../../src/interaction/clack-driver.js";
+import { drive } from "../../src/interaction/driver.js";
 import type { Step, StepResponse } from "../../src/interaction/step.js";
 import { AliasDriftError, ProxyError } from "../../src/lib/proxy-client.js";
 

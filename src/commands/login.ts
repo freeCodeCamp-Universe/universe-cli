@@ -1,6 +1,7 @@
 import { log } from "@clack/prompts";
 import { CredentialError } from "../errors.js";
-import { clackDriver, drive } from "../interaction/clack-driver.js";
+import { clackDriver } from "../interaction/clack-driver.js";
+import { drive } from "../interaction/driver.js";
 import type { Step, StepResponse } from "../interaction/step.js";
 import { DEFAULT_GH_CLIENT_ID } from "../lib/constants.js";
 import {
