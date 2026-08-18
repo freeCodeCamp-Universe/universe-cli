@@ -232,8 +232,8 @@ describe("clackDriver", () => {
     expect(mockClack.__spinnerInstance.stop).toHaveBeenCalled();
   });
 
-  it("passes validate wrapper to clack.text", async () => {
-    const validate = (v: string) => (v.length < 3 ? "Too short" : undefined);
+  it("passes validate directly to clack.text", async () => {
+    const validate = (v: string | undefined) => (v !== undefined && v.length < 3 ? "Too short" : undefined);
     mockClack.text.mockResolvedValueOnce("ok");
 
     const gen = singleStepGen({
@@ -246,11 +246,6 @@ describe("clackDriver", () => {
     await clackDriver(gen);
 
     const callArgs = mockClack.text.mock.lastCall![0] as { validate: (v: string | undefined) => string | undefined };
-    expect(callArgs.validate).toBeDefined();
-    // The wrapper should handle undefined → undefined
-    expect(callArgs.validate(undefined)).toBeUndefined();
-    // The wrapper should delegate to the original for real values
-    expect(callArgs.validate("ab")).toBe("Too short");
-    expect(callArgs.validate("abc")).toBeUndefined();
+    expect(callArgs.validate).toBe(validate);
   });
 });

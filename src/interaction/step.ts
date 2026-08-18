@@ -6,7 +6,7 @@ interface TextStep {
   message: string;
   placeholder?: string;
   defaultValue?: string;
-  validate?: (value: string) => string | undefined;
+  validate?: (value: string | undefined) => string | undefined;
 }
 
 interface SelectStep {

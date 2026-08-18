@@ -33,14 +33,7 @@ function clackStepHandler(): [StepHandler, () => void] {
 
     switch (step.type) {
       case "text":
-        return prompt(
-          clack.text({
-            ...step,
-            validate: step.validate
-              ? (v: string | undefined) => (v !== undefined ? step.validate!(v) : undefined)
-              : undefined,
-          }),
-        );
+        return prompt(clack.text(step));
       case "select":
         return prompt(clack.select(step));
       case "multiselect":
