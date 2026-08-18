@@ -1,43 +1,36 @@
-import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
+import { describe, it, expect, vi, beforeEach} from "vitest";
 import { clackDriver } from "../../src/interaction/clack-driver.js";
 import type { Step, StepResponse } from "../../src/interaction/step.js";
 import type { CommandResult } from "../../src/output/command-result.js";
 import { ConfirmError } from "../../src/errors.js";
 
-// Mock @clack/prompts
-vi.mock("@clack/prompts", () => {
-  const spinnerInstance = {
+const { mockSpinner } = vi.hoisted(() => {
+  const mockSpinner = {
     start: vi.fn(),
     stop: vi.fn(),
     message: vi.fn(),
-  };
+  }
+  return { mockSpinner }}
+)
+
+vi.mock("@clack/prompts", () => {
   return {
     text: vi.fn(),
     select: vi.fn(),
     multiselect: vi.fn(),
     confirm: vi.fn(),
-    spinner: vi.fn(() => spinnerInstance),
+    spinner: vi.fn(() => mockSpinner),
     isCancel: vi.fn(() => false),
     log: {
       warn: vi.fn(),
       info: vi.fn(),
     },
-    __spinnerInstance: spinnerInstance,
   };
 });
 
 import * as clack from "@clack/prompts";
 
-const mockClack = clack as unknown as {
-  text: Mock;
-  select: Mock;
-  multiselect: Mock;
-  confirm: Mock;
-  spinner: Mock;
-  isCancel: Mock;
-  log: { warn: Mock; info: Mock };
-  __spinnerInstance: { start: Mock; stop: Mock; message: Mock };
-};
+const mockClack = vi.mocked(clack)
 
 const dummyResult: CommandResult = {
   data: {
@@ -166,9 +159,9 @@ describe("clackDriver", () => {
 
     await clackDriver(progressGen());
 
-    expect(mockClack.__spinnerInstance.start).toHaveBeenCalledWith("Starting");
-    expect(mockClack.__spinnerInstance.message).toHaveBeenCalledWith("Halfway");
-    expect(mockClack.__spinnerInstance.stop).toHaveBeenCalled();
+    expect(mockSpinner.start).toHaveBeenCalledWith("Starting");
+    expect(mockSpinner.message).toHaveBeenCalledWith("Halfway");
+    expect(mockSpinner.stop).toHaveBeenCalled();
   });
 
   it("stops spinner before a prompt step", async () => {
@@ -183,7 +176,7 @@ describe("clackDriver", () => {
     await clackDriver(mixedGen());
 
     // stop should be called before confirm
-    expect(mockClack.__spinnerInstance.stop).toHaveBeenCalled();
+    expect(mockSpinner.stop).toHaveBeenCalled();
     expect(mockClack.confirm).toHaveBeenCalled();
   });
 
@@ -229,7 +222,7 @@ describe("clackDriver", () => {
     }
 
     await expect(clackDriver(errorGen())).rejects.toThrow("boom");
-    expect(mockClack.__spinnerInstance.stop).toHaveBeenCalled();
+    expect(mockSpinner.stop).toHaveBeenCalled();
   });
 
   it("passes validate directly to clack.text", async () => {
