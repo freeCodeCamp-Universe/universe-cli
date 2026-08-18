@@ -61,8 +61,6 @@ interface MakeDepsOptions {
   skillInstaller?: SkillInstaller;
 }
 
-// Backward-compat stub — makeDeps ignores this arg
-const createPromptPort = (_selection: CreateSelections | null) => null;
 
 function selectionToOptions(selection: CreateSelections) {
   return {
@@ -158,7 +156,7 @@ const collectGeneratedFiles = (directory: string): Record<string, string> => {
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const makeDeps = (cwd: string, _prompt?: any, options: MakeDepsOptions = {}) => {
+const makeDeps = (cwd: string, options: MakeDepsOptions = {}) => {
   const {
     packageManager = { specifyDeps: vi.fn(() => Promise.resolve()) },
     repoInitialiser = new StubRepoInitialiser(),
@@ -252,7 +250,7 @@ describe("create", () => {
 
     const specifyDeps = vi.fn((_opts: RunOptions) => Promise.resolve());
 
-    const deps = makeDeps(rootDirectory, createPromptPort(selection), {
+    const deps = makeDeps(rootDirectory, {
       packageManager: { specifyDeps },
     });
     await createHandler({ json: false, yes: true, ...selectionToOptions(selection) }, deps);
@@ -271,7 +269,7 @@ describe("create", () => {
 
     const specifyDeps = vi.fn((_opts: RunOptions) => Promise.resolve());
 
-    const deps = makeDeps(rootDirectory, createPromptPort(selection), {
+    const deps = makeDeps(rootDirectory, {
       packageManager: { specifyDeps },
     });
     await createHandler({ json: false, yes: true, ...selectionToOptions(selection) }, deps);
@@ -297,7 +295,7 @@ describe("create", () => {
       initialise: vi.fn((_dir: string) => Promise.resolve()),
     };
 
-    const deps = makeDeps(rootDirectory, createPromptPort(selection), {
+    const deps = makeDeps(rootDirectory, {
       repoInitialiser,
     });
     await createHandler({ json: false, yes: true, ...selectionToOptions(selection) }, deps);
@@ -314,7 +312,7 @@ describe("create", () => {
       initialise: vi.fn((_dir: string) => Promise.resolve()),
     };
 
-    const deps = makeDeps(rootDirectory, createPromptPort(selection), {
+    const deps = makeDeps(rootDirectory, {
       repoInitialiser,
     });
     await createHandler({ json: false, yes: true, ...selectionToOptions(selection) }, deps);
@@ -336,7 +334,7 @@ describe("create", () => {
       installSkills: vi.fn(() => Promise.resolve()),
     };
 
-    const deps = makeDeps(rootDirectory, createPromptPort(selection), {
+    const deps = makeDeps(rootDirectory, {
       skillInstaller,
     });
     await createHandler({ json: false, yes: true, ...selectionToOptions(selection) }, deps);
@@ -373,7 +371,7 @@ describe("create", () => {
       }),
     };
 
-    const deps = makeDeps(rootDirectory, createPromptPort(selection), {
+    const deps = makeDeps(rootDirectory, {
       repoInitialiser,
       skillInstaller,
     });
@@ -395,7 +393,7 @@ describe("create", () => {
       installSkills: vi.fn(() => Promise.resolve()),
     };
 
-    const deps = makeDeps(rootDirectory, createPromptPort(selection), {
+    const deps = makeDeps(rootDirectory, {
       skillInstaller,
     });
     await createHandler({ json: false, yes: true, ...selectionToOptions(selection) }, deps);
@@ -423,7 +421,7 @@ describe("create", () => {
       targetDirectory: string;
     }[] = [];
     const deps = {
-      ...makeDeps("/workspace", createPromptPort(createPromptResult)),
+      ...makeDeps("/workspace"),
       donationConfigWriter: new StubDonationConfigWriter(),
       filesystemWriter: {
         createSymlinks() {
@@ -476,7 +474,7 @@ describe("create", () => {
   it("returns actionable feedback for invalid input", async () => {
     // 'json' should be false since we're interested in user-facing errors.
     const deps = {
-      ...makeDeps("/workspace", createPromptPort(createPromptResult)),
+      ...makeDeps("/workspace"),
       validator: {
         validateCreateInput(_input: CreateSelections): never {
           throw new UsageError("InvalidName");
@@ -492,7 +490,7 @@ describe("create", () => {
   it("throws a typed write failure when scaffold output cannot be written", async () => {
     const message = (target: string) => `Failed to write files to ${target}`;
     const deps = {
-      ...makeDeps("/workspace", createPromptPort(createPromptResult)),
+      ...makeDeps("/workspace"),
       donationConfigWriter: new StubDonationConfigWriter(),
       filesystemWriter: {
         createSymlinks() {
@@ -557,7 +555,7 @@ describe("create", () => {
         });
 
       const deps = {
-        ...makeDeps(rootDirectory, createPromptPort(null)),
+        ...makeDeps(rootDirectory),
         isTTY: false,
       };
 
@@ -598,7 +596,7 @@ describe("create", () => {
 
     it("defaults to the first recommended runtime when --runtime is omitted", async () => {
       const deps = {
-        ...makeDeps(rootDirectory, createPromptPort(null)),
+        ...makeDeps(rootDirectory),
         isTTY: false,
       };
       const validateSpy = vi.spyOn(deps.validator, "validateCreateInput");
@@ -620,7 +618,7 @@ describe("create", () => {
 
     it("defaults to the first recommended framework when --framework is omitted", async () => {
       const deps = {
-        ...makeDeps(rootDirectory, createPromptPort(null)),
+        ...makeDeps(rootDirectory),
         isTTY: false,
       };
       const validateSpy = vi.spyOn(deps.validator, "validateCreateInput");
@@ -642,7 +640,7 @@ describe("create", () => {
 
     it("defaults to the first recommended PM when --packageManager is omitted", async () => {
       const deps = {
-        ...makeDeps(rootDirectory, createPromptPort(null)),
+        ...makeDeps(rootDirectory),
         isTTY: false,
       };
       const validateSpy = vi.spyOn(deps.validator, "validateCreateInput");
@@ -673,7 +671,7 @@ describe("create", () => {
         return { ...base, registry: { ...base.registry, "package-managers": partialPm } };
       };
       const deps = {
-        ...makeDeps(rootDirectory, createPromptPort(null)),
+        ...makeDeps(rootDirectory),
         isTTY: false,
         loadLayersFn: modifiedLoader,
       };
@@ -705,7 +703,7 @@ describe("create", () => {
         return { ...base, registry: { ...base.registry, runtime: noRecRuntime } };
       };
       const deps = {
-        ...makeDeps(rootDirectory, createPromptPort(null)),
+        ...makeDeps(rootDirectory),
         isTTY: false,
         loadLayersFn: modifiedLoader,
       };
@@ -733,7 +731,7 @@ describe("create", () => {
         return { ...base, registry: { ...base.registry, frameworks: noRecFramework } };
       };
       const deps = {
-        ...makeDeps(rootDirectory, createPromptPort(null)),
+        ...makeDeps(rootDirectory),
         isTTY: false,
         loadLayersFn: modifiedLoader,
       };
@@ -757,7 +755,7 @@ describe("create", () => {
         return { ...base, registry: { ...base.registry, "package-managers": noRecPm } };
       };
       const deps = {
-        ...makeDeps(rootDirectory, createPromptPort(null)),
+        ...makeDeps(rootDirectory),
         isTTY: false,
         loadLayersFn: modifiedLoader,
       };
@@ -797,7 +795,7 @@ describe("create", () => {
     vi.mocked(ensureTemplateDir).mockResolvedValue(FIXTURES_DIR);
 
     const deps = {
-      ...makeDeps(rootDirectory, createPromptPort(createPromptResult)),
+      ...makeDeps(rootDirectory),
       isTTY: false,
     };
 
