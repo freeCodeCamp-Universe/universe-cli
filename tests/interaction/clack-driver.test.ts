@@ -143,7 +143,7 @@ describe("clackDriver", () => {
       type: "confirm",
       field: "proceed",
       message: "Continue?",
-      default: true,
+      initialValue: true,
     });
 
     const result = await clackDriver(gen);
