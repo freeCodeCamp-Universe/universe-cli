@@ -17,9 +17,10 @@ export type {
 } from "./interaction/step.js";
 
 // Interaction driver
-export { clackDriver, drive } from "./interaction/clack-driver.js";
+export { drive } from "./interaction/driver.js";
+export type { StepHandler } from "./interaction/driver.js";
+export { clackDriver } from "./interaction/clack-driver.js";
 export { silentDrive } from "./interaction/silent-driver.js";
-export type { StepHandler } from "./interaction/clack-driver.js";
 
 // Commands
 export { create } from "./commands/create/index.js";
