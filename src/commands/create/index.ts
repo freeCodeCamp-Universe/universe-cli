@@ -179,8 +179,8 @@ async function* create(
       field: "name",
       message: "Enter project name",
       placeholder: "my-project",
-      validate: (value: string) =>
-        PROJECT_NAME_PATTERN.test(value)
+      validate: (value: string | undefined) =>
+        value !== undefined && PROJECT_NAME_PATTERN.test(value)
           ? undefined
           : "Name must be lowercase kebab-case, start with a letter, and be 3–50 characters long.",
     }) as string);
