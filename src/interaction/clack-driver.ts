@@ -35,26 +35,18 @@ function clackStepHandler(): [StepHandler, () => void] {
       case "text":
         return prompt(
           clack.text({
-            message: step.message,
-            placeholder: step.placeholder,
-            defaultValue: step.default,
+            ...step,
             validate: step.validate
               ? (v: string | undefined) => (v !== undefined ? step.validate!(v) : undefined)
               : undefined,
           }),
         );
       case "select":
-        return prompt(clack.select({ message: step.message, options: step.options }));
+        return prompt(clack.select(step));
       case "multiselect":
-        return prompt(
-          clack.multiselect({
-            message: step.message,
-            options: step.options,
-            required: step.required,
-          }),
-        );
+        return prompt(clack.multiselect(step));
       case "confirm":
-        return prompt(clack.confirm({ message: step.message, initialValue: step.default }));
+        return prompt(clack.confirm(step));
       case "progress":
         if (!spin) {
           spin = clack.spinner();

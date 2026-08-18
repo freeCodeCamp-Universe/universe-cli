@@ -5,7 +5,7 @@ interface TextStep {
   field: string;
   message: string;
   placeholder?: string;
-  default?: string;
+  defaultValue?: string;
   validate?: (value: string) => string | undefined;
 }
 
@@ -28,7 +28,7 @@ interface ConfirmStep {
   type: "confirm";
   field: string;
   message: string;
-  default?: boolean;
+  initialValue?: boolean;
 }
 
 interface ProgressStep {
