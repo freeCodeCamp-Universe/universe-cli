@@ -20,6 +20,11 @@ import { resolveTemplateVersions } from "../../../src/lib/template-version-check
 import { ensureTemplateDir } from "../../../src/commands/create/layer-composition/template-fetcher.js";
 import runtimeFixture from "../../fixtures/templates/layers/runtime.json";
 
+vi.mock("@clack/prompts", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@clack/prompts")>();
+  return { ...actual, log: { ...actual.log, success: vi.fn() } };
+});
+
 vi.mock("../../../src/commands/create/docker-check.js", () => ({
   isDockerAvailable: vi.fn(() => true),
 }));
