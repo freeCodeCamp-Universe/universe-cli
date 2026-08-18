@@ -1,30 +1,12 @@
 import * as clack from "@clack/prompts";
 import { ConfirmError } from "../errors.js";
+import { drive } from "./driver.js";
+import type { StepHandler } from "./driver.js";
 import type { Step, StepResponse } from "./step.js";
-
-type StepHandler = (step: Step) => Promise<StepResponse>;
 
 function assertNotCancelled<V>(value: V | symbol): asserts value is V {
   if (clack.isCancel(value)) {
     throw new ConfirmError("cancelled");
-  }
-}
-
-async function drive<T>(
-  gen: AsyncGenerator<Step, T, StepResponse>,
-  handle: StepHandler,
-  cleanup: () => void,
-): Promise<T> {
-  try {
-    let next = await gen.next();
-    while (!next.done) {
-      next = await gen.next(await handle(next.value));
-    }
-    cleanup();
-    return next.value;
-  } catch (err) {
-    cleanup();
-    throw err;
   }
 }
 
@@ -100,5 +82,4 @@ async function clackDriver<T>(
   return drive(gen, handle, cleanup);
 }
 
-export { drive, clackDriver };
-export type { StepHandler };
+export { clackDriver };
