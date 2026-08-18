@@ -142,9 +142,9 @@ async function detectBuildCommand(
   return `${manager} run build`;
 }
 
-function siteValidator(value: string): string | undefined {
-  const v = value.trim();
-  if (v.length === 0) return "site is required";
+function siteValidator(value: string | undefined): string | undefined {
+  const v = value?.trim();
+  if (!v) return "site is required";
   if (v.length > 63) return "site must be at most 63 characters";
   if (!SITE_NAME_PATTERN.test(v)) {
     return "lowercase letters, digits, single hyphens; no leading/trailing/consecutive hyphens";
@@ -152,8 +152,8 @@ function siteValidator(value: string): string | undefined {
   return undefined;
 }
 
-function nonEmptyValidator(value: string): string | undefined {
-  return value.trim().length === 0 ? "required" : undefined;
+function nonEmptyValidator(value: string | undefined): string | undefined {
+  return !value || value.trim().length === 0 ? "required" : undefined;
 }
 
 function renderYaml(site: string, build: BuildBlock | null): string {
@@ -197,7 +197,7 @@ async function* init(
       field: "site",
       message: "Site slug (becomes <slug>.freecode.camp)",
       placeholder: derivedSite,
-      default: derivedSite,
+      defaultValue: derivedSite,
       validate: siteValidator,
     }) as string) || derivedSite;
 
@@ -205,7 +205,7 @@ async function* init(
       type: "confirm",
       field: "want-build",
       message: "Does this project run a build command before deploy?",
-      default: detectedCommand !== null,
+      initialValue: detectedCommand !== null,
     }) as boolean;
 
     if (wantBuild) {
@@ -213,7 +213,7 @@ async function* init(
         type: "text",
         field: "build-command",
         message: "Build command",
-        default: detectedCommand ?? "npm run build",
+        defaultValue: detectedCommand ?? "npm run build",
         validate: nonEmptyValidator,
       }) as string) || (detectedCommand ?? "npm run build");
 
@@ -221,7 +221,7 @@ async function* init(
         type: "text",
         field: "build-output",
         message: "Build output directory (uploaded to the proxy)",
-        default: options.dir?.trim() || DEFAULT_OUTPUT,
+        defaultValue: options.dir?.trim() || DEFAULT_OUTPUT,
         validate: nonEmptyValidator,
       }) as string) || (options.dir?.trim() || DEFAULT_OUTPUT);
 
@@ -231,7 +231,7 @@ async function* init(
         type: "text",
         field: "output-dir",
         message: "Directory with pre-built files to deploy",
-        default: options.dir?.trim() || DEFAULT_OUTPUT,
+        defaultValue: options.dir?.trim() || DEFAULT_OUTPUT,
         validate: nonEmptyValidator,
       }) as string) || (options.dir?.trim() || DEFAULT_OUTPUT);
 
