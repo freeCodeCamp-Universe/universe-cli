@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.19.0](https://github.com/freeCodeCamp-Universe/universe-cli/compare/universe-cli-v0.18.0...universe-cli-v0.19.0) (2026-08-19)
+
+
+### Features
+
+* bust cache if version changes ([#69](https://github.com/freeCodeCamp-Universe/universe-cli/issues/69)) ([57aee2e](https://github.com/freeCodeCamp-Universe/universe-cli/commit/57aee2e3b29dea8a226c822bbacd95156d15e53a))
+* clearer create warnings ([#61](https://github.com/freeCodeCamp-Universe/universe-cli/issues/61)) ([50fd7d3](https://github.com/freeCodeCamp-Universe/universe-cli/commit/50fd7d325f4d3b4490aaa97191da065fdaf8e7ba))
+
+
+### Bug Fixes
+
+* **init:** link platform.yaml schema doc to github URL ([#74](https://github.com/freeCodeCamp-Universe/universe-cli/issues/74)) ([c62972a](https://github.com/freeCodeCamp-Universe/universe-cli/commit/c62972aab5069a5ae698631fed5b527e7b494c89))
+
 ## [0.18.0](https://github.com/freeCodeCamp-Universe/universe-cli/compare/universe-cli-v0.17.0...universe-cli-v0.18.0) (2026-08-11)
 
 
