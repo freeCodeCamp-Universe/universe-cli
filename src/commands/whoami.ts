@@ -3,14 +3,13 @@ import { resolveIdentity as defaultResolveIdentity } from "../lib/identity.js";
 import {
   createProxyClient as defaultCreateProxyClient,
   parseFetchTimeoutMs,
-  ProxyError,
+  wrapProxyError,
   type ProxyClient,
   type ProxyClientConfig,
 } from "../lib/proxy-client.js";
 import { buildEnvelope } from "../output/envelope.js";
 import { emitJson, outputError } from "../output/format.js";
 import { EXIT_CREDENTIALS, exitWithCode } from "../output/exit-codes.js";
-import { CliError } from "../errors.js";
 
 export interface WhoAmIOptions {
   json: boolean;
@@ -80,16 +79,10 @@ export async function whoami(options: WhoAmIOptions, deps: WhoAmIDeps = {}): Pro
       );
     }
   } catch (err) {
-    const exitCode = err instanceof CliError ? err.exitCode : EXIT_CREDENTIALS;
-    const message =
-      err instanceof ProxyError
-        ? `whoami failed (${err.code}): ${err.message}`
-        : err instanceof Error
-          ? err.message
-          : String(err);
-    outputError({ json: options.json, command: "whoami" }, exitCode, message, {
+    const { code, message } = wrapProxyError("whoami", err);
+    outputError({ json: options.json, command: "whoami" }, code, message, {
       logError: error,
     });
-    exit(exitCode);
+    exit(code);
   }
 }
