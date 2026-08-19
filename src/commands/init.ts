@@ -171,7 +171,7 @@ function nonEmptyValidator(value: string): string | undefined {
 function renderYaml(site: string, build: BuildBlock | null): string {
   const header =
     "# platform.yaml — freeCodeCamp Universe deploy config\n" +
-    "# Schema: docs/platform-yaml.md\n\n";
+    "# Schema: https://github.com/freeCodeCamp-Universe/universe-cli/blob/main/docs/platform-yaml.md\n\n";
   const doc: Record<string, unknown> = { site };
   if (build) {
     doc.build = build.command
