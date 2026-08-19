@@ -128,6 +128,28 @@ describe(hostRunnerFactory, () => {
     expect(pkg.packageManager).toBe("pnpm");
   });
 
+  it("throws an informative error when pnpm does not support --lockfile-only for list", async () => {
+    vi.mocked(execFile).mockImplementation(((...rawArgs: unknown[]) => {
+      const callback = rawArgs[rawArgs.length - 1] as MockCallback;
+      const cmd = rawArgs[0] as string;
+      const args = rawArgs[1] as string[];
+      if (args.includes("list")) {
+        callback(new Error("Unknown option: 'lockfile-only'"));
+        return;
+      }
+      if (cmd === "pnpm" && args.includes("-v")) {
+        callback(null, { stderr: "", stdout: "10.0.0\n" });
+        return;
+      }
+      callback(null, { stderr: "", stdout: "" });
+    }) as never);
+
+    const runner = hostRunnerFactory("10.0.0");
+    await expect(runner.list(hostTmpDir)).rejects.toThrow(
+      "pnpm version 10.0.0 does not support `ls --lockfile-only`, please use pnpm >= 10.23.0",
+    );
+  });
+
   it("installLockfileOnly runs corepack + pnpm install in the project directory", async () => {
     const runner = hostRunnerFactory("10.0.0");
     await runner.installLockfileOnly(hostTmpDir);

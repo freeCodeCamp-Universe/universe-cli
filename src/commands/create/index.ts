@@ -162,6 +162,13 @@ export const create = async (options: CreateOptions, deps: CreateDeps = {}): Pro
 
     let selections: CreateSelections;
 
+
+    if(!isDockerAvailable()) {   
+      logger.warn(
+        "docker is the preferred tool for scaffolding projects.\nLocal alternatives will be used where possible, but docker should be used for predictable results.",
+      );
+    }
+
     if (interactive) {
       const promptResult = await prompt.promptForCreateInputs();
 
@@ -253,6 +260,7 @@ export const create = async (options: CreateOptions, deps: CreateDeps = {}): Pro
       };
     }
 
+
     spinner.start("Preparing your project");
 
     const validatedInput = validator.validateCreateInput(selections);
@@ -311,14 +319,7 @@ export const create = async (options: CreateOptions, deps: CreateDeps = {}): Pro
 
     spinner.stop("Project scaffolded");
 
-    if (!isDockerAvailable()) {
-      logger.warn(
-        "docker daemon unavailable. Either restart the daemon or, if you aren't using docker, check the new project for a dev script",
-      );
-      logger.info(
-        "Once the daemon is available, `docker compose up --watch` will start the project. Otherwise check the project for a dev script.",
-      );
-    } else {
+    if (isDockerAvailable()) {
       logger.success(
         `cd into ${validatedInput.name} and run ` +
           "`docker compose up --watch` to start the project",
