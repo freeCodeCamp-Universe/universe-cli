@@ -20,9 +20,6 @@ importers:
       '@types/node':
         specifier: ^24.12.2
         version: 24.12.2
-      '@types/semver':
-        specifier: ^7.7.1
-        version: 7.7.1
       commander:
         specifier: 14.0.3
         version: 14.0.3
@@ -38,9 +35,6 @@ importers:
       postject:
         specifier: 1.0.0-alpha.6
         version: 1.0.0-alpha.6
-      semver:
-        specifier: ^7.8.5
-        version: 7.8.5
       tsdown:
         specifier: 0.22.14
         version: 0.22.14(tsx@4.22.4)(typescript@5.9.3)
@@ -62,13 +56,13 @@ importers:
 
   packages/core:
     dependencies:
+      '@clack/prompts':
+        specifier: 1.5.0
+        version: 1.5.0
       semver:
         specifier: 7.8.5
         version: 7.8.5
     devDependencies:
-      '@clack/prompts':
-        specifier: ^1.5.0
-        version: 1.5.0
       '@types/node':
         specifier: ^24.12.2
         version: 24.12.2
@@ -87,9 +81,6 @@ importers:
 
   packages/create:
     dependencies:
-      semver:
-        specifier: ^7.8.5
-        version: 7.8.5
       yaml:
         specifier: ^2.9.0
         version: 2.9.0
@@ -103,9 +94,6 @@ importers:
       '@types/node':
         specifier: ^24.12.2
         version: 24.12.2
-      '@types/semver':
-        specifier: ^7.7.1
-        version: 7.7.1
       tsdown:
         specifier: 0.22.14
         version: 0.22.14(tsx@4.22.4)(typescript@5.9.3)
