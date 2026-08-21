@@ -29,8 +29,7 @@ export {
 } from "./output/exit-codes.js";
 export { emitJson, outputError, outputSuccess } from "./output/format.js";
 export type { OutputContext, OutputErrorOptions } from "./output/format.js";
-export { clackLogger, logError, logSuccess, silentLogger } from "./output/logger.js";
-export type { Logger } from "./output/logger.js";
+export { logError, logSuccess } from "./output/logger.js";
 export { redact, redactObject } from "./output/redact.js";
 export { clackSpinner, silentSpinner } from "./output/spinner.js";
 export type { Spinner } from "./output/spinner.js";
