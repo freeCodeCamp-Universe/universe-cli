@@ -20,6 +20,7 @@ export interface TemplateCacheShape {
   readonly latest: string;
   readonly latestCompatible: string;
   readonly lastCheck: number;
+  readonly cliVersion: string;
 }
 
 export interface UpdateNotice {
@@ -57,6 +58,21 @@ export function parseCache(raw: string): CacheShape | null {
   return { latest, lastCheck };
 }
 
+function isTemplateCache(obj: unknown): obj is TemplateCacheShape {
+  return (
+    typeof obj == "object" &&
+    obj !== null &&
+    "latest" in obj &&
+    "latestCompatible" in obj &&
+    "lastCheck" in obj &&
+    "cliVersion" in obj &&
+    typeof obj.latest === "string" &&
+    typeof obj.latestCompatible === "string" &&
+    typeof obj.lastCheck === "number" &&
+    typeof obj.cliVersion === "string"
+  );
+}
+
 export function parseTemplateCache(raw: string): TemplateCacheShape | null {
   let parsed: unknown;
   try {
@@ -64,28 +80,7 @@ export function parseTemplateCache(raw: string): TemplateCacheShape | null {
   } catch {
     return null;
   }
-  if (
-    typeof parsed !== "object" ||
-    parsed === null ||
-    !("latest" in parsed) ||
-    !("latestCompatible" in parsed) ||
-    !("lastCheck" in parsed)
-  ) {
-    return null;
-  }
-  const { latest, latestCompatible, lastCheck } = parsed as {
-    latest: unknown;
-    latestCompatible: unknown;
-    lastCheck: unknown;
-  };
-  if (
-    typeof latest !== "string" ||
-    typeof latestCompatible !== "string" ||
-    typeof lastCheck !== "number"
-  ) {
-    return null;
-  }
-  return { latest, latestCompatible, lastCheck };
+  return isTemplateCache(parsed) ? parsed : null;
 }
 
 // Prerelease ignored ("0.7.0-rc.1" == "0.7.0") so prerelease users

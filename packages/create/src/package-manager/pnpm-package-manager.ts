@@ -84,8 +84,8 @@ const hostRunnerFactory: PnpmRunnerFactory = (pmVersion) => ({
         error.message.includes("Unknown option") &&
         error.message.includes("lockfile-only")
       ) {
-        const { stdout } = await execFileAsync("pnpm", ["-v"])
-          
+        const { stdout } = await execFileAsync("pnpm", ["-v"]);
+
         throw new UsageError(
           `pnpm version ${stdout.trim()} does not support \`ls --lockfile-only\`, please use pnpm >= 10.23.0`,
         );
