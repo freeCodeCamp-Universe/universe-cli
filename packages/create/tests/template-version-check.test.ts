@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm, writeFile, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-vi.mock("../../../package.json", () => ({ default: { version: "0.0.0" } }));
+vi.mock("../package.json", () => ({ default: { version: "0.0.0" } }));
 
 import { resolveTemplateVersions, formatTemplateNotice } from "../src/template-version-check.js";
 

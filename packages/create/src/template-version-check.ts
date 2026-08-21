@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
-import pkg from "../../../package.json" with { type: "json" };
+import pkg from "../package.json" with { type: "json" };
 
 import { templatesCache } from "./layer-composition/template-cache.js";
 import { ConfigError } from "@freecodecamp/universe-core";
