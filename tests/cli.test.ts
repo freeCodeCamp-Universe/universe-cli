@@ -4,26 +4,19 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { run, isVersionRequest } from "../src/cli.js";
 
-vi.mock("../src/output/format.js", async () => {
-  const actual =
-    await vi.importActual<typeof import("../src/output/format.js")>("../src/output/format.js");
-  return {
-    ...actual,
-    outputError: vi.fn(),
-  };
-});
-vi.mock("../src/output/exit-codes.js", async () => {
-  const actual = await vi.importActual<typeof import("../src/output/exit-codes.js")>(
-    "../src/output/exit-codes.js",
+vi.mock("@freecodecamp/universe-core", async () => {
+  const actual = await vi.importActual<typeof import("@freecodecamp/universe-core")>(
+    "@freecodecamp/universe-core",
   );
   return {
     ...actual,
     exitWithCode: vi.fn(),
+    outputError: vi.fn(actual.outputError),
   };
 });
 
-import { outputError } from "../src/output/format.js";
-import { exitWithCode } from "../src/output/exit-codes.js";
+import { outputError } from "@freecodecamp/universe-core";
+import { exitWithCode } from "@freecodecamp/universe-core";
 
 const mockOutputError = vi.mocked(outputError);
 const mockExitWithCode = vi.mocked(exitWithCode);
@@ -172,40 +165,40 @@ describe("top-level error handling", () => {
   });
 
   it("catches errors from deploy action and routes through outputError", async () => {
-    mockDeploy.mockRejectedValue(new Error("config file not found"));
+    const err = new Error("config file not found");
+    mockDeploy.mockRejectedValue(err);
 
     run(["node", "universe", "static", "deploy"]);
     await new Promise((resolve) => setTimeout(resolve, 50));
 
     expect(mockOutputError).toHaveBeenCalledWith(
       expect.objectContaining({ command: "deploy" }),
-      expect.any(Number),
-      expect.stringContaining("config file not found"),
+      err,
     );
     expect(mockExitWithCode).toHaveBeenCalled();
   });
 
   it("maps CliError subclasses to their declared exit code", async () => {
-    const { ConfigError } = await import("../src/errors.js");
-    const { EXIT_CONFIG, EXIT_USAGE } = await import("../src/output/exit-codes.js");
-    mockDeploy.mockRejectedValue(new ConfigError("bad platform.yaml"));
+    const { ConfigError } = await import("@freecodecamp/universe-core");
+    const { EXIT_CONFIG, EXIT_USAGE } = await import("@freecodecamp/universe-core");
+    const err = new ConfigError("bad platform.yaml");
+    mockDeploy.mockRejectedValue(err);
 
     run(["node", "universe", "static", "deploy"]);
     await new Promise((resolve) => setTimeout(resolve, 50));
 
     expect(mockExitWithCode).toHaveBeenCalledWith(EXIT_CONFIG);
     expect(mockExitWithCode).not.toHaveBeenCalledWith(EXIT_USAGE);
-    // outputError carries the user-facing message; exitWithCode just exits.
     expect(mockOutputError).toHaveBeenCalledWith(
       expect.objectContaining({ command: "deploy" }),
-      EXIT_CONFIG,
-      "bad platform.yaml",
+      err,
     );
   });
 
   it("falls back to EXIT_USAGE for raw Error instances", async () => {
-    const { EXIT_USAGE } = await import("../src/output/exit-codes.js");
-    mockDeploy.mockRejectedValue(new Error("mystery failure"));
+    const { EXIT_USAGE } = await import("@freecodecamp/universe-core");
+    const err = new Error("mystery failure");
+    mockDeploy.mockRejectedValue(err);
 
     run(["node", "universe", "static", "deploy"]);
     await new Promise((resolve) => setTimeout(resolve, 50));
@@ -213,8 +206,7 @@ describe("top-level error handling", () => {
     expect(mockExitWithCode).toHaveBeenCalledWith(EXIT_USAGE);
     expect(mockOutputError).toHaveBeenCalledWith(
       expect.objectContaining({ command: "deploy" }),
-      EXIT_USAGE,
-      "mystery failure",
+      err,
     );
   });
 
@@ -247,9 +239,10 @@ describe("top-level error handling", () => {
   });
 
   it("routes login errors through outputError + exit code map", async () => {
-    const { ConfigError } = await import("../src/errors.js");
-    const { EXIT_CONFIG } = await import("../src/output/exit-codes.js");
-    mockLogin.mockRejectedValue(new ConfigError("missing client id"));
+    const { ConfigError } = await import("@freecodecamp/universe-core");
+    const { EXIT_CONFIG } = await import("@freecodecamp/universe-core");
+    const err = new ConfigError("missing client id");
+    mockLogin.mockRejectedValue(err);
 
     run(["node", "universe", "login"]);
     await new Promise((resolve) => setTimeout(resolve, 50));
@@ -257,8 +250,7 @@ describe("top-level error handling", () => {
     expect(mockExitWithCode).toHaveBeenCalledWith(EXIT_CONFIG);
     expect(mockOutputError).toHaveBeenCalledWith(
       expect.objectContaining({ command: "login" }),
-      EXIT_CONFIG,
-      "missing client id",
+      err,
     );
   });
 });
@@ -392,7 +384,7 @@ describe("universe repo namespace", () => {
   });
 
   it("repo approve missing <id> routes through outputError, no uncaught throw", async () => {
-    const { EXIT_USAGE } = await import("../src/output/exit-codes.js");
+    const { EXIT_USAGE } = await import("@freecodecamp/universe-core");
     expect(() => run(["node", "universe", "repo", "approve"])).not.toThrow();
     expect(mockExitWithCode).toHaveBeenCalledWith(EXIT_USAGE);
     expect(mockOutputError).toHaveBeenCalledWith(
@@ -403,7 +395,7 @@ describe("universe repo namespace", () => {
   });
 
   it("repo create unknown option routes through outputError, no throw", async () => {
-    const { EXIT_USAGE } = await import("../src/output/exit-codes.js");
+    const { EXIT_USAGE } = await import("@freecodecamp/universe-core");
     expect(() =>
       run(["node", "universe", "repo", "create", "x", "--bogus", "--yes"]),
     ).not.toThrow();
@@ -416,7 +408,7 @@ describe("universe repo namespace", () => {
   });
 
   it("bare repo --json emits a JSON error envelope, not human help", async () => {
-    const { EXIT_USAGE } = await import("../src/output/exit-codes.js");
+    const { EXIT_USAGE } = await import("@freecodecamp/universe-core");
     run(["node", "universe", "repo", "--json"]);
     expect(mockOutputError).toHaveBeenCalledWith(
       expect.objectContaining({ command: "repo", json: true }),

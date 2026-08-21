@@ -1,9 +1,8 @@
 import { log } from "@clack/prompts";
-import { ConfirmError } from "../../errors.js";
-import { wrapProxyError } from "../../lib/proxy-client.js";
-import { buildEnvelope } from "../../output/envelope.js";
-import { exitWithCode } from "../../output/exit-codes.js";
-import { emitJson, outputError } from "../../output/format.js";
+import { ConfirmError } from "@freecodecamp/universe-core";
+import { buildEnvelope } from "@freecodecamp/universe-core";
+import { exitWithCode } from "@freecodecamp/universe-core";
+import { emitJson, outputError } from "@freecodecamp/universe-core";
 import { defaultRepoPrompts, type RepoCommandDeps, setupClient, UsageError } from "./_shared.js";
 
 export interface RepoRmOptions {
@@ -56,13 +55,11 @@ export async function rm(options: RepoRmOptions, deps: RepoCommandDeps = {}): Pr
       success(`Deleted request ${options.id} — the repo name is free to request again`);
     }
   } catch (err) {
-    const { code, message, kind, requestId } = wrapProxyError(command, err);
-    outputError({ json: options.json, command }, code, message, {
-      logError: error,
-      kind,
-      requestId,
-      extras: identitySource ? { identitySource } : undefined,
-    });
-    exit(code);
+    exit(
+      outputError({ json: options.json, command }, err, {
+        logError: error,
+        extras: identitySource ? { identitySource } : undefined,
+      }),
+    );
   }
 }

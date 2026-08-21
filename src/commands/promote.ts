@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { confirm, isCancel, log } from "@clack/prompts";
-import { ConfigError, CredentialError } from "../errors.js";
+import { ConfigError, CredentialError } from "@freecodecamp/universe-core";
 import { DEFAULT_PROXY_URL } from "../lib/constants.js";
 import { resolveIdentity as defaultResolveIdentity } from "../lib/identity.js";
 import { parsePlatformYaml, type PlatformYamlV2 } from "../lib/platform-yaml.js";
@@ -9,13 +9,12 @@ import {
   AliasDriftError,
   createProxyClient as defaultCreateProxyClient,
   parseFetchTimeoutMs,
-  wrapProxyError,
   type ProxyClient,
   type ProxyClientConfig,
 } from "../lib/proxy-client.js";
-import { buildEnvelope } from "../output/envelope.js";
-import { exitWithCode } from "../output/exit-codes.js";
-import { emitJson, outputError } from "../output/format.js";
+import { buildEnvelope } from "@freecodecamp/universe-core";
+import { exitWithCode } from "@freecodecamp/universe-core";
+import { emitJson, outputError } from "@freecodecamp/universe-core";
 
 export interface PromoteOptions {
   json: boolean;
@@ -192,14 +191,7 @@ export async function promote(options: PromoteOptions, deps: PromoteDeps = {}): 
       success(lines.join("\n"));
     }
   } catch (err) {
-    const { code, message } = wrapProxyError("promote", err);
-    // V3 additive: top-level `current` so scripted callers can branch +
-    // supply a fresh expectedCurrent on next attempt.
     const extras = err instanceof AliasDriftError ? { current: err.current } : undefined;
-    outputError({ json: options.json, command: "promote" }, code, message, {
-      logError: error,
-      extras,
-    });
-    exit(code);
+    exit(outputError({ json: options.json, command: "promote" }, err, { logError: error, extras }));
   }
 }

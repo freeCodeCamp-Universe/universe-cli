@@ -4,7 +4,7 @@ import {
   select as clackSelect,
   text as clackText,
 } from "@clack/prompts";
-import { CredentialError, UsageError } from "../../errors.js";
+import { CredentialError, UsageError } from "@freecodecamp/universe-core";
 import { DEFAULT_PROXY_URL } from "../../lib/constants.js";
 import { resolveIdentity as defaultResolveIdentity } from "../../lib/identity.js";
 import {
@@ -50,7 +50,7 @@ export interface RepoCommandDeps {
 
 /**
  * Resolve identity + construct a proxy client. Throws CredentialError
- * when no identity is available — the caller wraps via wrapProxyError.
+ * when no identity is available — the caller's `outputError` handles formatting.
  */
 export async function setupClient(deps: RepoCommandDeps): Promise<{
   client: ProxyClient;

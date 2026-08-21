@@ -1,8 +1,8 @@
 import { log } from "@clack/prompts";
-import { wrapProxyError, type SiteRow } from "../../lib/proxy-client.js";
-import { buildEnvelope } from "../../output/envelope.js";
-import { exitWithCode } from "../../output/exit-codes.js";
-import { emitJson, outputError } from "../../output/format.js";
+import { type SiteRow } from "../../lib/proxy-client.js";
+import { buildEnvelope } from "@freecodecamp/universe-core";
+import { exitWithCode } from "@freecodecamp/universe-core";
+import { emitJson, outputError } from "@freecodecamp/universe-core";
 import { setupClient, type SitesCommandDeps } from "./_shared.js";
 
 export interface SitesLsOptions {
@@ -53,10 +53,6 @@ export async function ls(options: SitesLsOptions, deps: SitesCommandDeps = {}): 
       success(formatTable(rows));
     }
   } catch (err) {
-    const { code, message } = wrapProxyError(command, err);
-    outputError({ json: options.json, command }, code, message, {
-      logError: error,
-    });
-    exit(code);
+    exit(outputError({ json: options.json, command }, err, { logError: error }));
   }
 }

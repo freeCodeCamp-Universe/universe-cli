@@ -1,4 +1,4 @@
-import { CredentialError, UsageError } from "../../errors.js";
+import { CredentialError, UsageError } from "@freecodecamp/universe-core";
 import { DEFAULT_PROXY_URL } from "../../lib/constants.js";
 import { resolveIdentity as defaultResolveIdentity } from "../../lib/identity.js";
 import {
@@ -34,7 +34,7 @@ export function parseTeamsFlag(raw: string | string[] | undefined): string[] {
 
 /**
  * Resolve identity + construct a proxy client. Throws CredentialError
- * if no identity is available — caller wraps via wrapProxyError.
+ * if no identity is available — the caller's `outputError` handles formatting.
  */
 export async function setupClient(deps: SitesCommandDeps): Promise<{
   client: ProxyClient;

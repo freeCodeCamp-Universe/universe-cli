@@ -1,4 +1,5 @@
 import { log } from "@clack/prompts";
+import { CredentialError } from "@freecodecamp/universe-core";
 import { DEFAULT_GH_CLIENT_ID } from "../lib/constants.js";
 import { runDeviceFlow as defaultRunDeviceFlow } from "../lib/device-flow.js";
 import {
@@ -11,9 +12,9 @@ import {
   loadToken as defaultLoadToken,
   saveToken as defaultSaveToken,
 } from "../lib/token-store.js";
-import { buildEnvelope } from "../output/envelope.js";
-import { EXIT_CONFIRM, EXIT_CREDENTIALS, exitWithCode } from "../output/exit-codes.js";
-import { emitJson, outputError } from "../output/format.js";
+import { buildEnvelope } from "@freecodecamp/universe-core";
+import { EXIT_CONFIRM, exitWithCode } from "@freecodecamp/universe-core";
+import { emitJson, outputError } from "@freecodecamp/universe-core";
 
 export interface LoginOptions {
   json: boolean;
@@ -110,11 +111,11 @@ export async function login(options: LoginOptions, deps: LoginDeps = {}): Promis
       },
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    outputError({ json: options.json, command: "login" }, EXIT_CREDENTIALS, message, {
-      logError: error,
-    });
-    exit(EXIT_CREDENTIALS);
+    const credErr =
+      err instanceof CredentialError
+        ? err
+        : new CredentialError(err instanceof Error ? err.message : String(err));
+    exit(outputError({ json: options.json, command: "login" }, credErr, { logError: error }));
     return;
   }
 

@@ -1,8 +1,8 @@
 import { log } from "@clack/prompts";
-import { type RepoRow, wrapProxyError } from "../../lib/proxy-client.js";
-import { buildEnvelope } from "../../output/envelope.js";
-import { exitWithCode } from "../../output/exit-codes.js";
-import { emitJson, outputError } from "../../output/format.js";
+import { type RepoRow } from "../../lib/proxy-client.js";
+import { buildEnvelope } from "@freecodecamp/universe-core";
+import { exitWithCode } from "@freecodecamp/universe-core";
+import { emitJson, outputError } from "@freecodecamp/universe-core";
 import { type RepoCommandDeps, setupClient, UsageError } from "./_shared.js";
 
 export interface RepoStatusOptions {
@@ -54,13 +54,11 @@ export async function status(
       message(humanRow(row));
     }
   } catch (err) {
-    const { code, message: msg, kind, requestId } = wrapProxyError(command, err);
-    outputError({ json: options.json, command }, code, msg, {
-      logError: error,
-      kind,
-      requestId,
-      extras: identitySource ? { identitySource } : undefined,
-    });
-    exit(code);
+    exit(
+      outputError({ json: options.json, command }, err, {
+        logError: error,
+        extras: identitySource ? { identitySource } : undefined,
+      }),
+    );
   }
 }

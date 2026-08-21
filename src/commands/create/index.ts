@@ -1,65 +1,15 @@
-import { existsSync } from "node:fs";
-import type { ProjectWriter } from "./io/project-writer.port.js";
+import { log } from "@clack/prompts";
 import {
-  LayerCompositionService,
-  type LayerComposer,
-} from "./layer-composition/layer-composition-service.js";
-import {
-  PackageManagerService,
-  type PackageManager,
-} from "./package-manager/package-manager.service.js";
-import { BunPackageManager } from "./package-manager/bun-package-manager.js";
-import { PnpmPackageManager } from "./package-manager/pnpm-package-manager.js";
-import {
-  PlatformManifestService,
-  type PlatformManifestGenerator,
-} from "./platform-manifest-service.js";
-import type { CreateSelections, Prompt } from "./prompt/prompt.port.js";
-import { ClackPrompt } from "./prompt/clack-prompt.js";
-import type { DonationConfigWriter } from "./io/donation-config-writer.port.js";
-import { LocalDonationConfigWriter } from "./io/local-donation-config-writer.js";
-import type { RepoInitialiser } from "./io/repo-initialiser.port.js";
-import { GitRepoInitialiser } from "./io/git-repo-initialiser.js";
-import type { SkillInstaller } from "./io/skill-installer.port.js";
-import { NpxSkillInstaller } from "./io/npx-skill-installer.js";
-import {
-  CreateInputValidationService,
-  type CreateInputValidator,
-} from "./create-input-validation-service.js";
-import {
-  recommendedFrameworkOptions,
-  recommendedPackageManagerOptions,
-  recommendedRuntimeOptions,
-} from "./layer-composition/allowed-configuration.js";
-import type {
-  DatabaseOption,
-  PackageManagerOption,
-  ServiceOption,
-} from "./layer-composition/schemas/layers.js";
-import { getLabel } from "./layer-composition/labels.js";
-import { clackLogger, silentLogger, type Logger } from "../../output/logger.js";
-import { clackSpinner, silentSpinner, type Spinner } from "../../output/spinner.js";
-import { EXIT_USAGE, exitWithCode } from "../../output/exit-codes.js";
-import { CliError, UsageError } from "../../errors.js";
-import { buildEnvelope } from "../../output/envelope.js";
-import { emitJson, outputError } from "../../output/format.js";
-import { LocalProjectWriter } from "./io/local-project-writer.js";
-import { loadFromDir, type TemplateData } from "./layer-composition/template-provider.js";
-import { bsd3ClauseLicense } from "./layer-composition/licenses/bsd-3-clause.js";
-import { templateVersionRange } from "./layer-composition/assets.js";
-import { ensureTemplateDir } from "./layer-composition/template-fetcher.js";
-import { resolveTemplateVersions, formatTemplateNotice } from "../../lib/template-version-check.js";
-import { isDisabled } from "../../lib/version-utils.js";
-import { isDockerAvailable } from "./docker-check.js";
+  clackDriver,
+  create,
+  emitJson,
+  exitWithCode,
+  outputError,
+  silentDrive,
+} from "@freecodecamp/universe-create";
+import type { CommandResult, CreateDeps, CreateOptions } from "@freecodecamp/universe-create";
 
-export interface HandlerResult {
-  exitCode: number;
-  meta?: Record<string, string>;
-}
-
-const defaultFilesystemWriter: ProjectWriter = new LocalProjectWriter();
-
-export interface CreateOptions {
+interface CreateHandlerOptions {
   json: boolean;
   forceFetch?: boolean;
   yes?: boolean;
@@ -71,283 +21,48 @@ export interface CreateOptions {
   packageManager?: string;
 }
 
-export interface CreateDeps {
-  cwd?: string;
-  donationConfigWriter?: DonationConfigWriter;
-  exit?: (code: number) => void;
-  filesystemWriter?: ProjectWriter;
+interface CreateHandlerDeps extends CreateDeps {
   isTTY?: boolean;
-  layerResolver?: LayerComposer;
-  logger?: Logger;
-  packageManager?: PackageManager;
-  platformManifestGenerator?: PlatformManifestGenerator;
-  prompt?: Prompt;
-  repoInitialiser?: RepoInitialiser;
-  skillInstaller?: SkillInstaller;
-  spinner?: Spinner;
-  loadLayersFn?: (dir: string) => Promise<TemplateData>;
-  validator?: CreateInputValidator;
+  logError?: (msg: string) => void;
+  exit?: (code: number) => void;
 }
 
-export const create = async (options: CreateOptions, deps: CreateDeps = {}): Promise<void> => {
-  const cwd = deps.cwd ?? process.cwd();
+async function createHandler(
+  options: CreateHandlerOptions,
+  deps: CreateHandlerDeps = {},
+): Promise<void> {
+  const error = deps.logError ?? ((message: string) => log.error(message));
   const exit = deps.exit ?? exitWithCode;
-  const filesystemWriter = deps.filesystemWriter ?? defaultFilesystemWriter;
-  const logger = deps.logger ?? (options.json ? silentLogger : clackLogger);
-  const packageManager =
-    deps.packageManager ??
-    new PackageManagerService({
-      pnpm: new PnpmPackageManager(),
-      bun: new BunPackageManager(),
-    });
-  const platformManifestGenerator = deps.platformManifestGenerator ?? new PlatformManifestService();
-  const donationConfigWriter = deps.donationConfigWriter ?? new LocalDonationConfigWriter();
-  const repoInitialiser = deps.repoInitialiser ?? new GitRepoInitialiser();
-  const skillInstaller = deps.skillInstaller ?? new NpxSkillInstaller();
-  const isTTY = process.stdin.isTTY;
-  const spinner = deps.spinner ?? (options.json || !isTTY ? silentSpinner() : clackSpinner());
+  const isTTY = deps.isTTY ?? Boolean(process.stdin.isTTY);
+  const interactive = isTTY && !options.yes && !options.json;
 
-  async function findTemplateVersion(range: string) {
-    const { latest, latestCompatible } = await resolveTemplateVersions(range);
+  const sdkOptions: CreateOptions = {
+    forceFetch: options.forceFetch,
+    name: options.name,
+    runtime: options.runtime,
+    framework: options.framework,
+    databases: options.databases,
+    services: options.services,
+    packageManager: options.packageManager,
+    yes: !interactive,
+  };
 
-    if (!isDisabled() && latestCompatible !== latest) {
-      process.stderr.write(
-        formatTemplateNotice({
-          current: latestCompatible,
-          latest,
-        }),
-      );
-    }
-
-    return latestCompatible;
-  }
-
-  async function findTemplateConfig(envVersion?: string, envDir?: string) {
-    // if envDir is specified, we don't need the version (since the version is used to get the data and we have the data)
-    if (envDir && envDir.length > 0)
-      return {
-        templateDir: envDir,
-        templateVersion: null,
-      };
-
-    const version =
-      envVersion && envVersion.length > 0
-        ? envVersion
-        : await findTemplateVersion(templateVersionRange);
-    return {
-      templateDir: await ensureTemplateDir(version, { forceFetch: options.forceFetch }),
-      templateVersion: version,
-    };
-  }
-
+  let result: CommandResult;
   try {
-    const envDir = process.env["UNIVERSE_TEMPLATES_DIR"];
-    const envVersion = process.env["UNIVERSE_TEMPLATES_VERSION"];
-
-    const { templateDir, templateVersion } = await findTemplateConfig(envVersion, envDir);
-
-    const loadLayersFn = deps.loadLayersFn ?? loadFromDir;
-    const { labels, registry } = await loadLayersFn(templateDir);
-
-    const isTTY = deps.isTTY ?? Boolean(process.stdin.isTTY);
-    const interactive = isTTY && !options.yes && !options.json;
-
-    const prompt =
-      deps.prompt ??
-      new ClackPrompt(registry.runtime, labels, registry.frameworks, registry["package-managers"]);
-    const layerResolver = deps.layerResolver ?? new LayerCompositionService(labels, registry);
-    const validator =
-      deps.validator ??
-      new CreateInputValidationService((path) => existsSync(path), registry.runtime);
-
-    let selections: CreateSelections;
-
-
-    if(!isDockerAvailable()) {   
-      logger.warn(
-        "docker is the preferred tool for scaffolding projects.\nLocal alternatives will be used where possible, but docker should be used for predictable results.",
-      );
-    }
-
-    if (interactive) {
-      const promptResult = await prompt.promptForCreateInputs();
-
-      if (promptResult === null) {
-        throw new UsageError("Create cancelled.");
-      }
-
-      const summaryLines = [
-        `Creating project with:`,
-        `- Name: ${promptResult.name}`,
-        `- Runtime: ${getLabel(labels, "runtime", promptResult.runtime)}`,
-        `- Framework: ${getLabel(labels, "framework", promptResult.framework)}`,
-      ];
-
-      if (promptResult.packageManager !== undefined) {
-        summaryLines.push(
-          `- Package manager: ${getLabel(labels, "packageManager", promptResult.packageManager)}`,
-        );
-      }
-
-      if (promptResult.databases.length > 0) {
-        summaryLines.push(
-          `- Databases: ${promptResult.databases.map((d) => getLabel(labels, "database", d)).join(", ")}`,
-        );
-      }
-
-      if (promptResult.platformServices.length > 0) {
-        summaryLines.push(
-          `- Platform services: ${promptResult.platformServices.map((s) => getLabel(labels, "service", s)).join(", ")}`,
-        );
-      }
-
-      if (templateVersion) {
-        summaryLines.push(`- Templates version: ${templateVersion}`);
-      }
-
-      logger.info(summaryLines.join("\n"));
-
-      selections = promptResult;
-    } else {
-      if (!options.name) {
-        throw new UsageError("--name is required in non-interactive mode");
-      }
-
-      const recRuntimes = recommendedRuntimeOptions(registry.runtime);
-      const runtime = options.runtime ?? recRuntimes[0];
-      if (runtime === undefined) {
-        throw new UsageError(
-          "No recommended runtimes — specify --runtime explicitly or update templates.",
-        );
-      }
-
-      const recFrameworks = recommendedFrameworkOptions(
-        registry.runtime,
-        runtime,
-        registry.frameworks,
-      );
-      const framework = options.framework ?? recFrameworks[0];
-      if (framework === undefined) {
-        throw new UsageError(
-          `No recommended frameworks for runtime "${runtime}" — specify --framework explicitly or update templates.`,
-        );
-      }
-
-      const recPMs = recommendedPackageManagerOptions(
-        registry.runtime,
-        runtime,
-        registry["package-managers"],
-      );
-      const pm =
-        options.packageManager !== undefined
-          ? (options.packageManager as PackageManagerOption)
-          : recPMs.length > 0
-            ? (recPMs[0] as PackageManagerOption)
-            : undefined;
-      if (pm === undefined) {
-        throw new UsageError(
-          `No recommended package managers for runtime "${runtime}" — specify --packageManager explicitly or update templates.`,
-        );
-      }
-
-      selections = {
-        name: options.name,
-        runtime,
-        framework,
-        databases: (options.databases ?? []) as DatabaseOption[],
-        platformServices: (options.services ?? []) as ServiceOption[],
-        ...(pm !== undefined ? { packageManager: pm } : {}),
-      };
-    }
-
-
-    spinner.start("Preparing your project");
-
-    const validatedInput = validator.validateCreateInput(selections);
-
-    spinner.message("Composing project layers");
-    const resolvedLayers = layerResolver.resolveLayers(validatedInput);
-    const targetDirectory = `${cwd}/${validatedInput.name}`;
-
-    spinner.message("Writing project files");
-    await filesystemWriter.writeProject(targetDirectory, resolvedLayers.files);
-
-    if (Object.keys(resolvedLayers.symlinks).length > 0) {
-      spinner.message("Creating symlinks");
-      await filesystemWriter.createSymlinks(targetDirectory, resolvedLayers.symlinks);
-    }
-
-    spinner.message("Writing platform manifest");
-    await filesystemWriter.writeProject(targetDirectory, {
-      "platform.yaml": platformManifestGenerator.generatePlatformManifest(validatedInput),
-    });
-
-    spinner.message("Adding LICENSE");
-    await filesystemWriter.writeProject(targetDirectory, {
-      LICENSE: bsd3ClauseLicense,
-    });
-
-    const manager = validatedInput.packageManager;
-
-    if (manager !== undefined) {
-      spinner.message(`Pinning dependencies with ${manager}`);
-      await packageManager.specifyDeps({
-        manager,
-        pmVersion: registry["package-managers"][manager]?.pmVersion ?? "",
-        projectDirectory: targetDirectory,
-      });
-    }
-
-    const skills = registry.frameworks[validatedInput.framework]?.skills;
-    if (skills && skills.length > 0) {
-      spinner.message("Installing skills");
-      try {
-        await skillInstaller.installSkills(skills, targetDirectory);
-      } catch (err) {
-        // Non-fatal: the project is already scaffolded. Route the failure to
-        // the logger (stderr / silent in --json mode) so it never lands on
-        // stdout and corrupts emitJson's envelope.
-        logger.error(err instanceof Error ? err.message : String(err));
-      }
-    }
-
-    spinner.message("Writing donation config");
-    await donationConfigWriter.write(targetDirectory);
-
-    spinner.message("Initialising git repository");
-    await repoInitialiser.initialise(targetDirectory);
-
-    spinner.stop("Project scaffolded");
-
-    if (isDockerAvailable()) {
-      logger.success(
-        `cd into ${validatedInput.name} and run ` +
-          "`docker compose up --watch` to start the project",
-      );
-    }
-
-    if (options.json) {
-      emitJson(
-        buildEnvelope("create", true, {
-          path: targetDirectory,
-          name: validatedInput.name,
-          runtime: validatedInput.runtime,
-          framework: validatedInput.framework,
-          databases: validatedInput.databases,
-          platformServices: validatedInput.platformServices,
-          packageManager: validatedInput.packageManager ?? null,
-          templateVersion,
-        }),
-      );
-      return;
-    }
-  } catch (err) {
-    spinner.error("Create failed");
-    const code = err instanceof CliError ? err.exitCode : EXIT_USAGE;
-    const message = err instanceof Error ? err.message : String(err);
-    outputError({ json: options.json, command: "create" }, code, message, {
-      logError: logger.error,
-    });
-    exit(code);
+    result = interactive
+      ? await clackDriver(create(sdkOptions, deps))
+      : await silentDrive(create(sdkOptions, deps));
+  } catch (error_) {
+    exit(outputError({ json: options.json, command: "create" }, error_, { logError: error }));
+    return;
   }
-};
+
+  if (options.json) {
+    emitJson(result.data);
+  } else {
+    log.success(result.format);
+  }
+}
+
+export { createHandler };
+export type { CreateHandlerDeps, CreateHandlerOptions };

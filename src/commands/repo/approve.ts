@@ -1,9 +1,8 @@
 import { log } from "@clack/prompts";
-import { ConfirmError, StorageError } from "../../errors.js";
-import { wrapProxyError } from "../../lib/proxy-client.js";
-import { buildEnvelope } from "../../output/envelope.js";
-import { EXIT_STORAGE, exitWithCode } from "../../output/exit-codes.js";
-import { emitJson, outputError } from "../../output/format.js";
+import { ConfirmError, StorageError } from "@freecodecamp/universe-core";
+import { buildEnvelope } from "@freecodecamp/universe-core";
+import { exitWithCode } from "@freecodecamp/universe-core";
+import { emitJson, outputError } from "@freecodecamp/universe-core";
 import { defaultRepoPrompts, type RepoCommandDeps, setupClient, UsageError } from "./_shared.js";
 
 export interface RepoApproveOptions {
@@ -54,11 +53,6 @@ export async function approve(
     const row = res.request;
 
     if (res.outcome === "approved_failed") {
-      if (!options.json) {
-        throw new StorageError(
-          `approved, but repository creation failed: ${row.error ?? "unknown"} (${row.owner}/${row.name}, requested by ${row.requestedBy})`,
-        );
-      }
       creationFailure = {
         outcome: res.outcome,
         id: row.id,
@@ -68,6 +62,9 @@ export async function approve(
         requestedBy: row.requestedBy,
         identitySource,
       };
+      throw new StorageError(
+        `approved, but repository creation failed: ${row.error ?? "unknown"} (${row.owner}/${row.name}, requested by ${row.requestedBy})`,
+      );
     } else if (options.json) {
       emitJson(
         buildEnvelope(command, true, {
@@ -92,22 +89,11 @@ export async function approve(
       );
     }
   } catch (err) {
-    const { code, message, kind, requestId } = wrapProxyError(command, err);
-    outputError({ json: options.json, command }, code, message, {
-      logError: error,
-      kind,
-      requestId,
-      extras: identitySource ? { identitySource } : undefined,
-    });
-    exit(code);
-    return;
-  }
-
-  if (creationFailure) {
-    outputError({ json: true, command }, EXIT_STORAGE, "approved, but repository creation failed", {
-      logError: error,
-      extras: creationFailure,
-    });
-    exit(EXIT_STORAGE);
+    exit(
+      outputError({ json: options.json, command }, err, {
+        logError: error,
+        extras: creationFailure ?? (identitySource ? { identitySource } : undefined),
+      }),
+    );
   }
 }

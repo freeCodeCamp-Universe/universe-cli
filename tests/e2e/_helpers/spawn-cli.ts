@@ -14,8 +14,17 @@ export async function runBinary(
   env: NodeJS.ProcessEnv,
   cwd?: string,
 ): Promise<RunBinaryResult> {
+  return runBinaryAt(BIN_PATH, args, env, cwd);
+}
+
+export async function runBinaryAt(
+  binaryPath: string,
+  args: string[],
+  env: NodeJS.ProcessEnv,
+  cwd?: string,
+): Promise<RunBinaryResult> {
   return new Promise<RunBinaryResult>((resolveP, reject) => {
-    const child = spawn("node", [BIN_PATH, ...args], {
+    const child = spawn("node", [binaryPath, ...args], {
       env,
       cwd,
       stdio: ["ignore", "pipe", "pipe"],

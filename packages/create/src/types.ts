@@ -1,0 +1,16 @@
+import type {
+  DatabaseOption,
+  PackageManagerOption,
+  ServiceOption,
+} from "./layer-composition/schemas/layers.js";
+
+interface CreateSelections {
+  name: string;
+  runtime: string;
+  framework: string;
+  databases: DatabaseOption[];
+  platformServices: ServiceOption[];
+  packageManager?: PackageManagerOption;
+}
+
+export type { CreateSelections, DatabaseOption, PackageManagerOption, ServiceOption };
