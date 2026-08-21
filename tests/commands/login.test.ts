@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi, type Mock } from "vitest";
 import { login } from "../../src/commands/login.js";
 import { DEFAULT_GH_CLIENT_ID } from "../../src/lib/constants.js";
 
@@ -12,7 +12,7 @@ interface FakeDeps {
   logInfo: ReturnType<typeof vi.fn>;
   logWarn: ReturnType<typeof vi.fn>;
   logError: ReturnType<typeof vi.fn>;
-  exit: ReturnType<typeof vi.fn>;
+  exit: Mock<(code: number) => never>;
 }
 
 /**
@@ -48,7 +48,7 @@ function mkDeps(overrides: Partial<FakeDeps> = {}): FakeDeps {
     logInfo: vi.fn(),
     logWarn: vi.fn(),
     logError: vi.fn(),
-    exit: vi.fn().mockImplementation((_code: number) => {
+    exit: vi.fn((_code: number): never => {
       throw new Error("__exit__");
     }),
     ...overrides,

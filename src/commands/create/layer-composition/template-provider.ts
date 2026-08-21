@@ -78,21 +78,42 @@ const walkDir = async (
     return;
   }
 
-  await Promise.all(
-    entries.map(async (name) => {
+  const read = await Promise.all(
+    entries.sort().map(async (name) => {
       const fullPath = join(dir, name);
       const relativePath = prefix === "" ? name : `${prefix}/${name}`;
       const stat = await lstat(fullPath);
 
       if (stat.isSymbolicLink()) {
-        symlinks[relativePath] = await readlink(fullPath);
-      } else if (stat.isFile()) {
-        files[relativePath] = await readFile(fullPath, "utf-8");
-      } else if (stat.isDirectory()) {
-        await walkDir(fullPath, relativePath, files, symlinks);
+        return {
+          kind: "symlink" as const,
+          relativePath,
+          target: await readlink(fullPath),
+        };
       }
+      if (stat.isFile()) {
+        return {
+          kind: "file" as const,
+          relativePath,
+          content: await readFile(fullPath, "utf-8"),
+        };
+      }
+      if (stat.isDirectory()) {
+        return { kind: "directory" as const, relativePath, fullPath };
+      }
+      return { kind: "other" as const };
     }),
   );
+
+  for (const entry of read) {
+    if (entry.kind === "symlink") {
+      symlinks[entry.relativePath] = entry.target;
+    } else if (entry.kind === "file") {
+      files[entry.relativePath] = entry.content;
+    } else if (entry.kind === "directory") {
+      await walkDir(entry.fullPath, entry.relativePath, files, symlinks);
+    }
+  }
 };
 
 const readLayerFiles = async (
@@ -116,13 +137,16 @@ const addLayerData = async <T extends Record<string, unknown>>(
 ): Promise<{ [K in keyof T]: T[K] & LayerData }> => {
   const result = {} as { [K in keyof T]: T[K] & LayerData };
 
-  await Promise.all(
-    Object.keys(parsed).map(async (key) => {
-      const layerFiles = await readLayerFiles(filesDir, layerType, key);
-      const value = parsed[key] as Record<string, unknown>;
-      result[key as keyof T] = { ...value, ...layerFiles } as T[keyof T] & LayerData;
-    }),
+  const loaded = await Promise.all(
+    Object.keys(parsed).map(
+      async (key) => [key, await readLayerFiles(filesDir, layerType, key)] as const,
+    ),
   );
+
+  for (const [key, layerFiles] of loaded) {
+    const value = parsed[key] as Record<string, unknown>;
+    result[key as keyof T] = { ...value, ...layerFiles } as T[keyof T] & LayerData;
+  }
 
   return result;
 };
@@ -148,15 +172,21 @@ const loadFromDir = async (dir: string): Promise<TemplateData> => {
         readLayer("service.json").then((raw) => ServiceSchema.parse(JSON.parse(raw))),
       ]);
 
-    const [alwaysWithFiles, frameworkWithFiles, pmWithFiles, runtimeWithFiles, serviceWithFiles, databaseWithFiles] =
-      await Promise.all([
-        addLayerData(always, filesDir, "always"),
-        addLayerData(framework, filesDir, "framework"),
-        addLayerData(packageManager, filesDir, "package-manager"),
-        addLayerData(runtime, filesDir, "runtime"),
-        addLayerData(service, filesDir, "service"),
-        addLayerData(database, filesDir, "database"),
-      ]);
+    const [
+      alwaysWithFiles,
+      frameworkWithFiles,
+      pmWithFiles,
+      runtimeWithFiles,
+      serviceWithFiles,
+      databaseWithFiles,
+    ] = await Promise.all([
+      addLayerData(always, filesDir, "always"),
+      addLayerData(framework, filesDir, "framework"),
+      addLayerData(packageManager, filesDir, "package-manager"),
+      addLayerData(runtime, filesDir, "runtime"),
+      addLayerData(service, filesDir, "service"),
+      addLayerData(database, filesDir, "database"),
+    ]);
 
     return {
       labels,

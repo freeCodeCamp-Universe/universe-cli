@@ -4,18 +4,10 @@ import type { ProxyClient } from "../../src/lib/proxy-client.js";
 
 function mkClient(
   upload: ProxyClient["deployUpload"] = vi.fn().mockResolvedValue({ received: "x", key: "k" }),
-): { client: ProxyClient; upload: ReturnType<typeof vi.fn> } {
+): { client: Pick<ProxyClient, "deployUpload">; upload: ReturnType<typeof vi.fn> } {
   const fn = upload as ReturnType<typeof vi.fn>;
   return {
-    client: {
-      whoami: vi.fn(),
-      deployInit: vi.fn(),
-      deployUpload: fn,
-      deployFinalize: vi.fn(),
-      siteDeploys: vi.fn(),
-      sitePromote: vi.fn(),
-      siteRollback: vi.fn(),
-    },
+    client: { deployUpload: fn },
     upload: fn,
   };
 }

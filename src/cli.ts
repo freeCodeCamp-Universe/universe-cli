@@ -291,17 +291,20 @@ export async function run(argv = process.argv): Promise<void> {
     .description("Deploy static site via the artemis proxy")
     .option("--promote", "Finalize as production (default: preview)")
     .option("--dir <path>", "Override build.output dir from platform.yaml")
+    .option("--no-reuse", "Always rebuild; never promote an existing preview")
     .action(async (_opts, cmd: Command) => {
       const opts = cmd.optsWithGlobals<{
         json?: boolean;
         promote?: boolean;
         dir?: string;
+        reuse?: boolean;
       }>();
       try {
         await deploy({
           json: opts.json ?? false,
           promote: opts.promote ?? false,
           dir: opts.dir,
+          noReuse: opts.reuse === false,
         });
       } catch (err: unknown) {
         handleActionError("deploy", opts.json ?? false, err);
