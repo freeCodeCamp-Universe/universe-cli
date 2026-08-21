@@ -4,7 +4,7 @@ import { LayerCompositionService } from "../../src/layer-composition/layer-compo
 import { loadFromDir } from "../../src/layer-composition/template-provider.js";
 import { resolve } from "node:path";
 
-const FIXTURES_DIR = resolve(import.meta.dirname, "../fixtures/templates");
+const FIXTURES_DIR = resolve("tests/fixtures/templates");
 
 describe(LayerCompositionService, () => {
   let service: LayerCompositionService;

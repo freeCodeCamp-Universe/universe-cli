@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 import { create } from "../src/index.js";
 import type { CreateDeps, Step } from "../src/index.js";
 
-const templatesDirectory = resolve(import.meta.dirname, "fixtures/templates");
+const templatesDirectory = resolve("tests/fixtures/templates");
 
 function createDependencies(): CreateDeps {
   return {

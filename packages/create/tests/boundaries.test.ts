@@ -18,7 +18,7 @@ async function sourceFiles(directory: string): Promise<string[]> {
 
 describe("create package boundaries", () => {
   it("does not import root source or escape the package", async () => {
-    const sourceDirectory = join(import.meta.dirname, "../src");
+    const sourceDirectory = "src";
     const violations: string[] = [];
 
     for (const file of await sourceFiles(sourceDirectory)) {
@@ -40,7 +40,7 @@ describe("create package boundaries", () => {
   });
 
   it("imports core only by its package name", async () => {
-    const sourceDirectory = join(import.meta.dirname, "../src");
+    const sourceDirectory = "src";
     const sources = await Promise.all(
       (await sourceFiles(sourceDirectory)).map((file) => readFile(file, "utf8")),
     );

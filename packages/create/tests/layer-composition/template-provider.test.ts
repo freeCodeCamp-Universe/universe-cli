@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { loadFromDir } from "../../src/layer-composition/template-provider.js";
 
-const FIXTURES_DIR = resolve(import.meta.dirname, "../fixtures/templates");
+const FIXTURES_DIR = resolve("tests/fixtures/templates");
 
 describe("loadFromDir", () => {
   let tmpDir: string;

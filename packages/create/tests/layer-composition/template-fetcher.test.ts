@@ -9,7 +9,7 @@ import { ensureTemplateDir } from "../../src/layer-composition/template-fetcher.
 import type { FetchFn } from "../../src/layer-composition/template-fetcher.js";
 
 const execFileAsync = promisify(execFile);
-const FIXTURES_DIR = resolve(import.meta.dirname, "../fixtures/templates");
+const FIXTURES_DIR = resolve("tests/fixtures/templates");
 const TEMPLATE_VERSION = "1.0.0";
 
 const createTarball = async (sourceDir: string, destPath: string): Promise<void> => {
