@@ -7,7 +7,11 @@ const execFileP = promisify(execFile);
 
 const REPO_ROOT = resolve(process.cwd());
 const BIN_PATH = resolve(REPO_ROOT, "dist", "index.cjs");
-const SRC_DIR = resolve(REPO_ROOT, "src");
+const SOURCE_DIRECTORIES = [
+  resolve(REPO_ROOT, "src"),
+  resolve(REPO_ROOT, "packages", "core", "src"),
+  resolve(REPO_ROOT, "packages", "create", "src"),
+];
 
 async function maxMtime(dir) {
   let max = 0;
@@ -32,7 +36,7 @@ async function ensureBinaryBuilt() {
   } catch {
     binMtime = -1;
   }
-  const srcMtime = await maxMtime(SRC_DIR);
+  const srcMtime = Math.max(...(await Promise.all(SOURCE_DIRECTORIES.map(maxMtime))));
   if (binMtime < 0 || srcMtime > binMtime) {
     await execFileP("pnpm", ["build"], {
       cwd: REPO_ROOT,

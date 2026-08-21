@@ -1,5 +1,5 @@
-import { EXIT_USAGE } from "../output/exit-codes.js";
-import { redact } from "../output/redact.js";
+import { EXIT_USAGE } from "@freecodecamp/universe-core";
+import { redact } from "@freecodecamp/universe-core";
 
 export function formatFatal(err: unknown): string {
   const message = err instanceof Error ? err.message : String(err);

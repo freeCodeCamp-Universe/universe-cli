@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runBinary } from "./_helpers/spawn-cli.js";
-import { EXIT_USAGE } from "../../src/output/exit-codes.js";
+import { EXIT_USAGE } from "@freecodecamp/universe-core";
 
 let tmp: string | undefined;
 let server: Server | undefined;

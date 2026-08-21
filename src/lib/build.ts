@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { stat } from "node:fs/promises";
 import { isAbsolute, resolve } from "node:path";
-import { ConfigError } from "../errors.js";
+import { ConfigError } from "@freecodecamp/universe-core";
 
 /**
  * Build orchestrator for `universe static deploy`.

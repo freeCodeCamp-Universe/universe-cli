@@ -6,9 +6,9 @@ import {
   type ProxyClient,
   type ProxyClientConfig,
 } from "../lib/proxy-client.js";
-import { buildEnvelope } from "../output/envelope.js";
-import { emitJson, outputError } from "../output/format.js";
-import { EXIT_CREDENTIALS, exitWithCode } from "../output/exit-codes.js";
+import { buildEnvelope } from "@freecodecamp/universe-core";
+import { emitJson, outputError } from "@freecodecamp/universe-core";
+import { EXIT_CREDENTIALS, exitWithCode } from "@freecodecamp/universe-core";
 
 export interface WhoAmIOptions {
   json: boolean;

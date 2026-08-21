@@ -1,0 +1,183 @@
+import { lstat, readdir, readFile, readlink } from "node:fs/promises";
+import { join } from "node:path";
+
+import { ConfigError } from "@freecodecamp/universe-core";
+import type { LayerData, LayerRegistry } from "./resolve-ordered-layers.js";
+import {
+  AlwaysSchema,
+  DatabaseSchema,
+  FrameworkSchema,
+  PackageManagerSchema,
+  RuntimeSchema,
+  ServiceSchema,
+} from "./schemas/layers.js";
+import { LabelsSchema, type Labels } from "./schemas/labels.js";
+
+const EXPECTED_LAYER_FILES = [
+  "always.json",
+  "database.json",
+  "framework.json",
+  "package-manager.json",
+  "runtime.json",
+  "service.json",
+] as const;
+
+const EXPECTED_ROOT_ENTRIES = ["files", "labels.json", "layers"] as const;
+
+interface TemplateData {
+  labels: Labels;
+  registry: LayerRegistry;
+}
+
+const validateEntries = (expected: readonly string[], actual: string[]): void => {
+  const expectedSet = new Set<string>(expected);
+  const actualSet = new Set(actual);
+
+  const missing = [...expectedSet].filter((f) => !actualSet.has(f));
+  if (missing.length > 0) {
+    throw new ConfigError(`Expected files missing from templates: ${missing.join(", ")}`);
+  }
+
+  const extra = [...actualSet].filter((f) => !expectedSet.has(f));
+  if (extra.length > 0) {
+    throw new ConfigError(`Unexpected files in templates directory: ${extra.join(", ")}`);
+  }
+};
+
+const validateStructure = async (dir: string): Promise<void> => {
+  let rootEntries: string[];
+  try {
+    rootEntries = await readdir(dir);
+  } catch {
+    throw new ConfigError(`Template directory not found: ${dir}`);
+  }
+
+  validateEntries(EXPECTED_ROOT_ENTRIES, rootEntries);
+
+  const layersDir = join(dir, "layers");
+  let layerEntries: string[];
+  try {
+    layerEntries = await readdir(layersDir);
+  } catch {
+    throw new ConfigError(`Template layers directory not found: ${layersDir}`);
+  }
+
+  validateEntries(EXPECTED_LAYER_FILES, layerEntries);
+};
+
+const walkDir = async (
+  dir: string,
+  prefix: string,
+  files: Record<string, string>,
+  symlinks: Record<string, string>,
+): Promise<void> => {
+  let entries: string[];
+  try {
+    entries = await readdir(dir);
+  } catch {
+    return;
+  }
+
+  await Promise.all(
+    entries.map(async (name) => {
+      const fullPath = join(dir, name);
+      const relativePath = prefix === "" ? name : `${prefix}/${name}`;
+      const stat = await lstat(fullPath);
+
+      if (stat.isSymbolicLink()) {
+        symlinks[relativePath] = await readlink(fullPath);
+      } else if (stat.isFile()) {
+        files[relativePath] = await readFile(fullPath, "utf-8");
+      } else if (stat.isDirectory()) {
+        await walkDir(fullPath, relativePath, files, symlinks);
+      }
+    }),
+  );
+};
+
+const readLayerFiles = async (
+  filesDir: string,
+  layerType: string,
+  optionName: string,
+): Promise<LayerData> => {
+  const optionDir = join(filesDir, layerType, optionName);
+  const files: Record<string, string> = {};
+  const symlinks: Record<string, string> = {};
+
+  await walkDir(optionDir, "", files, symlinks);
+
+  return { files, symlinks };
+};
+
+const addLayerData = async <T extends Record<string, unknown>>(
+  parsed: T,
+  filesDir: string,
+  layerType: string,
+): Promise<{ [K in keyof T]: T[K] & LayerData }> => {
+  const entries = await Promise.all(
+    Object.keys(parsed).map(async (key) => {
+      const layerFiles = await readLayerFiles(filesDir, layerType, key);
+      const value = parsed[key] as Record<string, unknown>;
+      return [key, { ...value, ...layerFiles }] as const;
+    }),
+  );
+
+  return Object.fromEntries(entries) as { [K in keyof T]: T[K] & LayerData };
+};
+
+const loadFromDir = async (dir: string): Promise<TemplateData> => {
+  await validateStructure(dir);
+
+  try {
+    const readLayer = (name: string) => readFile(join(dir, "layers", name), "utf-8");
+    const readRoot = (name: string) => readFile(join(dir, name), "utf-8");
+    const filesDir = join(dir, "files");
+
+    const [labels, always, database, framework, packageManager, runtime, service] =
+      await Promise.all([
+        readRoot("labels.json").then((raw) => LabelsSchema.parse(JSON.parse(raw))),
+        readLayer("always.json").then((raw) => AlwaysSchema.parse(JSON.parse(raw))),
+        readLayer("database.json").then((raw) => DatabaseSchema.parse(JSON.parse(raw))),
+        readLayer("framework.json").then((raw) => FrameworkSchema.parse(JSON.parse(raw))),
+        readLayer("package-manager.json").then((raw) =>
+          PackageManagerSchema.parse(JSON.parse(raw)),
+        ),
+        readLayer("runtime.json").then((raw) => RuntimeSchema.parse(JSON.parse(raw))),
+        readLayer("service.json").then((raw) => ServiceSchema.parse(JSON.parse(raw))),
+      ]);
+
+    const [
+      alwaysWithFiles,
+      frameworkWithFiles,
+      pmWithFiles,
+      runtimeWithFiles,
+      serviceWithFiles,
+      databaseWithFiles,
+    ] = await Promise.all([
+      addLayerData(always, filesDir, "always"),
+      addLayerData(framework, filesDir, "framework"),
+      addLayerData(packageManager, filesDir, "package-manager"),
+      addLayerData(runtime, filesDir, "runtime"),
+      addLayerData(service, filesDir, "service"),
+      addLayerData(database, filesDir, "database"),
+    ]);
+
+    return {
+      labels,
+      registry: {
+        always: alwaysWithFiles,
+        frameworks: frameworkWithFiles,
+        "package-managers": pmWithFiles,
+        runtime: runtimeWithFiles,
+        services: { ...serviceWithFiles, ...databaseWithFiles },
+      },
+    };
+  } catch (err) {
+    if (err instanceof ConfigError) throw err;
+    const message = err instanceof Error ? err.message : String(err);
+    throw new ConfigError(`Template validation failed: ${message}`);
+  }
+};
+
+export { EXPECTED_LAYER_FILES, EXPECTED_ROOT_ENTRIES, loadFromDir, validateStructure };
+export type { TemplateData };

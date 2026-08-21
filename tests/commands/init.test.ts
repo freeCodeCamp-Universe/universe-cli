@@ -181,7 +181,7 @@ describe("init command", () => {
   });
 
   it("exits with EXIT_CONFIRM when an interactive prompt is cancelled", async () => {
-    const { ConfirmError } = await import("../../src/errors.js");
+    const { ConfirmError } = await import("@freecodecamp/universe-core");
     const deps = mkDeps({
       isTTY: true,
       promptText: vi.fn().mockRejectedValue(new ConfirmError("init cancelled")),

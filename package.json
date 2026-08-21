@@ -19,8 +19,8 @@
     "url": "git+https://github.com/freeCodeCamp-Universe/universe-cli.git"
   },
   "bin": {
-    "universe": "dist/index.cjs",
-    "create-constellation-app": "bin/create-constellation-app.mjs"
+    "create-constellation-app": "bin/create-constellation-app.mjs",
+    "universe": "dist/index.cjs"
   },
   "files": [
     "dist/",
@@ -28,50 +28,38 @@
     "LICENSE"
   ],
   "type": "module",
-  "exports": {
-    ".": {
-      "import": "./dist/sdk.mjs",
-      "types": "./dist/sdk.d.mts"
-    },
-    "./cli": {
-      "import": "./dist/index.mjs",
-      "types": "./dist/index.d.mts"
-    }
-  },
-  "main": "dist/index.cjs",
-  "types": "dist/sdk.d.mts",
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
-    "test": "vitest run",
+    "test": "vitest run && pnpm --filter='./packages/*' test",
     "test:smoke": "UNIVERSE_E2E_REAL=1 vitest run tests/e2e/smoke-real-artemis.test.ts",
-    "build": "tsdown",
+    "build": "pnpm --filter @freecodecamp/universe-core build && pnpm --filter @freecodecamp/universe-create build && tsdown",
     "lint": "oxlint src tests",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && pnpm --filter './packages/*' typecheck",
     "prepare": "husky",
     "dev": "tsx src/index.ts",
     "fmt": "oxfmt",
     "fmt:check": "oxfmt --check"
   },
-  "dependencies": {
-    "@clack/prompts": "^1.5.0",
-    "commander": "14.0.3",
-    "semver": "^7.8.5",
-    "yaml": "^2.9.0",
-    "zod": "^4.4.3"
-  },
   "devDependencies": {
+    "@clack/prompts": "^1.5.0",
+    "@freecodecamp/universe-core": "workspace:*",
+    "@freecodecamp/universe-create": "workspace:*",
     "@types/node": "^24.12.2",
     "@types/semver": "^7.7.1",
+    "commander": "14.0.3",
     "husky": "^9.1.7",
     "oxfmt": "^0.59.0",
     "oxlint": "^1.68.0",
     "postject": "1.0.0-alpha.6",
-    "tsdown": "0.22.1",
+    "semver": "^7.8.5",
+    "tsdown": "0.22.14",
     "tsx": "4.22.4",
     "typescript": "^5.9.3",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "yaml": "^2.9.0",
+    "zod": "^4.4.3"
   },
   "engines": {
     "node": ">=24.0.0"
