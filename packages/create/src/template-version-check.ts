@@ -14,7 +14,7 @@ import {
   ttlMs,
   useColor,
   maxSatisfying,
-} from "./version-utils.js";
+} from "@freecodecamp/universe-core";
 
 const cliVersion = pkg.version;
 const CACHE_FILE = "template-version-check.json";
