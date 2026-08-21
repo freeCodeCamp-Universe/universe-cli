@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -59,7 +59,7 @@ describe("CLI module", () => {
 });
 
 describe("top-level CLI", () => {
-  let stdoutSpy: ReturnType<typeof vi.spyOn>;
+  let stdoutSpy: MockInstance;
   let output: string;
 
   beforeEach(() => {
@@ -298,6 +298,7 @@ describe("universe static namespace", () => {
     expect(output).toContain("--json");
     expect(output).toContain("--promote");
     expect(output).toContain("--dir");
+    expect(output).toContain("--no-reuse");
   });
 
   it("global --json BEFORE 'static' still routes to staticCli (F6)", async () => {
@@ -312,6 +313,20 @@ describe("universe static namespace", () => {
     run(["node", "universe", "static", "deploy", "--json", "--promote"]);
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(mockDeploy).toHaveBeenCalledWith(expect.objectContaining({ json: true, promote: true }));
+  });
+
+  it("maps --no-reuse to noReuse: true", async () => {
+    mockDeploy.mockResolvedValue(undefined);
+    run(["node", "universe", "static", "deploy", "--promote", "--no-reuse"]);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(mockDeploy).toHaveBeenCalledWith(expect.objectContaining({ noReuse: true }));
+  });
+
+  it("leaves noReuse false when --no-reuse is absent", async () => {
+    mockDeploy.mockResolvedValue(undefined);
+    run(["node", "universe", "static", "deploy", "--promote"]);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(mockDeploy).toHaveBeenCalledWith(expect.objectContaining({ noReuse: false }));
   });
 });
 

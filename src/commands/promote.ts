@@ -13,6 +13,7 @@ import {
   type ProxyClient,
   type ProxyClientConfig,
 } from "../lib/proxy-client.js";
+import { deployIdSentinelSource } from "../deploy/stamp.js";
 import { buildEnvelope } from "../output/envelope.js";
 import { exitWithCode } from "../output/exit-codes.js";
 import { emitJson, outputError } from "../output/format.js";
@@ -30,6 +31,7 @@ export interface PromoteDeps {
   resolveIdentity?: typeof defaultResolveIdentity;
   createProxyClient?: (cfg: ProxyClientConfig) => ProxyClient;
   logSuccess?: (msg: string) => void;
+  logWarn?: (msg: string) => void;
   logError?: (msg: string) => void;
   exit?: (code: number) => never;
   promptConfirm?: (msg: string) => Promise<boolean>;
@@ -70,6 +72,7 @@ export async function promote(options: PromoteOptions, deps: PromoteDeps = {}): 
   const resolveId = deps.resolveIdentity ?? defaultResolveIdentity;
   const mkClient = deps.createProxyClient ?? defaultCreateProxyClient;
   const success = deps.logSuccess ?? ((s: string) => log.success(s));
+  const warn = deps.logWarn ?? ((s: string) => log.warn(s));
   const error = deps.logError ?? ((s: string) => log.error(s));
   const exit = deps.exit ?? exitWithCode;
   const promptConfirm = deps.promptConfirm ?? defaultPromptConfirm;
@@ -165,12 +168,20 @@ export async function promote(options: PromoteOptions, deps: PromoteDeps = {}): 
       }
     }
 
+    const sentinel = deployIdSentinelSource(result.deployId);
+    if (sentinel !== null && !options.json) {
+      warn(
+        `${result.deployId} is stamped ${sentinel}, so this production build is not reproducible from a commit.`,
+      );
+    }
+
     if (options.json) {
       emitJson(
         buildEnvelope("promote", true, {
           deployId: result.deployId,
           url: result.url,
           site: config.site,
+          shaSource: sentinel ?? "unverified",
           identitySource: identity.source,
         }),
       );

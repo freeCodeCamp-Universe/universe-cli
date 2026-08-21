@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi, type Mock } from "vitest";
 import { rollback } from "../../src/commands/rollback.js";
 import { AliasDriftError, ProxyError } from "../../src/lib/proxy-client.js";
 
@@ -37,7 +37,7 @@ interface FakeDeps {
   createProxyClient: ReturnType<typeof vi.fn>;
   logSuccess: ReturnType<typeof vi.fn>;
   logError: ReturnType<typeof vi.fn>;
-  exit: ReturnType<typeof vi.fn>;
+  exit: Mock<(code: number) => never>;
   promptConfirm: ReturnType<typeof vi.fn>;
 }
 
@@ -53,7 +53,7 @@ function mkDeps(overrides: Partial<FakeDeps> = {}): FakeDeps {
     createProxyClient: vi.fn().mockReturnValue(mkProxy()),
     logSuccess: vi.fn(),
     logError: vi.fn(),
-    exit: vi.fn().mockImplementation((_code: number) => {
+    exit: vi.fn((_code: number): never => {
       throw new Error("__exit__");
     }),
     promptConfirm: vi.fn().mockResolvedValue(false),

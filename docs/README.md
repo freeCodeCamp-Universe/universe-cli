@@ -99,7 +99,7 @@ Node 24+ required.
 | ----------------- | ----------------------------------------------------------- |
 | `pnpm install`    | Install dependencies.                                       |
 | `pnpm lint`       | oxlint.                                                     |
-| `pnpm typecheck`  | `tsc --noEmit`.                                             |
+| `pnpm typecheck`  | `tsc --noEmit` for `src`, then `tsconfig.test.json` for `tests`. |
 | `pnpm test`       | vitest run (includes the in-process E2E layer).             |
 | `pnpm build`      | tsdown → `dist/`.                                           |
 | `pnpm test:smoke` | Opt-in: real-artemis smoke against `uploads.freecode.camp`. |

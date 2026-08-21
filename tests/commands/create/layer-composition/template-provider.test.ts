@@ -17,6 +17,19 @@ describe("loadFromDir", () => {
     await rm(tmpDir, { force: true, recursive: true });
   });
 
+  it("keeps every layer map in its declared key order across repeated loads", async () => {
+    const declared = {
+      runtime: ["node", "static_web"],
+      frameworks: ["express", "html-css-js", "react-vite", "tanstack-shadcn", "typescript"],
+    };
+
+    for (let i = 0; i < 12; i += 1) {
+      const { registry } = await loadFromDir(FIXTURES_DIR);
+      expect(Object.keys(registry.runtime)).toEqual(declared.runtime);
+      expect(Object.keys(registry.frameworks)).toEqual(declared.frameworks);
+    }
+  });
+
   it("loads layers from a valid directory", async () => {
     const { labels, registry } = await loadFromDir(FIXTURES_DIR);
 

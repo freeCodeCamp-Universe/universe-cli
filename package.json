@@ -37,7 +37,7 @@
     "test:smoke": "UNIVERSE_E2E_REAL=1 vitest run tests/e2e/smoke-real-artemis.test.ts",
     "build": "tsdown",
     "lint": "oxlint src tests",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json --noEmit",
     "prepare": "husky",
     "dev": "tsx src/index.ts",
     "fmt": "oxfmt",

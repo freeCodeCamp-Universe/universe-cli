@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi, type Mock } from "vitest";
 import { init, repoNameFromRemote, sanitizeSite } from "../../src/commands/init.js";
 
 interface FakeDeps {
@@ -13,7 +13,7 @@ interface FakeDeps {
   logSuccess: ReturnType<typeof vi.fn>;
   logInfo: ReturnType<typeof vi.fn>;
   logError: ReturnType<typeof vi.fn>;
-  exit: ReturnType<typeof vi.fn>;
+  exit: Mock<(code: number) => never>;
 }
 
 function mkDeps(overrides: Partial<FakeDeps> = {}): FakeDeps {
@@ -31,7 +31,7 @@ function mkDeps(overrides: Partial<FakeDeps> = {}): FakeDeps {
     logSuccess: vi.fn(),
     logInfo: vi.fn(),
     logError: vi.fn(),
-    exit: vi.fn().mockImplementation((_code: number) => {
+    exit: vi.fn((_code: number): never => {
       throw new Error("__exit__");
     }),
     ...overrides,

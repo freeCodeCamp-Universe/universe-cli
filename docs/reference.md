@@ -29,12 +29,33 @@ Every `universe` command, flag, exit code, and environment variable. Task walkth
 
 | Command                    | Flags                                  | Purpose                                                                                                                           |
 | -------------------------- | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `universe static deploy`   | `--promote`, `--dir <path>`, `--json`  | Build (if `build.command` set) and upload to **preview**. `--promote` finalizes as production.                                    |
-| `universe static promote`  | `--from <deployId>`, `--json`          | Re-point production at the current preview, or at `--from`.                                                                       |
+| `universe static deploy`   | `--promote`, `--dir <path>`, `--no-reuse`, `--json` | Build (if `build.command` set) and upload to **preview**. `--promote` finalizes as production.                                    |
+| `universe static promote`  | `--from <deployId>`, `--json`          | Re-point production at the current preview, or at `--from`. Never reads git state and never rebuilds.                             |
 | `universe static rollback` | `--to <deployId>` (required), `--json` | Rewrite the production alias to a past deploy id.                                                                                 |
 | `universe static ls`       | `--site <slug>`, `--json`              | Recent deploys for the `platform.yaml` site, or `--site`. A `STATE` column flags `preview` / `production` / `preview+production`. |
 
-Deploy ids are `YYYYMMDD-HHMMSS-<gitsha>` (or `nogit-<ts>` outside a git repo). `deploy --promote` is idempotent on an unchanged commit: when the working tree is clean and the current preview deploy is already at `HEAD`, it promotes that exact build (the one you previewed) instead of rebuilding and re-uploading a duplicate — the `--json` envelope flags this with `reusedPreview: true`. `promote`/`rollback` send a compare-and-swap guard; a concurrent change returns `alias_drift` (interactive retry, or exit 10 + `current` field under `--json`). `static ls` cross-references the preview and production aliases so each row shows whether it is the current `preview`, `production`, both, or neither (a superseded build); `--json` adds a per-deploy `state` plus a top-level `aliases` object. Source: `src/commands/{deploy,promote,rollback,ls}.ts`.
+Deploy ids are `YYYYMMDD-HHMMSS-<sha7>`. artemis truncates the sha to seven characters (`internal/r2/r2.go:422-425`), so the CLI mints every non-commit sha at exactly seven characters. Four stamps exist, and the `--json` envelope names the one in force through `shaSource`:
+
+| `shaSource` | sha sent      | when                                        |
+| ----------- | ------------- | ------------------------------------------- |
+| `head`      | the full HEAD hash | clean tree, no `--dir`                 |
+| `dirty`     | `dty` + 4 random base36 | working tree has uncommitted changes |
+| `dirover`   | `dov` + 4 random base36 | `--dir` overrode `build.output` on a clean tree |
+| `synthetic` | `nog` + 4 random base36 | not a git repository                 |
+
+The three sentinels are deliberately not hex, so no commit hash can ever prefix-match one, and each carries four random characters drawn from a 36^4 space, so two deploys in the same second collide with probability about 1 in 1.7 million. artemis mints the id without a collision check (`internal/handler/deploy.go:82`), so that residual chance is the whole guard. The stamps are checked in the order `synthetic`, `dirty`, `dirover`, `head`, and the first match wins. So a `--dir` build outside a git repository stamps `synthetic`, and a `--dir` build on a dirty tree stamps `dirty` — `dirover` needs both a commit and a clean tree.
+
+A sentinel replaces the commit in the deploy id, so the id alone no longer says which commit produced the build. When a commit exists the `--json` envelope keeps it in a `headSha` field and the text summary prints a `Commit:` line, so the mapping survives in CI logs even though artemis records only the stamped sha. `headSha` is absent when the stamp is `head` (the sha already is the commit) and outside a git repository (there is no commit).
+
+Two limits are worth knowing. First, a clean tree at the same commit does not prove the same bytes: an environment variable or a gitignored file can change the build while `git status --porcelain` stays empty, and nothing detects that — `--no-reuse` is the manual opt-out. Second, previews minted by a CLI older than this change carry a commit sha even when they were built from a dirty tree, so the reuse fast path can still match one. That window closes for a site once it has deployed with a CLI carrying the stamps above.
+
+`deploy --promote` is idempotent on an unchanged commit: when the working tree is clean and the current preview deploy is already at `HEAD`, it promotes that exact build (the one you previewed) instead of rebuilding and re-uploading a duplicate. The `--json` envelope always carries `reusedPreview`: `true` on that fast path, `false` on a rebuild. `fileCount` and `totalSize` count what **this invocation uploaded**, so the reuse fast path reports `0` for both — the promoted deploy still holds its original files.
+
+Pass `--no-reuse` to opt out explicitly — use it when the build reads an input git cannot see, such as an environment variable or a gitignored file, so a clean tree at the same commit no longer means the same bytes. `--no-reuse` applies to that one invocation only. It does not change the deploy id, and `--promote` never repoints the preview alias, so a later bare `deploy --promote` at the same commit can still reuse the older preview. Any stamp other than `head` also opts out, in both directions: the preview cannot be reused, and the build cannot be reused later.
+
+`static promote` is a pure alias rewrite. It never reads git state and never rebuilds, so it promotes whatever the preview alias holds, stamp and all. When the deploy it promotes carries a sentinel stamp it prints a warning, and `--json` reports that stamp in a `shaSource` field. Otherwise `shaSource` is `unverified`: `promote` reads only the deploy id, so it can recognise a stamp this CLI minted but can never prove that a hex sha really came from a clean tree at that commit. Only the `deploy` envelope reports `head`.
+
+`promote`/`rollback` send a compare-and-swap guard; a concurrent change returns `alias_drift` (interactive retry, or exit 10 + `current` field under `--json`). `static ls` cross-references the preview and production aliases so each row shows whether it is the current `preview`, `production`, both, or neither (a superseded build); `--json` adds a per-deploy `state` plus a top-level `aliases` object. Source: `src/commands/{deploy,promote,rollback,ls}.ts`, `src/deploy/stamp.ts`.
 
 ### `sites` — registry (staff-gated writes)
 

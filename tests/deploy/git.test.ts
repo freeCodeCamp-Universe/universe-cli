@@ -20,7 +20,7 @@ describe("getGitState", () => {
       return "";
     });
 
-    const state = getGitState();
+    const state = getGitState("/repo");
     expect(state).toEqual({ hash: "abc1234def5678", dirty: false });
   });
 
@@ -31,21 +31,48 @@ describe("getGitState", () => {
       return "";
     });
 
-    const state = getGitState();
+    const state = getGitState("/repo");
     expect(state).toEqual({ hash: "abc1234def5678", dirty: true });
   });
 
-  it("returns null hash with error when not in a git repo", () => {
-    mockedExecSync.mockImplementation(() => {
-      throw new Error("fatal: not a git repository");
+  it("never lets git write to the parent stderr", () => {
+    const seen: Array<{ stdio?: unknown }> = [];
+    mockedExecSync.mockImplementation((cmd: string, opts?: { stdio?: unknown }) => {
+      seen.push({ stdio: opts?.stdio });
+      if (cmd === "git rev-parse HEAD") return "abc1234def5678\n";
+      return "";
     });
 
-    const state = getGitState();
-    expect(state).toEqual({
-      hash: null,
-      dirty: false,
-      error: "not a git repository",
+    getGitState("/repo");
+
+    expect(seen.length).toBeGreaterThan(0);
+    for (const call of seen) {
+      expect(call.stdio).toEqual(["ignore", "pipe", "ignore"]);
+    }
+  });
+
+  it("returns a null hash when not in a repo", () => {
+    mockedExecSync.mockImplementation(() => {
+      throw new Error("fatal: not a git repository (or any of the parent directories): .git");
     });
+
+    expect(getGitState("/repo")).toEqual({ hash: null, dirty: false });
+  });
+
+  it("returns a null hash when the directory does not exist", () => {
+    mockedExecSync.mockImplementation(() => {
+      throw new Error("spawnSync /bin/sh ENOENT");
+    });
+
+    expect(getGitState("/no/such/dir")).toEqual({ hash: null, dirty: false });
+  });
+
+  it("returns a null hash on a non-Error throw", () => {
+    mockedExecSync.mockImplementation(() => {
+      throw "git exploded";
+    });
+
+    expect(getGitState("/repo")).toEqual({ hash: null, dirty: false });
   });
 
   it("trims whitespace from git hash", () => {
@@ -55,7 +82,22 @@ describe("getGitState", () => {
       return "";
     });
 
-    const state = getGitState();
+    const state = getGitState("/repo");
     expect(state.hash).toBe("fedcba9876543");
+  });
+  it("reads git state from the given directory, not process.cwd()", () => {
+    const seen: Array<{ cmd: string; cwd: unknown }> = [];
+    mockedExecSync.mockImplementation((cmd: string, opts?: { cwd?: string | URL }) => {
+      seen.push({ cmd, cwd: opts?.cwd });
+      if (cmd === "git rev-parse HEAD") return "abc1234def5678\n";
+      return "";
+    });
+
+    getGitState("/some/project/dir");
+
+    expect(seen.length).toBeGreaterThan(0);
+    for (const call of seen) {
+      expect(call.cwd).toBe("/some/project/dir");
+    }
   });
 });

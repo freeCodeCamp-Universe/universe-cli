@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi, type Mock } from "vitest";
 import { deploy } from "../../src/commands/deploy.js";
 import { ProxyError } from "../../src/lib/proxy-client.js";
 
@@ -17,7 +17,7 @@ interface FakeDeps {
   logInfo: ReturnType<typeof vi.fn>;
   logWarn: ReturnType<typeof vi.fn>;
   logError: ReturnType<typeof vi.fn>;
-  exit: ReturnType<typeof vi.fn>;
+  exit: Mock<(code: number) => never>;
 }
 
 function mkSpinner(): {
@@ -111,7 +111,7 @@ function mkDeps(overrides: Partial<FakeDeps> = {}): FakeDeps {
     logInfo: vi.fn(),
     logWarn: vi.fn(),
     logError: vi.fn(),
-    exit: vi.fn().mockImplementation((_code: number) => {
+    exit: vi.fn((_code: number): never => {
       throw new Error("__exit__");
     }),
     ...overrides,
@@ -163,6 +163,21 @@ describe("deploy command (proxy plane)", () => {
       expect(env.url).toBe("https://my-site.preview.freecode.camp");
       expect(env.mode).toBe("preview");
       expect(env.fileCount).toBe(2);
+    });
+
+    it("emits reusedPreview: false on the rebuild path", async () => {
+      const stdout: string[] = [];
+      const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+        stdout.push(String(chunk));
+        return true;
+      });
+
+      const deps = mkDeps();
+      await deploy({ json: true }, deps);
+      writeSpy.mockRestore();
+
+      const env = JSON.parse(stdout.join("").trim());
+      expect(env.reusedPreview).toBe(false);
     });
 
     it("prints summary in text mode (deploy id + preview url)", async () => {
@@ -385,14 +400,97 @@ describe("deploy command (proxy plane)", () => {
       expect(proxy.deployInit).toHaveBeenCalled();
     });
 
-    it("falls back to a synthetic sha when no git state", async () => {
+    it("carries the HEAD commit as headSha when the stamp is a sentinel", async () => {
+      const stdout: string[] = [];
+      const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+        stdout.push(String(chunk));
+        return true;
+      });
       const deps = mkDeps({
-        getGitState: vi.fn().mockReturnValue({ hash: null, dirty: false, error: "no git" }),
+        getGitState: vi.fn().mockReturnValue({ hash: "abc1234567", dirty: true }),
+      });
+      await deploy({ json: true }, deps);
+      writeSpy.mockRestore();
+
+      const env = JSON.parse(stdout.join("").trim());
+      expect(env.shaSource).toBe("dirty");
+      expect(env.headSha).toBe("abc1234567");
+    });
+
+    it("omits headSha when the stamp is the HEAD commit", async () => {
+      const stdout: string[] = [];
+      const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+        stdout.push(String(chunk));
+        return true;
+      });
+      const deps = mkDeps();
+      await deploy({ json: true }, deps);
+      writeSpy.mockRestore();
+
+      const env = JSON.parse(stdout.join("").trim());
+      expect(env.shaSource).toBe("head");
+      expect(env).not.toHaveProperty("headSha");
+    });
+
+    it("omits headSha outside a git repository", async () => {
+      const stdout: string[] = [];
+      const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+        stdout.push(String(chunk));
+        return true;
+      });
+      const deps = mkDeps({
+        getGitState: vi.fn().mockReturnValue({ hash: null, dirty: false }),
+      });
+      await deploy({ json: true }, deps);
+      writeSpy.mockRestore();
+
+      const env = JSON.parse(stdout.join("").trim());
+      expect(env.shaSource).toBe("synthetic");
+      expect(env).not.toHaveProperty("headSha");
+    });
+
+    it("sends a dirty sentinel sha to deployInit when the working tree is dirty", async () => {
+      const deps = mkDeps({
+        getGitState: vi.fn().mockReturnValue({ hash: "abc1234567", dirty: true }),
       });
       await deploy({ json: false }, deps);
       const proxy = deps.createProxyClient.mock.results[0]?.value as ReturnType<typeof mkProxy>;
       const initArg = proxy.deployInit.mock.calls[0]?.[0] as { sha: string };
-      expect(initArg.sha).toMatch(/^nogit-/);
+      expect(initArg.sha).toMatch(/^dty[0-9a-z]{4}$/);
+    });
+
+    it("falls back to a synthetic sha when no git state", async () => {
+      const deps = mkDeps({
+        getGitState: vi.fn().mockReturnValue({ hash: null, dirty: false }),
+      });
+      await deploy({ json: false }, deps);
+      const proxy = deps.createProxyClient.mock.results[0]?.value as ReturnType<typeof mkProxy>;
+      const initArg = proxy.deployInit.mock.calls[0]?.[0] as { sha: string };
+      expect(initArg.sha).toMatch(/^nog[0-9a-z]{4}$/);
+    });
+
+    it("mints a distinct synthetic sha for two deploys in the same second", async () => {
+      const shaOnce = async (): Promise<string> => {
+        const deps = mkDeps({
+          getGitState: vi.fn().mockReturnValue({ hash: null, dirty: false }),
+        });
+        await deploy({ json: false }, deps);
+        const proxy = deps.createProxyClient.mock.results[0]?.value as ReturnType<typeof mkProxy>;
+        const initArg = proxy.deployInit.mock.calls[0]?.[0] as { sha: string } | undefined;
+        expect(initArg).toBeDefined();
+        return initArg!.sha;
+      };
+
+      const nowSpy = vi.spyOn(Date, "now").mockReturnValue(1_787_252_657_181);
+      const shas = new Set<string>();
+      try {
+        for (let i = 0; i < 25; i += 1) shas.add(await shaOnce());
+      } finally {
+        nowSpy.mockRestore();
+      }
+
+      expect(shas.size).toBe(25);
+      for (const sha of shas) expect(sha).toHaveLength(7);
     });
   });
 
@@ -784,6 +882,56 @@ describe("deploy command (proxy plane)", () => {
       expect(msg).toContain("production");
     });
 
+    it("reads git state from the deploy dir, not the process cwd", async () => {
+      const proxy = mkProxy();
+      const deps = mkDeps({
+        cwd: "/proj",
+        createProxyClient: vi.fn().mockReturnValue(proxy),
+      });
+
+      await deploy({ json: false, promote: false }, deps);
+
+      expect(deps.getGitState).toHaveBeenCalledWith("/proj");
+    });
+
+    it("stamps a synthetic sha, not dirover, when --dir runs outside a git repo", async () => {
+      const proxy = mkProxy();
+      const deps = mkDeps({
+        createProxyClient: vi.fn().mockReturnValue(proxy),
+        getGitState: vi.fn().mockReturnValue({ hash: null, dirty: false }),
+        runBuild: vi.fn().mockResolvedValue({
+          skipped: false,
+          outputDir: "/proj/build-out",
+        }),
+      });
+
+      await deploy({ json: false, dir: "build-out" }, deps);
+
+      const initArg = proxy.deployInit.mock.calls[0]?.[0] as { sha: string };
+      expect(initArg.sha).toMatch(/^nog[0-9a-z]{4}$/);
+    });
+
+    it("does not reuse the preview when the deploy dir is not a git repo", async () => {
+      const proxy = mkProxy();
+      proxy.getAlias.mockResolvedValue({
+        url: "https://my-site.preview.freecode.camp",
+        deployId: "20260512-120000-abc1234",
+      });
+      const deps = mkDeps({
+        createProxyClient: vi.fn().mockReturnValue(proxy),
+        getGitState: vi
+          .fn()
+          .mockReturnValue({ hash: null, dirty: false, error: "not a git repository" }),
+      });
+
+      await deploy({ json: false, promote: true }, deps);
+
+      expect(proxy.sitePromote).not.toHaveBeenCalled();
+      expect(deps.runBuild).toHaveBeenCalled();
+      expect(proxy.deployInit).toHaveBeenCalled();
+      expect(deps.uploadFiles).toHaveBeenCalled();
+    });
+
     it("emits reusedPreview in the JSON envelope", async () => {
       const proxy = mkProxy();
       proxy.getAlias.mockResolvedValue({
@@ -826,6 +974,153 @@ describe("deploy command (proxy plane)", () => {
       await deploy({ json: false, promote: true }, deps);
       expect(deps.runBuild).toHaveBeenCalled();
       expect(proxy.sitePromote).not.toHaveBeenCalled();
+    });
+
+    it("does NOT dedup when --no-reuse is passed", async () => {
+      const proxy = mkProxy();
+      proxy.getAlias.mockResolvedValue({
+        url: "https://my-site.preview.freecode.camp",
+        deployId: "20260512-120000-abc1234",
+      });
+      const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
+
+      await deploy({ json: false, promote: true, noReuse: true }, deps);
+
+      expect(proxy.sitePromote).not.toHaveBeenCalled();
+      expect(deps.runBuild).toHaveBeenCalled();
+      expect(proxy.deployInit).toHaveBeenCalled();
+    });
+
+    it("reports zero uploads on the reuse envelope", async () => {
+      const proxy = mkProxy();
+      proxy.getAlias.mockResolvedValue({
+        url: "https://my-site.preview.freecode.camp",
+        deployId: "20260512-120000-abc1234",
+      });
+      proxy.sitePromote.mockResolvedValue({
+        url: "https://my-site.freecode.camp",
+        deployId: "20260512-120000-abc1234",
+      });
+      const stdout: string[] = [];
+      const spy = vi.spyOn(process.stdout, "write").mockImplementation((c) => {
+        stdout.push(String(c));
+        return true;
+      });
+      const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
+
+      await deploy({ json: true, promote: true }, deps);
+      spy.mockRestore();
+
+      const env = JSON.parse(stdout.join("")) as Record<string, unknown>;
+      expect(env["reusedPreview"]).toBe(true);
+      expect(env["fileCount"]).toBe(0);
+      expect(env["totalSize"]).toBe(0);
+    });
+
+    it("names the dirty stamp in the warning", async () => {
+      const deps = mkDeps({
+        getGitState: vi.fn().mockReturnValue({ hash: "abc1234567", dirty: true }),
+      });
+
+      await deploy({ json: false }, deps);
+
+      expect(deps.logWarn).toHaveBeenCalledWith(
+        expect.stringMatching(/stamped dty[0-9a-z]{4}, not the HEAD commit/),
+      );
+    });
+
+    it("does NOT dedup when --dir was passed explicitly", async () => {
+      const proxy = mkProxy();
+      proxy.getAlias.mockResolvedValue({
+        url: "https://my-site.preview.freecode.camp",
+        deployId: "20260512-120000-abc1234",
+      });
+      proxy.sitePromote.mockResolvedValue({
+        url: "https://my-site.freecode.camp",
+        deployId: "20260512-120000-abc1234",
+      });
+      const deps = mkDeps({
+        createProxyClient: vi.fn().mockReturnValue(proxy),
+        runBuild: vi.fn().mockResolvedValue({
+          skipped: false,
+          outputDir: "/proj/build-out",
+        }),
+      });
+
+      await deploy({ json: false, promote: true, dir: "build-out" }, deps);
+
+      expect(proxy.sitePromote).not.toHaveBeenCalled();
+      const arg = deps.runBuild.mock.calls[0]?.[0] as { outputDir: string };
+      expect(arg.outputDir).toBe("build-out");
+      expect(proxy.deployInit).toHaveBeenCalled();
+    });
+
+    it("does NOT dedup a preview that was built from a dirty tree at the same commit", async () => {
+      const head = "abc1234567";
+      const mintDeployId = (sha: string): string => `20260512-120000-${sha.slice(0, 7)}`;
+
+      const dirtyProxy = mkProxy();
+      const dirtyDeps = mkDeps({
+        createProxyClient: vi.fn().mockReturnValue(dirtyProxy),
+        getGitState: vi.fn().mockReturnValue({ hash: head, dirty: true }),
+      });
+      await deploy({ json: false }, dirtyDeps);
+      const dirtyInitArg = dirtyProxy.deployInit.mock.calls[0]?.[0] as { sha: string };
+      const stamped = dirtyInitArg.sha;
+
+      const cleanProxy = mkProxy();
+      cleanProxy.getAlias.mockResolvedValue({
+        url: "https://my-site.preview.freecode.camp",
+        deployId: mintDeployId(stamped),
+      });
+      cleanProxy.sitePromote.mockResolvedValue({
+        url: "https://my-site.freecode.camp",
+        deployId: mintDeployId(stamped),
+      });
+      const cleanDeps = mkDeps({
+        createProxyClient: vi.fn().mockReturnValue(cleanProxy),
+        getGitState: vi.fn().mockReturnValue({ hash: head, dirty: false }),
+      });
+      await deploy({ json: false, promote: true }, cleanDeps);
+
+      expect(cleanProxy.sitePromote).not.toHaveBeenCalled();
+      expect(cleanDeps.runBuild).toHaveBeenCalled();
+    });
+
+    it("does NOT dedup a preview that was built with a --dir override at the same commit", async () => {
+      const head = "abc1234567";
+      const mintDeployId = (sha: string): string => `20260512-120000-${sha.slice(0, 7)}`;
+
+      const previewProxy = mkProxy();
+      const previewDeps = mkDeps({
+        createProxyClient: vi.fn().mockReturnValue(previewProxy),
+        getGitState: vi.fn().mockReturnValue({ hash: head, dirty: false }),
+        runBuild: vi.fn().mockResolvedValue({
+          skipped: false,
+          outputDir: "/proj/build-out",
+        }),
+      });
+      await deploy({ json: false, dir: "build-out" }, previewDeps);
+      const previewInitArg = previewProxy.deployInit.mock.calls[0]?.[0] as { sha: string };
+      const stamped = previewInitArg.sha;
+
+      const promoteProxy = mkProxy();
+      promoteProxy.getAlias.mockResolvedValue({
+        url: "https://my-site.preview.freecode.camp",
+        deployId: mintDeployId(stamped),
+      });
+      promoteProxy.sitePromote.mockResolvedValue({
+        url: "https://my-site.freecode.camp",
+        deployId: mintDeployId(stamped),
+      });
+      const promoteDeps = mkDeps({
+        createProxyClient: vi.fn().mockReturnValue(promoteProxy),
+        getGitState: vi.fn().mockReturnValue({ hash: head, dirty: false }),
+      });
+      await deploy({ json: false, promote: true }, promoteDeps);
+
+      expect(promoteProxy.sitePromote).not.toHaveBeenCalled();
+      expect(promoteDeps.runBuild).toHaveBeenCalled();
     });
 
     it("does NOT dedup when the preview sha differs from HEAD", async () => {
