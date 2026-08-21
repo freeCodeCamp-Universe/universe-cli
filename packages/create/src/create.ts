@@ -1,4 +1,5 @@
 import { existsSync } from "node:fs";
+import { join } from "node:path";
 import type { Step, StepResponse } from "@freecodecamp/universe-core";
 import type { ProjectWriter } from "./io/project-writer.port.js";
 import {
@@ -142,9 +143,10 @@ async function* create(
   const { labels, registry } = await loadLayersFn(templateDir);
 
   const layerResolver = deps.layerResolver ?? new LayerCompositionService(labels, registry);
+  const toTarget = (path: string) => join(cwd, path)
   const validator =
     deps.validator ??
-    new CreateInputValidationService((path) => existsSync(path), registry.runtime);
+    new CreateInputValidationService((path) => existsSync(toTarget(path)), registry.runtime);
 
   let selections: CreateSelections;
 
@@ -341,7 +343,7 @@ async function* create(
 
   yield { type: "progress", message: "Composing project layers" };
   const resolvedLayers = layerResolver.resolveLayers(validatedInput);
-  const targetDirectory = `${cwd}/${validatedInput.name}`;
+  const targetDirectory = toTarget(validatedInput.name);
 
   yield { type: "progress", message: "Writing project files" };
   await filesystemWriter.writeProject(targetDirectory, resolvedLayers.files);
