@@ -4,26 +4,19 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { run, isVersionRequest } from "../src/cli.js";
 
-vi.mock("../src/output/format.js", async () => {
-  const actual =
-    await vi.importActual<typeof import("../src/output/format.js")>("../src/output/format.js");
-  return {
-    ...actual,
-    outputError: vi.fn(actual.outputError),
-  };
-});
-vi.mock("../src/output/exit-codes.js", async () => {
-  const actual = await vi.importActual<typeof import("../src/output/exit-codes.js")>(
-    "../src/output/exit-codes.js",
+vi.mock("@freecodecamp/universe-core", async () => {
+  const actual = await vi.importActual<typeof import("@freecodecamp/universe-core")>(
+    "@freecodecamp/universe-core",
   );
   return {
     ...actual,
     exitWithCode: vi.fn(),
+    outputError: vi.fn(actual.outputError),
   };
 });
 
-import { outputError } from "../src/output/format.js";
-import { exitWithCode } from "../src/output/exit-codes.js";
+import { outputError } from "@freecodecamp/universe-core";
+import { exitWithCode } from "@freecodecamp/universe-core";
 
 const mockOutputError = vi.mocked(outputError);
 const mockExitWithCode = vi.mocked(exitWithCode);
@@ -186,8 +179,8 @@ describe("top-level error handling", () => {
   });
 
   it("maps CliError subclasses to their declared exit code", async () => {
-    const { ConfigError } = await import("../src/errors.js");
-    const { EXIT_CONFIG, EXIT_USAGE } = await import("../src/output/exit-codes.js");
+    const { ConfigError } = await import("@freecodecamp/universe-core");
+    const { EXIT_CONFIG, EXIT_USAGE } = await import("@freecodecamp/universe-core");
     const err = new ConfigError("bad platform.yaml");
     mockDeploy.mockRejectedValue(err);
 
@@ -203,7 +196,7 @@ describe("top-level error handling", () => {
   });
 
   it("falls back to EXIT_USAGE for raw Error instances", async () => {
-    const { EXIT_USAGE } = await import("../src/output/exit-codes.js");
+    const { EXIT_USAGE } = await import("@freecodecamp/universe-core");
     const err = new Error("mystery failure");
     mockDeploy.mockRejectedValue(err);
 
@@ -246,8 +239,8 @@ describe("top-level error handling", () => {
   });
 
   it("routes login errors through outputError + exit code map", async () => {
-    const { ConfigError } = await import("../src/errors.js");
-    const { EXIT_CONFIG } = await import("../src/output/exit-codes.js");
+    const { ConfigError } = await import("@freecodecamp/universe-core");
+    const { EXIT_CONFIG } = await import("@freecodecamp/universe-core");
     const err = new ConfigError("missing client id");
     mockLogin.mockRejectedValue(err);
 
@@ -406,7 +399,7 @@ describe("universe repo namespace", () => {
   });
 
   it("repo approve missing <id> routes through outputError, no uncaught throw", async () => {
-    const { EXIT_USAGE } = await import("../src/output/exit-codes.js");
+    const { EXIT_USAGE } = await import("@freecodecamp/universe-core");
     expect(() => run(["node", "universe", "repo", "approve"])).not.toThrow();
     expect(mockExitWithCode).toHaveBeenCalledWith(EXIT_USAGE);
     expect(mockOutputError).toHaveBeenCalledWith(
@@ -417,7 +410,7 @@ describe("universe repo namespace", () => {
   });
 
   it("repo create unknown option routes through outputError, no throw", async () => {
-    const { EXIT_USAGE } = await import("../src/output/exit-codes.js");
+    const { EXIT_USAGE } = await import("@freecodecamp/universe-core");
     expect(() =>
       run(["node", "universe", "repo", "create", "x", "--bogus", "--yes"]),
     ).not.toThrow();
@@ -430,7 +423,7 @@ describe("universe repo namespace", () => {
   });
 
   it("bare repo --json emits a JSON error envelope, not human help", async () => {
-    const { EXIT_USAGE } = await import("../src/output/exit-codes.js");
+    const { EXIT_USAGE } = await import("@freecodecamp/universe-core");
     run(["node", "universe", "repo", "--json"]);
     expect(mockOutputError).toHaveBeenCalledWith(
       expect.objectContaining({ command: "repo", json: true }),

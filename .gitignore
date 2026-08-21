@@ -13,3 +13,6 @@ coverage/
 
 # Claude config
 .claude
+
+# pnpm config
+.pnpm-store/

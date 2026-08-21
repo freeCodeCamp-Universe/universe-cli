@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { walkFiles } from "../../src/deploy/walk.js";
-import { StorageError } from "../../src/errors.js";
+import { StorageError } from "@freecodecamp/universe-core";
 
 describe("walkFiles", () => {
   let root: string;

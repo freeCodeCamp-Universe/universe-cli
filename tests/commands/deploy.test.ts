@@ -549,7 +549,13 @@ describe("deploy command (proxy plane)", () => {
     it("surfaces user_unauthorized hint", async () => {
       const proxy = mkProxy();
       proxy.deployInit.mockRejectedValue(
-        new ProxyError(403, "user_unauthorized", "caller is not on the required team", "req-42", "check SSO"),
+        new ProxyError(
+          403,
+          "user_unauthorized",
+          "caller is not on the required team",
+          "req-42",
+          "check SSO",
+        ),
       );
       const deps = mkDeps({
         createProxyClient: vi.fn().mockReturnValue(proxy),

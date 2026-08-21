@@ -6,7 +6,7 @@ import {
   parseFetchTimeoutMs,
   ProxyError,
 } from "../../src/lib/proxy-client.js";
-import { EXIT_CREDENTIALS, EXIT_STORAGE, EXIT_USAGE } from "../../src/output/exit-codes.js";
+import { EXIT_CREDENTIALS, EXIT_STORAGE, EXIT_USAGE } from "@freecodecamp/universe-core";
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -1175,7 +1175,6 @@ describe("createProxyClient — repo requests", () => {
     });
   });
 });
-
 
 describe("repo response validation (H2)", () => {
   it("rejects a createRepoRequest body missing required fields with exit 13", async () => {

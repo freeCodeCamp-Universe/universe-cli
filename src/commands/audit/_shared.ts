@@ -1,4 +1,4 @@
-import { CredentialError, UsageError } from "../../errors.js";
+import { CredentialError, UsageError } from "@freecodecamp/universe-core";
 import { DEFAULT_PROXY_URL } from "../../lib/constants.js";
 import { resolveIdentity as defaultResolveIdentity } from "../../lib/identity.js";
 import {

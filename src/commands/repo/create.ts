@@ -1,9 +1,9 @@
 import { log } from "@clack/prompts";
-import { ConfirmError } from "../../errors.js";
+import { ConfirmError } from "@freecodecamp/universe-core";
 import { ProxyError, type ProxyClient } from "../../lib/proxy-client.js";
-import { buildEnvelope } from "../../output/envelope.js";
-import { exitWithCode } from "../../output/exit-codes.js";
-import { emitJson, outputError } from "../../output/format.js";
+import { buildEnvelope } from "@freecodecamp/universe-core";
+import { exitWithCode } from "@freecodecamp/universe-core";
+import { emitJson, outputError } from "@freecodecamp/universe-core";
 import {
   defaultRepoPrompts,
   type RepoCommandDeps,
@@ -223,9 +223,11 @@ export async function create(
       );
     }
   } catch (err) {
-    exit(outputError({ json: options.json, command }, err, {
-      logError: error,
-      extras: identitySource ? { identitySource } : undefined,
-    }));
+    exit(
+      outputError({ json: options.json, command }, err, {
+        logError: error,
+        extras: identitySource ? { identitySource } : undefined,
+      }),
+    );
   }
 }

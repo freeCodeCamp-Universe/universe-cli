@@ -1,8 +1,8 @@
 import { log } from "@clack/prompts";
-import { UsageError } from "../../errors.js";
-import { buildEnvelope } from "../../output/envelope.js";
-import { exitWithCode } from "../../output/exit-codes.js";
-import { emitJson, outputError } from "../../output/format.js";
+import { UsageError } from "@freecodecamp/universe-core";
+import { buildEnvelope } from "@freecodecamp/universe-core";
+import { exitWithCode } from "@freecodecamp/universe-core";
+import { emitJson, outputError } from "@freecodecamp/universe-core";
 import { formatRepoTable, type RepoCommandDeps, setupClient } from "./_shared.js";
 import { repoStatusSchema } from "./schema.js";
 
@@ -59,9 +59,11 @@ export async function ls(options: RepoLsOptions, deps: RepoCommandDeps = {}): Pr
       message(formatRepoTable(rows, empty));
     }
   } catch (err) {
-    exit(outputError({ json: options.json, command }, err, {
-      logError: error,
-      extras: identitySource ? { identitySource } : undefined,
-    }));
+    exit(
+      outputError({ json: options.json, command }, err, {
+        logError: error,
+        extras: identitySource ? { identitySource } : undefined,
+      }),
+    );
   }
 }
