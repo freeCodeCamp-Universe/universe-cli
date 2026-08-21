@@ -67,8 +67,8 @@ function outputError(
   messageOrOptions?: string | OutputErrorOptions | string[],
   maybeOptions?: OutputErrorOptions | string[],
 ): number {
-  if (typeof exitCodeOrError === "number") {
-    return renderError(context, exitCodeOrError, messageOrOptions as string, maybeOptions);
+  if (typeof exitCodeOrError === "number" && typeof messageOrOptions === "string") {
+    return renderError(context, exitCodeOrError, messageOrOptions, maybeOptions);
   }
   const parsed = parseError(context.command, exitCodeOrError);
   const options = (messageOrOptions ?? {}) as OutputErrorOptions;
