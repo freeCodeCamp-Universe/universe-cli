@@ -151,7 +151,8 @@ async function* create(
   if (!isDockerAvailable()) {
     yield {
       type: "warning",
-      message: "docker is the preferred tool for scaffolding projects.\nLocal alternatives will be used where possible, but docker should be used for predictable results.",
+      message:
+        "docker is the preferred tool for scaffolding projects.\nLocal alternatives will be used where possible, but docker should be used for predictable results.",
     };
   }
 

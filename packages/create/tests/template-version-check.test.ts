@@ -3,12 +3,8 @@ import { mkdtemp, readFile, rm, writeFile, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-vi.mock("../../package.json", () => ({ default: { version: "0.0.0" } }));
+vi.mock("../../../package.json", () => ({ default: { version: "0.0.0" } }));
 
-import {
-  resolveTemplateVersions,
-  formatTemplateNotice,
-} from "../../src/lib/template-version-check.js";
 import { resolveTemplateVersions, formatTemplateNotice } from "../src/template-version-check.js";
 
 let tmp: string;
@@ -140,9 +136,7 @@ describe(resolveTemplateVersions, () => {
     // so .slice(15) yields valid semver "0.9.0" — the prefix check
     // must reject this before slicing.
     stubFetch(
-      jsonResponse(200, [
-        { tag_name: "wrong-templates0.9.0", draft: false, prerelease: false },
-      ]),
+      jsonResponse(200, [{ tag_name: "wrong-templates0.9.0", draft: false, prerelease: false }]),
     );
 
     await expect(resolveTemplateVersions(RANGE)).rejects.toThrow("No template releases found");
@@ -171,12 +165,11 @@ describe(resolveTemplateVersions, () => {
 
   it("serves from cache when fresh", async () => {
     await seedCache("1.0.0", "0.3.0", NOW - 60_000);
-    const fetchMock = vi.fn<typeof fetch>();
-    vi.stubGlobal("fetch", fetchMock);
-
+    // stubbing fetch so the test error is clear
+    stubFetch(jsonResponse(200, [release("0.1.0")]));
     const result = await resolveTemplateVersions(RANGE, NOW);
 
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fetch, "Unexpected fetch call - it should have used the cache").not.toHaveBeenCalled();
     expect(result).toEqual({ latest: "1.0.0", latestCompatible: "0.3.0" });
   });
 
@@ -200,12 +193,12 @@ describe(resolveTemplateVersions, () => {
   it("respects UNIVERSE_UPDATE_TTL_MS override", async () => {
     vi.stubEnv("UNIVERSE_UPDATE_TTL_MS", String(10 * 60 * 1000));
     await seedCache("1.0.0", "0.3.0", NOW - 5 * 60 * 1000);
-    const fetchMock = vi.fn<typeof fetch>();
-    vi.stubGlobal("fetch", fetchMock);
+    // stubbing fetch so the test error is clear
+    stubFetch(jsonResponse(200, [release("0.1.0")]));
 
     await resolveTemplateVersions(RANGE, NOW);
 
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fetch, "Unexpected fetch call - it should have used the cache").not.toHaveBeenCalled();
   });
 
   it("sends accept header for GitHub API", async () => {
@@ -218,7 +211,7 @@ describe(resolveTemplateVersions, () => {
   });
 
   it("re-fetches when CLI version changes", async () => {
-    await seedCache("1.0.0", "0.3.0", NOW - 60_000, "0.0.1" ); // default cliVersion is 0.0.0
+    await seedCache("1.0.0", "0.3.0", NOW - 60_000, "0.0.1"); // default cliVersion is 0.0.0
     const fetchMock = stubFetch(jsonResponse(200, [release("0.3.0"), release("1.0.0")]));
 
     await resolveTemplateVersions(RANGE, NOW);
