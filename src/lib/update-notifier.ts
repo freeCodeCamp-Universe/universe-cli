@@ -13,7 +13,7 @@ import {
   parseCache,
   ttlMs,
   useColor,
-} from "./version-utils.js";
+} from "@freecodecamp/universe-core";
 
 // Opt-out: UNIVERSE_NO_UPDATE_CHECK=1.
 // Cache: $XDG_CONFIG_HOME/universe-cli/update-check.json (fallback $HOME/.config/...).

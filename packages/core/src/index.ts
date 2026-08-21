@@ -49,3 +49,15 @@ export type {
   TextStep,
   WarningStep,
 } from "./interaction/step.js";
+export {
+  compareVersions,
+  isDisabled,
+  maxSatisfying,
+  paint,
+  parseCache,
+  parseTemplateCache,
+  satisfies,
+  ttlMs,
+  useColor,
+} from "./version-utils.js";
+export type { CacheShape, TemplateCacheShape, UpdateNotice } from "./version-utils.js";

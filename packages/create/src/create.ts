@@ -49,7 +49,7 @@ import { bsd3ClauseLicense } from "./layer-composition/licenses/bsd-3-clause.js"
 import { templateVersionRange } from "./layer-composition/assets.js";
 import { ensureTemplateDir } from "./layer-composition/template-fetcher.js";
 import { resolveTemplateVersions, formatTemplateNotice } from "./template-version-check.js";
-import { isDisabled } from "./version-utils.js";
+import { isDisabled } from "@freecodecamp/universe-core";
 import { isDockerAvailable } from "./docker-check.js";
 
 const PROJECT_NAME_PATTERN = /^[a-z][a-z0-9-]{2,49}$/;
