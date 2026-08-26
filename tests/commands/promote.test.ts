@@ -302,7 +302,7 @@ describe("promote provenance", () => {
     });
     const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
 
-    await promote({ json: false }, deps);
+    await promote({ json: false, allowDirty: true }, deps);
 
     expect(deps.logWarn).toHaveBeenCalledWith(
       expect.stringContaining("not reproducible from a commit"),
@@ -342,7 +342,7 @@ describe("promote provenance", () => {
     });
     const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
 
-    await promote({ json: false, from: "20260512-090000-dov9z8y" }, deps);
+    await promote({ json: false, from: "20260512-090000-dov9z8y", allowDirty: true }, deps);
 
     expect(deps.logWarn).toHaveBeenCalledWith(
       expect.stringContaining("not reproducible from a commit"),
@@ -367,10 +367,82 @@ describe("promote provenance", () => {
     });
     const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
 
-    await promote({ json: true }, deps);
+    await promote({ json: true, allowDirty: true }, deps);
     spy.mockRestore();
 
     const env = JSON.parse(stdout.join("").trim());
     expect(env.shaSource).toBe("dirover");
+  });
+});
+
+describe("promote --allow-dirty gate", () => {
+  it("refuses a dty-stamped preview without --allow-dirty (EXIT_GIT)", async () => {
+    const proxy = mkProxy();
+    proxy.getAlias.mockImplementation(async (req: { mode: string }) =>
+      req.mode === "preview"
+        ? { url: "https://p", deployId: "20260512-120000-dty1a2b" }
+        : { url: "https://x", deployId: "20260512-110000-abc1234" },
+    );
+    const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
+
+    await expect(promote({ json: false }, deps)).rejects.toThrow("__exit__");
+
+    expect(deps.exit).toHaveBeenCalledWith(15);
+    expect(deps.logError).toHaveBeenCalledWith(expect.stringContaining("--allow-dirty"));
+    expect(proxy.sitePromote).not.toHaveBeenCalled();
+  });
+
+  it("refuses a dov-stamped --from id without --allow-dirty (EXIT_GIT)", async () => {
+    const proxy = mkProxy();
+    const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
+
+    await expect(
+      promote({ json: false, from: "20260512-090000-dov9z8y" }, deps),
+    ).rejects.toThrow("__exit__");
+
+    expect(deps.exit).toHaveBeenCalledWith(15);
+    expect(proxy.siteRollback).not.toHaveBeenCalled();
+  });
+
+  it("promotes a dty-stamped preview with --allow-dirty and still warns", async () => {
+    const proxy = mkProxy();
+    proxy.getAlias.mockImplementation(async (req: { mode: string }) =>
+      req.mode === "preview"
+        ? { url: "https://p", deployId: "20260512-120000-dty1a2b" }
+        : { url: "https://x", deployId: "20260512-110000-abc1234" },
+    );
+    proxy.sitePromote.mockResolvedValue({
+      url: "https://my-site.freecode.camp",
+      deployId: "20260512-120000-dty1a2b",
+    });
+    const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
+
+    await promote({ json: false, allowDirty: true }, deps);
+
+    expect(proxy.sitePromote).toHaveBeenCalled();
+    expect(deps.logWarn).toHaveBeenCalledWith(
+      expect.stringContaining("not reproducible from a commit"),
+    );
+  });
+
+  it("keeps a nog-stamped preview warn-only without --allow-dirty", async () => {
+    const proxy = mkProxy();
+    proxy.getAlias.mockImplementation(async (req: { mode: string }) =>
+      req.mode === "preview"
+        ? { url: "https://p", deployId: "20260512-120000-nog1a2b" }
+        : { url: "https://x", deployId: "20260512-110000-abc1234" },
+    );
+    proxy.sitePromote.mockResolvedValue({
+      url: "https://my-site.freecode.camp",
+      deployId: "20260512-120000-nog1a2b",
+    });
+    const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
+
+    await promote({ json: false }, deps);
+
+    expect(proxy.sitePromote).toHaveBeenCalled();
+    expect(deps.logWarn).toHaveBeenCalledWith(
+      expect.stringContaining("not reproducible from a commit"),
+    );
   });
 });

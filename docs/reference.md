@@ -30,7 +30,7 @@ Every `universe` command, flag, exit code, and environment variable. Task walkth
 | Command                    | Flags                                  | Purpose                                                                                                                           |
 | -------------------------- | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
 | `universe static deploy`   | `--promote`, `--dir <path>`, `--no-reuse`, `--allow-dirty`, `--json` | Build (if `build.command` set) and upload to **preview**. `--promote` finalizes as production.                                    |
-| `universe static promote`  | `--from <deployId>`, `--json`          | Re-point production at the current preview, or at `--from`. Never reads git state and never rebuilds.                             |
+| `universe static promote`  | `--from <deployId>`, `--allow-dirty`, `--json` | Re-point production at the current preview, or at `--from`. Never reads git state and never rebuilds.                             |
 | `universe static rollback` | `--to <deployId>` (required), `--json` | Rewrite the production alias to a past deploy id.                                                                                 |
 | `universe static ls`       | `--site <slug>`, `--json`              | Recent deploys for the `platform.yaml` site, or `--site`. A `STATE` column flags `preview` / `production` / `preview+production`. |
 

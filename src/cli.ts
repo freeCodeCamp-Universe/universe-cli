@@ -318,12 +318,14 @@ export async function run(argv = process.argv): Promise<void> {
     .command("promote")
     .description("Promote the current preview to production")
     .option("--from <deployId>", "Promote a specific past deploy id (alias rewrite)")
+    .option("--allow-dirty", "Promote a deploy stamped from a dirty tree or a --dir override")
     .action(async (_opts, cmd: Command) => {
-      const opts = cmd.optsWithGlobals<{ json?: boolean; from?: string }>();
+      const opts = cmd.optsWithGlobals<{ json?: boolean; from?: string; allowDirty?: boolean }>();
       try {
         await promote({
           json: opts.json ?? false,
           from: opts.from,
+          allowDirty: opts.allowDirty ?? false,
         });
       } catch (err: unknown) {
         handleActionError("promote", opts.json ?? false, err);

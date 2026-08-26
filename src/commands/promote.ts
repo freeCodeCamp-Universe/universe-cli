@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { confirm, isCancel, log } from "@clack/prompts";
-import { ConfigError, CredentialError } from "../errors.js";
+import { ConfigError, CredentialError, GitError } from "../errors.js";
 import { DEFAULT_PROXY_URL } from "../lib/constants.js";
 import { resolveIdentity as defaultResolveIdentity } from "../lib/identity.js";
 import { parsePlatformYaml, type PlatformYamlV2 } from "../lib/platform-yaml.js";
@@ -22,6 +22,7 @@ export interface PromoteOptions {
   json: boolean;
   /** Promote a specific deploy id instead of the current preview alias. */
   from?: string;
+  allowDirty?: boolean;
 }
 
 export interface PromoteDeps {
@@ -65,6 +66,15 @@ async function readAndParseConfig(
   return r.value;
 }
 
+function assertPromotable(deployId: string, allowDirty: boolean): void {
+  const sentinel = deployIdSentinelSource(deployId);
+  if ((sentinel === "dirty" || sentinel === "dirover") && !allowDirty) {
+    throw new GitError(
+      `${deployId} is stamped ${sentinel} — it was not built from a commit at HEAD. Pass --allow-dirty to promote it anyway.`,
+    );
+  }
+}
+
 export async function promote(options: PromoteOptions, deps: PromoteDeps = {}): Promise<void> {
   const cwd = deps.cwd ?? process.cwd();
   const env = deps.env ?? process.env;
@@ -96,6 +106,7 @@ export async function promote(options: PromoteOptions, deps: PromoteDeps = {}): 
 
     let result: { url: string; deployId: string };
     if (options.from) {
+      assertPromotable(options.from, options.allowDirty ?? false);
       // Per ADR-016: artemis promote endpoint copies preview alias to
       // production. To promote a *specific* prior deploy id, the alias
       // must be rewritten directly — the rollback endpoint is the
@@ -137,6 +148,7 @@ export async function promote(options: PromoteOptions, deps: PromoteDeps = {}): 
       if (preview === null) {
         throw new ConfigError("no preview alias to promote — run `universe static deploy` first");
       }
+      assertPromotable(preview.deployId, options.allowDirty ?? false);
       const prod = await client.getAlias({
         site: config.site,
         mode: "production",
