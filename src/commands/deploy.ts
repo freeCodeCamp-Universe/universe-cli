@@ -255,6 +255,11 @@ export async function deploy(options: DeployOptions, deps: DeployDeps = {}): Pro
         "git working tree is dirty — refusing to deploy uncommitted files. Commit them, or pass --allow-dirty to deploy anyway.",
       );
     }
+    if (shaSource === "dirover" && !options.allowDirty) {
+      throw new GitError(
+        "--dir replaces build.output, so the upload cannot be traced to HEAD. Pass --allow-dirty to deploy it anyway.",
+      );
+    }
     if (git.dirty && !options.json) {
       warn(`git working tree is dirty — this deploy is stamped ${sha}, not the HEAD commit.`);
     }

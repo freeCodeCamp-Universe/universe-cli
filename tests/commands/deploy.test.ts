@@ -209,7 +209,7 @@ describe("deploy command (proxy plane)", () => {
           outputDir: "/proj/build-out",
         }),
       });
-      await deploy({ json: false, dir: "build-out" }, deps);
+      await deploy({ json: false, dir: "build-out", allowDirty: true }, deps);
       const arg = deps.runBuild.mock.calls[0]?.[0] as { outputDir: string };
       expect(arg.outputDir).toBe("build-out");
       expect(deps.walkFiles).toHaveBeenCalledWith("/proj/build-out");
@@ -1047,7 +1047,7 @@ describe("deploy command (proxy plane)", () => {
         }),
       });
 
-      await deploy({ json: false, promote: true, dir: "build-out" }, deps);
+      await deploy({ json: false, promote: true, dir: "build-out", allowDirty: true }, deps);
 
       expect(proxy.sitePromote).not.toHaveBeenCalled();
       const arg = deps.runBuild.mock.calls[0]?.[0] as { outputDir: string };
@@ -1100,7 +1100,7 @@ describe("deploy command (proxy plane)", () => {
           outputDir: "/proj/build-out",
         }),
       });
-      await deploy({ json: false, dir: "build-out" }, previewDeps);
+      await deploy({ json: false, dir: "build-out", allowDirty: true }, previewDeps);
       const previewInitArg = previewProxy.deployInit.mock.calls[0]?.[0] as { sha: string };
       const stamped = previewInitArg.sha;
 
@@ -1206,6 +1206,25 @@ describe("deploy command (proxy plane)", () => {
       await deploy({ json: false }, deps);
       expect(deps.exit).not.toHaveBeenCalled();
       expect(deps.runBuild).toHaveBeenCalled();
+    });
+
+    it("refuses a --dir override without --allow-dirty (EXIT_GIT)", async () => {
+      const deps = mkDeps();
+      await expect(deploy({ json: false, dir: "build-out" }, deps)).rejects.toThrow("__exit__");
+      expect(deps.exit).toHaveBeenCalledWith(15);
+      expect(deps.logError).toHaveBeenCalledWith(expect.stringContaining("--allow-dirty"));
+      expect(deps.runBuild).not.toHaveBeenCalled();
+    });
+
+    it("proceeds and stamps dov on a --dir override with --allow-dirty", async () => {
+      const deps = mkDeps({
+        runBuild: vi.fn().mockResolvedValue({ skipped: false, outputDir: "/proj/build-out" }),
+      });
+      await deploy({ json: false, dir: "build-out", allowDirty: true }, deps);
+      const proxy = deps.createProxyClient.mock.results[0]?.value as ReturnType<typeof mkProxy>;
+      expect(proxy.deployInit).toHaveBeenCalledWith(
+        expect.objectContaining({ sha: expect.stringMatching(/^dov[0-9a-z]{4}$/) }),
+      );
     });
 
     it("emits an error envelope naming --allow-dirty on refusal under --json", async () => {
