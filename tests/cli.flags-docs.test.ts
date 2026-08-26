@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const reference = readFileSync(join(repoRoot, "docs", "reference.md"), "utf-8");
 const cli = readFileSync(join(repoRoot, "src", "cli.ts"), "utf-8");
 
