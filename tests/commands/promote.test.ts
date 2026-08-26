@@ -392,6 +392,21 @@ describe("promote --allow-dirty gate", () => {
     expect(proxy.sitePromote).not.toHaveBeenCalled();
   });
 
+  it("refuses a dov-stamped preview without --allow-dirty (EXIT_GIT)", async () => {
+    const proxy = mkProxy();
+    proxy.getAlias.mockImplementation(async (req: { mode: string }) =>
+      req.mode === "preview"
+        ? { url: "https://p", deployId: "20260512-120000-dov1a2b" }
+        : { url: "https://x", deployId: "20260512-110000-abc1234" },
+    );
+    const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
+
+    await expect(promote({ json: false }, deps)).rejects.toThrow("__exit__");
+
+    expect(deps.exit).toHaveBeenCalledWith(15);
+    expect(proxy.sitePromote).not.toHaveBeenCalled();
+  });
+
   it("refuses a dov-stamped --from id without --allow-dirty (EXIT_GIT)", async () => {
     const proxy = mkProxy();
     const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
