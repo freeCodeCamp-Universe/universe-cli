@@ -263,6 +263,9 @@ export async function deploy(options: DeployOptions, deps: DeployDeps = {}): Pro
     if (git.dirty && !options.json) {
       warn(`git working tree is dirty — this deploy is stamped ${sha}, not the HEAD commit.`);
     }
+    if (shaSource === "dirover" && !options.json) {
+      warn(`--dir replaced build.output — this deploy is stamped ${sha}, not the HEAD commit.`);
+    }
 
     if (
       options.promote &&

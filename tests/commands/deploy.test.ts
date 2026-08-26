@@ -921,7 +921,7 @@ describe("deploy command (proxy plane)", () => {
         createProxyClient: vi.fn().mockReturnValue(proxy),
         getGitState: vi
           .fn()
-          .mockReturnValue({ hash: null, dirty: false, error: "not a git repository" }),
+          .mockReturnValue({ hash: null, dirty: false }),
       });
 
       await deploy({ json: false, promote: true }, deps);
@@ -1197,6 +1197,28 @@ describe("deploy command (proxy plane)", () => {
       expect(proxy.deployInit).toHaveBeenCalledWith(
         expect.objectContaining({ sha: expect.stringMatching(/^dty[0-9a-z]{4}$/) }),
       );
+    });
+
+    it("warns that a --dir override is stamped dov under --allow-dirty", async () => {
+      const deps = mkDeps({
+        runBuild: vi.fn().mockResolvedValue({ skipped: false, outputDir: "/proj/build-out" }),
+      });
+      await deploy({ json: false, dir: "build-out", allowDirty: true }, deps);
+      expect(deps.logWarn).toHaveBeenCalledWith(expect.stringMatching(/stamped dov[0-9a-z]{4}/));
+    });
+
+    it("does not warn about --dir under --json", async () => {
+      const stdout: string[] = [];
+      const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+        stdout.push(String(chunk));
+        return true;
+      });
+      const deps = mkDeps({
+        runBuild: vi.fn().mockResolvedValue({ skipped: false, outputDir: "/proj/build-out" }),
+      });
+      await deploy({ json: true, dir: "build-out", allowDirty: true }, deps);
+      writeSpy.mockRestore();
+      expect(deps.logWarn).not.toHaveBeenCalled();
     });
 
     it("does not gate a non-repo directory (nog stays allowed)", async () => {
