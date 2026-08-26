@@ -116,8 +116,8 @@ universe static deploy
 
 On success the proxy returns a deploy id (`YYYYMMDD-HHMMSS-<sha7>`) and a preview URL. The sha is the `HEAD` commit when the tree is clean and `build.output` was not overridden. Otherwise the CLI stamps a sentinel in its place, and a later `--promote` at that commit rebuilds instead of promoting the earlier build:
 
-- `dty…` — the working tree was dirty. The CLI also prints a warning.
-- `dov…` — `--dir` overrode `build.output` on a clean tree. A dirty tree stamps `dty…` even with `--dir`.
+- `dty…` — the working tree was dirty. This needs `--allow-dirty`; without the flag the deploy stops with exit code 15.
+- `dov…` — `--dir` overrode `build.output` on a clean tree. This needs `--allow-dirty` too. A dirty tree stamps `dty…` even with `--dir`.
 - `nog…` — not a git repository. Git is **not** required.
 
 Under `--json` the `deploy` envelope names the stamp in a `shaSource` field: `head`, `dirty`, `dirover` or `synthetic`. Read that field in CI rather than pattern-matching the sha.
@@ -165,7 +165,7 @@ universe static promote --from 20260511-091422-abc1234
 
 `--from` rewrites **only** the production alias (it uses the rollback primitive); preview is left untouched.
 
-`promote` never reads git state and never rebuilds. It ships whatever the preview alias holds. If that build was stamped `dty…`, `dov…` or `nog…`, `promote` warns that production will not map to a commit, and `--json` reports the stamp in `shaSource`. For anything else `shaSource` is `unverified`, because `promote` reads only the deploy id. A preview minted by a CLI older than these stamps carries a commit sha even when it was built from a dirty tree, and neither `promote` nor the reuse fast path can tell. Re-deploy from a clean tree when production must be traceable to a commit.
+`promote` never reads git state and never rebuilds. It ships whatever the preview alias holds. It refuses a `dty…` or `dov…` build unless you pass `--allow-dirty`. With the flag, or for `nog…`, `promote` warns that production will not map to a commit, and `--json` reports the stamp in `shaSource`. For anything else `shaSource` is `unverified`, because `promote` reads only the deploy id. A preview minted by a CLI older than these stamps carries a commit sha even when it was built from a dirty tree, and neither `promote` nor the reuse fast path can tell. Re-deploy from a clean tree when production must be traceable to a commit.
 
 If you'd rather promote right after checking preview, `universe static deploy --promote` works too — and when your tree is clean and the preview is already at the current commit, it promotes that same build instead of uploading a duplicate. So `deploy` → check preview → `deploy --promote` ships exactly what you reviewed, with no second deploy of the same hash.
 
@@ -350,8 +350,8 @@ A `user_unauthorized` failure means the token can't prove team membership — mi
 | `Site '<slug>' is not registered …` | The error inlines a "Did you mean?" hint plus the `sites register` / `sites update` commands. Registered but no access? Ask a `staff` member to add your team. |
 | `No files to deploy under <dir>`    | Output dir empty after the `deploy.ignore` filter. Check the build produced files in `build.output` (or `--dir`). Exits `GIT` (15).                            |
 | Deploy id shows `nog…`              | Not in a git repo — git isn't required; run from inside one for a sha-stamped id.                                                                              |
-| Deploy id shows `dty…`              | The working tree had uncommitted changes. Commit them and re-deploy for a sha-stamped id.                                                                     |
-| Deploy id shows `dov…`              | `--dir` overrode `build.output`. Drop `--dir` and set `build.output` in `platform.yaml` for a sha-stamped id.                                                  |
+| Deploy id shows `dty…`              | The working tree had uncommitted changes. Commit them and re-deploy for a sha-stamped id. A dirty deploy needs `--allow-dirty`.                                |
+| Deploy id shows `dov…`              | `--dir` overrode `build.output`. Drop `--dir` and set `build.output` in `platform.yaml` for a sha-stamped id. A `--dir` deploy needs `--allow-dirty`.          |
 | Need the commit behind a sentinel id | The `--json` envelope carries it in `headSha`, and the text summary prints a `Commit:` line. artemis stores only the stamped sha.                             |
 | `user_unauthorized`                 | Token lacks `read:org` / SSO authorization, or a low-scope `$GITHUB_TOKEN` is shadowing your login token. `universe whoami`, then re-authorize or unset it.    |
 | Wrong identity resolved             | `universe whoami` shows which source fired. Env tokens (`env_GITHUB_TOKEN`/`env_GH_TOKEN`) outrank your `device_flow` login token — unset them for that shell. |

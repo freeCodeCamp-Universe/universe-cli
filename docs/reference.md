@@ -45,6 +45,8 @@ Deploy ids are `YYYYMMDD-HHMMSS-<sha7>`. artemis truncates the sha to seven char
 
 The three sentinels are deliberately not hex, so no commit hash can ever prefix-match one, and each carries four random characters drawn from a 36^4 space, so two deploys in the same second collide with probability about 1 in 1.7 million. artemis mints the id without a collision check (`internal/handler/deploy.go:82`), so that residual chance is the whole guard. The stamps are checked in the order `synthetic`, `dirty`, `dirover`, `head`, and the first match wins. So a `--dir` build outside a git repository stamps `synthetic`, and a `--dir` build on a dirty tree stamps `dirty` — `dirover` needs both a commit and a clean tree.
 
+The `dty` and `dov` stamps need an explicit opt-in. Without `--allow-dirty`, `static deploy` refuses a dirty tree or a `--dir` override and exits with code 15, and `static promote` refuses a `dty`/`dov`-stamped deploy id the same way. With the flag the command proceeds and the stamp still replaces the sha. The `nog` stamp needs no flag: a directory without git has no clean state to hold it to.
+
 A sentinel replaces the commit in the deploy id, so the id alone no longer says which commit produced the build. When a commit exists the `--json` envelope keeps it in a `headSha` field and the text summary prints a `Commit:` line, so the mapping survives in CI logs even though artemis records only the stamped sha. `headSha` is absent when the stamp is `head` (the sha already is the commit) and outside a git repository (there is no commit).
 
 Two limits are worth knowing. First, a clean tree at the same commit does not prove the same bytes: an environment variable or a gitignored file can change the build while `git status --porcelain` stays empty, and nothing detects that — `--no-reuse` is the manual opt-out. Second, previews minted by a CLI older than this change carry a commit sha even when they were built from a dirty tree, so the reuse fast path can still match one. That window closes for a site once it has deployed with a CLI carrying the stamps above.
@@ -53,7 +55,7 @@ Two limits are worth knowing. First, a clean tree at the same commit does not pr
 
 Pass `--no-reuse` to opt out explicitly — use it when the build reads an input git cannot see, such as an environment variable or a gitignored file, so a clean tree at the same commit no longer means the same bytes. `--no-reuse` applies to that one invocation only. It does not change the deploy id, and `--promote` never repoints the preview alias, so a later bare `deploy --promote` at the same commit can still reuse the older preview. Any stamp other than `head` also opts out, in both directions: the preview cannot be reused, and the build cannot be reused later.
 
-`static promote` is a pure alias rewrite. It never reads git state and never rebuilds, so it promotes whatever the preview alias holds, stamp and all. When the deploy it promotes carries a sentinel stamp it prints a warning, and `--json` reports that stamp in a `shaSource` field. Otherwise `shaSource` is `unverified`: `promote` reads only the deploy id, so it can recognise a stamp this CLI minted but can never prove that a hex sha really came from a clean tree at that commit. Only the `deploy` envelope reports `head`.
+`static promote` is a pure alias rewrite. It never reads git state and never rebuilds, so it promotes whatever the preview alias holds. It refuses a `dty`- or `dov`-stamped deploy unless `--allow-dirty` is set. With the flag, or with a `nog` stamp, it promotes, prints a warning, and `--json` reports the stamp in a `shaSource` field. Otherwise `shaSource` is `unverified`: `promote` reads only the deploy id, so it can recognise a stamp this CLI minted but can never prove that a hex sha really came from a clean tree at that commit. Only the `deploy` envelope reports `head`.
 
 `promote`/`rollback` send a compare-and-swap guard; a concurrent change returns `alias_drift` (interactive retry, or exit 10 + `current` field under `--json`). `static ls` cross-references the preview and production aliases so each row shows whether it is the current `preview`, `production`, both, or neither (a superseded build); `--json` adds a per-deploy `state` plus a top-level `aliases` object. Source: `src/commands/{deploy,promote,rollback,ls}.ts`, `src/deploy/stamp.ts`.
 
@@ -92,7 +94,7 @@ Stable contract — `src/output/exit-codes.ts`. Callers import the constants, ne
 | 11   | `CONFIG`      | `platform.yaml` missing/invalid, or build output dir missing/not a directory.                  |
 | 12   | `CREDENTIALS` | Auth failed (401/403) — re-`login`, or the token is not user-scoped.                           |
 | 13   | `STORAGE`     | Server/network failure (5xx, timeout, 422), or a symlink escape.                               |
-| 15   | `GIT`         | No files to deploy (empty upload set after the ignore filter). Git itself is not required.     |
+| 15   | `GIT`         | No files to deploy (empty upload set after the ignore filter), or a `dty`/`dov` deploy or promote refused without `--allow-dirty`. Git itself is not required. |
 | 18   | `CONFIRM`     | Confirmation declined (answered no, or `--yes` absent).                                        |
 | 19   | `PARTIAL`     | Some files failed to upload; the deploy was not finalized.                                     |
 
