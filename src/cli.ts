@@ -292,12 +292,14 @@ export async function run(argv = process.argv): Promise<void> {
     .option("--promote", "Finalize as production (default: preview)")
     .option("--dir <path>", "Override build.output dir from platform.yaml")
     .option("--no-reuse", "Always rebuild; never promote an existing preview")
+    .option("--allow-dirty", "Deploy files that do not match a clean HEAD (dirty tree or --dir)")
     .action(async (_opts, cmd: Command) => {
       const opts = cmd.optsWithGlobals<{
         json?: boolean;
         promote?: boolean;
         dir?: string;
         reuse?: boolean;
+        allowDirty?: boolean;
       }>();
       try {
         await deploy({
@@ -305,6 +307,7 @@ export async function run(argv = process.argv): Promise<void> {
           promote: opts.promote ?? false,
           dir: opts.dir,
           noReuse: opts.reuse === false,
+          allowDirty: opts.allowDirty ?? false,
         });
       } catch (err: unknown) {
         handleActionError("deploy", opts.json ?? false, err);

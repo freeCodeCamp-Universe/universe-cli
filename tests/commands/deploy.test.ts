@@ -390,11 +390,11 @@ describe("deploy command (proxy plane)", () => {
   });
 
   describe("git state", () => {
-    it("warns but proceeds when working tree is dirty", async () => {
+    it("warns but proceeds when working tree is dirty with --allow-dirty", async () => {
       const deps = mkDeps({
         getGitState: vi.fn().mockReturnValue({ hash: "abcdef0", dirty: true }),
       });
-      await deploy({ json: false }, deps);
+      await deploy({ json: false, allowDirty: true }, deps);
       expect(deps.logWarn).toHaveBeenCalled();
       const proxy = deps.createProxyClient.mock.results[0]?.value as ReturnType<typeof mkProxy>;
       expect(proxy.deployInit).toHaveBeenCalled();
@@ -409,7 +409,7 @@ describe("deploy command (proxy plane)", () => {
       const deps = mkDeps({
         getGitState: vi.fn().mockReturnValue({ hash: "abc1234567", dirty: true }),
       });
-      await deploy({ json: true }, deps);
+      await deploy({ json: true, allowDirty: true }, deps);
       writeSpy.mockRestore();
 
       const env = JSON.parse(stdout.join("").trim());
@@ -453,7 +453,7 @@ describe("deploy command (proxy plane)", () => {
       const deps = mkDeps({
         getGitState: vi.fn().mockReturnValue({ hash: "abc1234567", dirty: true }),
       });
-      await deploy({ json: false }, deps);
+      await deploy({ json: false, allowDirty: true }, deps);
       const proxy = deps.createProxyClient.mock.results[0]?.value as ReturnType<typeof mkProxy>;
       const initArg = proxy.deployInit.mock.calls[0]?.[0] as { sha: string };
       expect(initArg.sha).toMatch(/^dty[0-9a-z]{4}$/);
@@ -602,7 +602,7 @@ describe("deploy command (proxy plane)", () => {
           dirty: true,
         }),
       });
-      await deploy({ json: true }, deps);
+      await deploy({ json: true, allowDirty: true }, deps);
       expect(deps.logWarn).not.toHaveBeenCalled();
     });
 
@@ -613,7 +613,7 @@ describe("deploy command (proxy plane)", () => {
           dirty: true,
         }),
       });
-      await deploy({ json: false }, deps);
+      await deploy({ json: false, allowDirty: true }, deps);
       expect(deps.logWarn).toHaveBeenCalledTimes(1);
     });
   });
@@ -971,7 +971,7 @@ describe("deploy command (proxy plane)", () => {
         getGitState: vi.fn().mockReturnValue({ hash: "abc1234567", dirty: true }),
         createProxyClient: vi.fn().mockReturnValue(proxy),
       });
-      await deploy({ json: false, promote: true }, deps);
+      await deploy({ json: false, promote: true, allowDirty: true }, deps);
       expect(deps.runBuild).toHaveBeenCalled();
       expect(proxy.sitePromote).not.toHaveBeenCalled();
     });
@@ -1022,7 +1022,7 @@ describe("deploy command (proxy plane)", () => {
         getGitState: vi.fn().mockReturnValue({ hash: "abc1234567", dirty: true }),
       });
 
-      await deploy({ json: false }, deps);
+      await deploy({ json: false, allowDirty: true }, deps);
 
       expect(deps.logWarn).toHaveBeenCalledWith(
         expect.stringMatching(/stamped dty[0-9a-z]{4}, not the HEAD commit/),
@@ -1064,7 +1064,7 @@ describe("deploy command (proxy plane)", () => {
         createProxyClient: vi.fn().mockReturnValue(dirtyProxy),
         getGitState: vi.fn().mockReturnValue({ hash: head, dirty: true }),
       });
-      await deploy({ json: false }, dirtyDeps);
+      await deploy({ json: false, allowDirty: true }, dirtyDeps);
       const dirtyInitArg = dirtyProxy.deployInit.mock.calls[0]?.[0] as { sha: string };
       const stamped = dirtyInitArg.sha;
 
@@ -1174,6 +1174,55 @@ describe("deploy command (proxy plane)", () => {
       await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
       expect(deps.exit).toHaveBeenCalledWith(13);
       expect(deps.logError).toHaveBeenCalledWith(expect.stringContaining("static export"));
+    });
+  });
+  describe("--allow-dirty gate", () => {
+    it("refuses a dirty tree without --allow-dirty (EXIT_GIT)", async () => {
+      const deps = mkDeps({
+        getGitState: vi.fn().mockReturnValue({ hash: "abc1234567", dirty: true }),
+      });
+      await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
+      expect(deps.exit).toHaveBeenCalledWith(15);
+      expect(deps.logError).toHaveBeenCalledWith(expect.stringContaining("--allow-dirty"));
+      expect(deps.runBuild).not.toHaveBeenCalled();
+    });
+
+    it("proceeds, warns, and stamps dty on a dirty tree with --allow-dirty", async () => {
+      const deps = mkDeps({
+        getGitState: vi.fn().mockReturnValue({ hash: "abc1234567", dirty: true }),
+      });
+      await deploy({ json: false, allowDirty: true }, deps);
+      expect(deps.logWarn).toHaveBeenCalledWith(expect.stringMatching(/stamped dty/));
+      const proxy = deps.createProxyClient.mock.results[0]?.value as ReturnType<typeof mkProxy>;
+      expect(proxy.deployInit).toHaveBeenCalledWith(
+        expect.objectContaining({ sha: expect.stringMatching(/^dty[0-9a-z]{4}$/) }),
+      );
+    });
+
+    it("does not gate a non-repo directory (nog stays allowed)", async () => {
+      const deps = mkDeps({
+        getGitState: vi.fn().mockReturnValue({ hash: null, dirty: false }),
+      });
+      await deploy({ json: false }, deps);
+      expect(deps.exit).not.toHaveBeenCalled();
+      expect(deps.runBuild).toHaveBeenCalled();
+    });
+
+    it("emits an error envelope naming --allow-dirty on refusal under --json", async () => {
+      const stdout: string[] = [];
+      const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+        stdout.push(String(chunk));
+        return true;
+      });
+      const deps = mkDeps({
+        getGitState: vi.fn().mockReturnValue({ hash: "abc1234567", dirty: true }),
+      });
+      await expect(deploy({ json: true }, deps)).rejects.toThrow("__exit__");
+      writeSpy.mockRestore();
+      const env = JSON.parse(stdout.join("").trim());
+      expect(env.success).toBe(false);
+      expect(env.error.code).toBe(15);
+      expect(env.error.message).toContain("--allow-dirty");
     });
   });
 });

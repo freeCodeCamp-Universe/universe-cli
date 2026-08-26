@@ -37,6 +37,7 @@ export interface DeployOptions {
   /** Override `build.output` from platform.yaml (matches `--dir` flag). */
   dir?: string;
   noReuse?: boolean;
+  allowDirty?: boolean;
 }
 
 /**
@@ -249,6 +250,11 @@ export async function deploy(options: DeployOptions, deps: DeployDeps = {}): Pro
     const git = gitState(cwd);
     const { sha, source: shaSource } = stampSha(git, options.dir !== undefined);
     const provenance = shaSource === "head" || git.hash === null ? {} : { headSha: git.hash };
+    if (shaSource === "dirty" && !options.allowDirty) {
+      throw new GitError(
+        "git working tree is dirty — refusing to deploy uncommitted files. Commit them, or pass --allow-dirty to deploy anyway.",
+      );
+    }
     if (git.dirty && !options.json) {
       warn(`git working tree is dirty — this deploy is stamped ${sha}, not the HEAD commit.`);
     }
