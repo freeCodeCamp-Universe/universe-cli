@@ -54,7 +54,7 @@ export async function undelete(
     const { code, message } = wrapProxyError(command, err);
     const versionHint =
       err instanceof ProxyError && err.status === 404
-        ? `${message}\n  hint: this artemis may predate 1.10.0, which added undelete. Check the slug first, then the server version.`
+        ? `${message}\n  hint: the hold may have expired, or the slug may be wrong. Run \`universe sites ls --held\` to see the names still recoverable.`
         : message;
     outputError({ json: options.json, command }, code, versionHint, {
       logError: error,

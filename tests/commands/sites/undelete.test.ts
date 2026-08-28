@@ -62,14 +62,17 @@ describe("sites undelete command", () => {
   });
 });
 
-describe("sites undelete against a pre-1.10.0 artemis", () => {
-  it("names the version floor so a 404 is not read as an unknown slug", async () => {
+describe("sites undelete on a 404", () => {
+  it("names the causes that can actually occur and points at the list", async () => {
     const { ProxyError } = await import("../../../src/lib/proxy-client.js");
     const proxy = {
       undeleteSite: vi.fn().mockRejectedValue(new ProxyError(404, "http_404", "Not Found")),
     };
     const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
     await expect(undelete({ json: false, slug: "blog" }, deps)).rejects.toThrow("__exit__");
-    expect(deps.logError).toHaveBeenCalledWith(expect.stringMatching(/1\.10\.0/));
+    const msg = deps.logError.mock.calls[0]?.[0] as string;
+    expect(msg).toMatch(/expired/i);
+    expect(msg).toMatch(/sites ls --held/);
+    expect(msg).not.toMatch(/predate/i);
   });
 });
