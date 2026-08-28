@@ -4,74 +4,96 @@ Every `universe` command, flag, exit code, and environment variable. Task walkth
 
 ## Global conventions
 
-- **`--json`** — accepted by every command. Envelope on **stdout**; human errors on **stderr**, so `… --json | jq` stays clean. Required in non-TTY/CI for commands that otherwise prompt.
+- **`--json`** — accepted by every command. Envelope on **stdout**, human errors on **stderr**, so `… --json | jq` stays clean. Required in non-TTY/CI wherever a command would otherwise prompt.
 - **`--help` / `-h`**, **`--version` / `-v`** — per-command help and version.
 - **Namespaces** — `static`, `sites`, `repo` group verbs; global flags may precede the namespace token (`universe --json static deploy`).
-- **Auto-update check** — a detached background process checks npm for a newer version (cached 1 h, override `UNIVERSE_UPDATE_TTL_MS`; 3 s timeout) and the next run prints a notice to **stderr** only. Survives error/exit paths. Disable with `UNIVERSE_NO_UPDATE_CHECK=1`.
+- **Auto-update check** — a detached process checks npm (cached 1 h, override `UNIVERSE_UPDATE_TTL_MS`; 3 s timeout); the next run prints a notice to **stderr** only, on error and exit paths alike. Disable with `UNIVERSE_NO_UPDATE_CHECK=1`.
 
 ## Commands
 
 ### Top-level
 
-| Command           | Flags                                                                                                                                                       | Purpose                                                                    |
-| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Command           | Flags                                                                                                                                                      | Purpose                                                                    |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
 | `universe create` | `--name <name>`, `--runtime <rt>`, `--framework <fw>`, `--database <db...>`, `--service <svc...>`, `--pkg-manager <pm>`, `--force-fetch`, `--yes`, `--json` | Scaffold a new project from layered templates into a subdirectory.         |
 | `universe init`   | `--site <slug>`, `--dir <path>`, `--force`, `--yes`, `--json`                                                                                               | Scaffold a `platform.yaml` in the current directory.                       |
 | `universe login`  | `--force`, `--json`                                                                                                                                         | GitHub OAuth device flow → token at `~/.config/universe-cli/token` (0600). |
 | `universe logout` | `--json`                                                                                                                                                    | Delete the stored device-flow token.                                       |
 | `universe whoami` | `--json`                                                                                                                                                    | Resolved login, identity source, proxy URL, authorized-site count.         |
 
-`create` fetches templates from an external repository (cached locally; `--force-fetch` re-downloads), prompts for runtime, framework, databases, services, and package manager, then writes the composed project files — including a generated `platform.yaml` — into `./<name>`, installs dependencies, and initialises a git repo. In a TTY it runs interactively; `--yes`, `--json`, or a non-TTY require `--name` and use defaults or flag values for the remaining selections. No network identity is needed. Source: `src/commands/create/`.
+`create` and `init` need no network and no identity. In a TTY both prompt; `--yes`, `--json`, or a non-TTY use derived defaults, and `create` then requires `--name`.
 
-`init` needs no network or identity. It derives `site` from the git `origin` remote (falling back to the directory name), sanitized to `SITE_NAME_PATTERN`, and infers `build.command` from `package.json`'s `build` script plus the lockfile's package manager. In a TTY it prompts for each field; `--yes`, `--json`, or a non-TTY write the derived defaults. It refuses to clobber an existing `platform.yaml` unless `--force` is passed (exit 11). Source: `src/commands/init.ts`.
+- `create` — fetches templates from an external repository (cached; `--force-fetch` re-downloads), writes the project and a generated `platform.yaml` into `./<name>`, installs dependencies, runs `git init`. Source: `src/commands/create/`.
+- `init` — derives `site` from the git `origin` remote, else the directory name, sanitized to `SITE_NAME_PATTERN`; infers `build.command` from `package.json`'s `build` script and the lockfile's package manager. Refuses to clobber an existing `platform.yaml` without `--force` (exit 11). Source: `src/commands/init.ts`.
 
 ### `static` — deploy lifecycle
 
-| Command                    | Flags                                  | Purpose                                                                                                                           |
-| -------------------------- | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Command                    | Flags                                                               | Purpose                                                                                                                           |
+| -------------------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | `universe static deploy`   | `--promote`, `--dir <path>`, `--no-reuse`, `--allow-dirty`, `--json` | Build (if `build.command` set) and upload to **preview**. `--promote` finalizes as production.                                    |
-| `universe static promote`  | `--from <deployId>`, `--allow-dirty`, `--json` | Re-point production at the current preview, or at `--from`. Never reads git state and never rebuilds.                             |
-| `universe static rollback` | `--to <deployId>` (required), `--json` | Rewrite the production alias to a past deploy id.                                                                                 |
-| `universe static ls`       | `--site <slug>`, `--json`              | Recent deploys for the `platform.yaml` site, or `--site`. A `STATE` column flags `preview` / `production` / `preview+production`. |
+| `universe static promote`  | `--from <deployId>`, `--allow-dirty`, `--json`                       | Re-point production at the current preview, or at `--from`. Never reads git state and never rebuilds.                             |
+| `universe static rollback` | `--to <deployId>` (required), `--json`                               | Rewrite the production alias to a past deploy id.                                                                                 |
+| `universe static ls`       | `--site <slug>`, `--json`                                            | Recent deploys for the `platform.yaml` site, or `--site`. A `STATE` column flags `preview` / `production` / `preview+production`. |
 
-Deploy ids are `YYYYMMDD-HHMMSS-<sha7>`. artemis truncates the sha to seven characters, so the CLI mints every non-commit sha at exactly seven characters. Four stamps exist, and the `--json` envelope names the one in force through `shaSource`:
+Deploy ids are `YYYYMMDD-HHMMSS-<sha7>`. artemis truncates the sha to seven characters, so the CLI mints every non-commit sha at exactly seven. `--json` names the stamp in force through `shaSource`:
 
-| `shaSource` | sha sent                | when                                            | needs `--allow-dirty` |
-| ----------- | ----------------------- | ----------------------------------------------- | --------------------- |
-| `head`      | the full HEAD hash      | clean tree, no `--dir`                          | no                    |
-| `dirty`     | `dty` + 4 random base36 | working tree has uncommitted changes            | yes                   |
-| `dirover`   | `dov` + 4 random base36 | `--dir` overrode `build.output` on a clean tree | yes                   |
-| `synthetic` | `nog` + 4 random base36 | not a git repository                            | no                    |
+| `shaSource` | sha sent                | when                                            | `--allow-dirty` | preview reuse |
+| ----------- | ----------------------- | ----------------------------------------------- | --------------- | ------------- |
+| `head`      | the full HEAD hash      | clean tree, no `--dir`                          | no              | yes           |
+| `dirty`     | `dty` + 4 random base36 | working tree has uncommitted changes            | yes             | no            |
+| `dirover`   | `dov` + 4 random base36 | `--dir` overrode `build.output` on a clean tree | yes             | no            |
+| `synthetic` | `nog` + 4 random base36 | not a git repository                            | no              | no            |
 
-The stamps are checked in the order `synthetic`, `dirty`, `dirover`, `head`, and the first match wins — so a `--dir` build on a dirty tree stamps `dirty`, and `dirover` needs both a commit and a clean tree. The three sentinels are deliberately not hex, so no commit hash can ever prefix-match one, and their four random characters draw from a 36^4 space: two deploys in the same second collide with probability about 1 in 1.7 million. artemis mints the id without a collision check, so that residual chance is the whole guard.
+- Checked in the order `synthetic`, `dirty`, `dirover`, `head`; first match wins, so `--dir` on a dirty tree stamps `dirty`. The sentinels are not hex, so no commit sha can prefix-match one.
+- Exit 15 without `--allow-dirty`: `deploy` on a dirty tree or a `--dir` override, `promote` on a `dty`/`dov` id. With the flag both warn and proceed, stamp intact. `nog` never needs it.
+- A sentinel replaces the commit, so `--json` keeps it in `headSha` and the summary prints a `Commit:` line. `headSha` is absent when the stamp is `head`, and outside a git repository.
 
-Without `--allow-dirty`, `static deploy` refuses a dirty tree or a `--dir` override and exits with code 15, and `static promote` refuses a `dty`/`dov`-stamped deploy id the same way. With the flag both proceed, print a warning, and the stamp still replaces the sha. The `nog` stamp needs no flag: a directory without git has no clean state to hold it to. Because a sentinel replaces the commit, the id alone no longer says which commit produced the build, so the `--json` envelope keeps the commit in a `headSha` field and the text summary prints a `Commit:` line, so the mapping survives in CI logs even though artemis records only the stamped sha. `headSha` is absent when the stamp is `head` (the sha already is the commit) and outside a git repository (there is no commit).
+**Preview reuse.** `deploy --promote` on a clean tree whose preview is already at `HEAD` promotes that exact build instead of rebuilding a duplicate.
 
-`deploy --promote` is idempotent on an unchanged commit: when the working tree is clean and the current preview is already at `HEAD`, it promotes that exact build — the one you previewed — instead of rebuilding and re-uploading a duplicate. The `--json` envelope always carries `reusedPreview` — `true` on that fast path, `false` on a rebuild — and `fileCount` and `totalSize` count what **this invocation uploaded**, so both read `0` on the fast path; the promoted deploy still holds its original files. Two things defeat reuse. Any stamp other than `head` opts out in both directions: the preview cannot be reused, and the build cannot be reused later. `--no-reuse` opts out manually for one invocation — reach for it when the build reads an input git cannot see, such as an environment variable or a gitignored file, because a clean tree at the same commit does not prove the same bytes: `git status --porcelain` stays empty and nothing detects the difference. `--no-reuse` does not change the deploy id, and `--promote` never repoints the preview alias, so a later bare `deploy --promote` at the same commit can still reuse the older preview. One legacy gap remains: previews minted by a CLI older than this change carry a commit sha even when they were built from a dirty tree, so the fast path can still match one. That window closes for a site once it has deployed with a CLI carrying these stamps.
+- `--json` always carries `reusedPreview`: `true` on the fast path, `false` on a rebuild. `fileCount` and `totalSize` count only this invocation's upload, so both read `0` on the fast path; the deploy keeps its original files.
+- Any stamp but `head` opts out both ways: that preview cannot be reused, and that build cannot be reused later.
+- `--no-reuse` opts out for one invocation, without changing the deploy id. Reach for it when the build reads an input git cannot see — an environment variable, a gitignored file.
+- `--promote` never repoints the preview alias, so a later bare `deploy --promote` at the same commit can still reuse the older preview.
+- Previews minted before these stamps carry a commit sha even when built from a dirty tree, so the fast path can still match one. The window closes for a site once it deploys with a stamping CLI.
 
-`static promote` is a pure alias rewrite. It never reads git state and never rebuilds, so it promotes whatever the preview alias holds. Promoting any sentinel-stamped deploy — `dty`, `dov` or `nog` — prints a warning in the text summary, and `--json` reports the stamp in `shaSource` instead. Otherwise `shaSource` is `unverified`: `promote` reads only the deploy id, so it can recognise a stamp this CLI minted but can never prove that a hex sha really came from a clean tree at that commit. Only the `deploy` envelope reports `head`.
+`static promote` is a pure alias rewrite: it promotes whatever the preview alias holds. A sentinel-stamped deploy warns and reports its stamp in `shaSource`; every hex sha reports `unverified`, since `promote` sees only the deploy id. Only `deploy` reports `head`.
 
-`promote`/`rollback` send a compare-and-swap guard; a concurrent change returns `alias_drift` (interactive retry, or exit 10 + `current` field under `--json`). `static ls` cross-references the preview and production aliases so each row shows whether it is the current `preview`, `production`, both, or neither (a superseded build); `--json` adds a per-deploy `state` plus a top-level `aliases` object. Source: `src/commands/{deploy,promote,rollback,ls}.ts`, `src/deploy/stamp.ts`.
+`promote`/`rollback` send a compare-and-swap guard; a concurrent change returns `alias_drift` — interactive retry, or exit 10 plus a `current` field under `--json`. `static ls` cross-references both aliases, so each row reads `preview`, `production`, both, or neither (a superseded build); `--json` adds a per-deploy `state` and a top-level `aliases`. Source: `src/commands/{deploy,promote,rollback,ls}.ts`, `src/deploy/stamp.ts`.
 
 ### `sites` — registry (staff-gated writes)
 
-| Command                          | Flags                                | Purpose                                                         |
-| -------------------------------- | ------------------------------------ | --------------------------------------------------------------- |
+| Command                          | Flags                                | Purpose                                                                                                                              |
+| -------------------------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
 | `universe sites ls`              | `--mine`, `--held`, `--json`         | List registered sites; `--mine` filters to your authorized set; `--held` lists names held by a delete (not combinable with `--mine`). |
-| `universe sites register <slug>` | `--team <name>`, `--json`            | Register a site (staff). `--team` defaults to `staff`.          |
-| `universe sites update <slug>`   | `--team <name>` (required), `--json` | Replace the teams list (staff).                                 |
-| `universe sites rm <slug>`       | `--json`                             | Take the site offline and hold its name (staff). Reversible with `undelete` while the hold lasts. |
-| `universe sites undelete <slug>` | `--json`                             | Bring back a site while its name is still held (staff).         |
-| `universe sites release <slug>`  | `-y`, `--yes`, `--json`              | Free a held name now and trash its files (approvers). Not reversible. |
+| `universe sites register <slug>` | `--team <name>`, `--json`            | Register a site (staff). `--team` defaults to `staff`.                                                                               |
+| `universe sites update <slug>`   | `--team <name>` (required), `--json` | Replace the teams list (staff).                                                                                                      |
+| `universe sites rm <slug>`       | `--json`                             | Take the site offline and hold its name (staff). Reversible with `undelete` while the hold lasts.                                    |
+| `universe sites undelete <slug>` | `--json`                             | Bring back a site while its name is still held (staff).                                                                              |
+| `universe sites release <slug>`  | `-y`, `--yes`, `--json`              | Free a held name now and trash its files (approvers). Not reversible.                                                                |
 
-A delete does not free the name. `rm` takes the site offline and **holds** its slug so nobody else can register it; `undelete` brings the site back and restores both alias pointers, which the server reports once and then forgets. The hold is **72 hours by default** — a deployment overrides it with `SITE_RESERVATION_GRACE`, so read the real deadline from `sites ls --held` rather than counting from the delete. When the hold expires the name frees itself and the files are cleaned up. `release` ends the hold early: it frees the name and trashes the files in one irreversible step, so it is gated on the approver team and exits 18 without `--yes` in any non-interactive mode. Registering a held name returns `409 site_reserved` and the CLI names `undelete`; the expiry rides along only on the verbs that send it, and `sites register` is not one of them, so read the deadline from `sites ls --held`. Every site-scoped path — `promote`, `rollback`, deploy init, upload, finalize, deploys, trash, alias, deploy-delete, deploy-restore — reads the same three states, so learn them once. **Held** — deleted, still inside the grace: all of them return `409 site_reserved` with the expiry, exit 10. **Gone** — the hold expired, or `release` ran: all of them answer `403 site_unauthorized`, exit 12, because the cached snapshot no longer lists the name. The write verbs among them can instead answer `410 site_gone` with a message, exit 10, for up to 60 seconds after the change — the window in which the snapshot still lists a site the registry has already dropped. **Active**: the call proceeds. A delete therefore reads as `409` while you can still undo it, and as `403` — briefly `410` — once you cannot. Server floors: `undelete` and `release` need artemis 1.10.0, and `ls --held` needs 1.10.2.
+**A delete does not free the name.** `rm` takes the site offline and holds its slug so nobody else can register it; `undelete` restores the site and both alias pointers, which the server reports once and then forgets.
 
-`--team` is comma-separated and repeatable; values are GitHub team slugs in `freeCodeCamp-Universe`. Slug `^[a-z][a-z0-9-]{0,62}$`, team `^[a-z0-9][a-z0-9_-]{0,38}$`. There is no in-place slug **rename** (no server primitive, and the CLI can't move R2 bytes) — `register` the new slug, redeploy under it, then `rm` the old one; full recipe in [STAFF-GUIDE.md](STAFF-GUIDE.md#rename-a-site-slug). Source: `src/commands/sites/`.
+- The hold is **72 hours by default**, overridden per deployment by `SITE_RESERVATION_GRACE`. Read the real deadline from `sites ls --held`, never by counting from the delete.
+- On expiry the name frees itself and the files are cleaned up.
+- `release` ends the hold early, freeing the name and trashing the files in one irreversible step. Approver-gated; exit 18 without `--yes` in any non-interactive mode.
+- Server floors: `undelete` and `release` need artemis **1.10.0**; `ls --held` needs **1.10.2**.
+
+Every site-scoped path — `promote`, `rollback`, deploy init, upload, finalize, deploys, trash, alias, deploy-delete, deploy-restore — reads the same three states:
+
+| State      | When                               | Answer                                   | Exit |
+| ---------- | ---------------------------------- | ---------------------------------------- | ---- |
+| **Active** | registered, not deleted            | the call proceeds                        | —    |
+| **Held**   | deleted, still inside the grace    | `409 site_reserved`, carrying the expiry | 10   |
+| **Gone**   | the hold expired, or `release` ran | `403 site_unauthorized`                  | 12   |
+
+For up to 60 seconds after the change, write verbs may answer `410 site_gone` (exit 10) instead of `403` — the window in which the cached snapshot still lists a name the registry has dropped. `sites register` on a held name returns `409` and the CLI names `undelete`, but it does not carry the expiry; `sites ls --held` does.
+
+`--team` is comma-separated and repeatable; values are GitHub team slugs in `freeCodeCamp-Universe`. Slug `^[a-z][a-z0-9-]{0,62}$`, team `^[a-z0-9][a-z0-9_-]{0,38}$`. There is no in-place slug **rename** — `register` the new slug, redeploy under it, then `rm` the old one ([recipe](STAFF-GUIDE.md#rename-a-site-slug)). Source: `src/commands/sites/`.
 
 ### `repo` — repository requests + approval queue
 
-| Command                       | Flags                                                                                            | Purpose                                                                                                                       |
-| ----------------------------- | ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| Command                       | Flags                                                                                           | Purpose                                                                                                                       |
+| ----------------------------- | ------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | `universe repo create [name]` | `--visibility <public\|private>`, `--template <repo>`, `--description <text>`, `--yes`, `--json` | Request a repo under `freeCodeCamp-Universe` (staff). Prompts when bare; `--yes` required non-TTY.                            |
 | `universe repo ls`            | `--status <state>`, `--all`, `--mine`, `--json`                                                  | List requests. `--status` ∈ `pending\|approved\|active\|rejected\|failed\|all` (default `pending`); `--all` = `--status all`. |
 | `universe repo status <id>`   | `--json`                                                                                         | One request's lifecycle state.                                                                                                |
@@ -85,16 +107,16 @@ A delete does not free the name. `rm` takes the site offline and **holds** its s
 
 Stable contract — `src/output/exit-codes.ts`. Callers import the constants, never integers.
 
-| Code | Name          | Meaning                                                                                        |
-| ---- | ------------- | ---------------------------------------------------------------------------------------------- |
-| 0    | `SUCCESS`     | Completed.                                                                                     |
+| Code | Name          | Meaning                                                                                                          |
+| ---- | ------------- | ------------------------------------------------------------------------------------------------------------------ |
+| 0    | `SUCCESS`     | Completed.                                                                                                       |
 | 10   | `USAGE`       | Bad input — unknown flag, missing arg, or a 400/404/409/410 (incl. alias drift, deploy not found, site released). |
-| 11   | `CONFIG`      | `platform.yaml` missing/invalid, or build output dir missing/not a directory.                  |
-| 12   | `CREDENTIALS` | Auth failed (401/403) — re-`login`, or the token is not user-scoped.                           |
-| 13   | `STORAGE`     | Server/network failure (5xx, timeout, 422), or a symlink escape.                               |
+| 11   | `CONFIG`      | `platform.yaml` missing/invalid, or build output dir missing/not a directory.                                    |
+| 12   | `CREDENTIALS` | Auth failed (401/403) — re-`login`, or the token is not user-scoped.                                             |
+| 13   | `STORAGE`     | Server/network failure (5xx, timeout, 422), or a symlink escape.                                                 |
 | 15   | `GIT`         | No files to deploy (empty upload set after the ignore filter), or a `dty`/`dov` deploy or promote refused without `--allow-dirty`. Git itself is not required. |
-| 18   | `CONFIRM`     | Confirmation declined (answered no, or `--yes` absent).                                        |
-| 19   | `PARTIAL`     | Some files failed to upload; the deploy was not finalized.                                     |
+| 18   | `CONFIRM`     | Confirmation declined (answered no, or `--yes` absent).                                                          |
+| 19   | `PARTIAL`     | Some files failed to upload; the deploy was not finalized.                                                       |
 
 Codes 14, 16, 17 are reserved for contract stability and no longer emitted.
 
@@ -111,25 +133,25 @@ Codes 14, 16, 17 are reserved for contract stability and no longer emitted.
 | 3     | `~/.config/universe-cli/token` | `device_flow`      | `universe login` (mode 0600; honors `$XDG_CONFIG_HOME`).    |
 | 4     | `gh auth token`                | `gh_cli`           | Laptop fallback when no login token but `gh` is authed.     |
 
-Source 3 outranks 4 by design: the device-flow `ghu_` token is scoped to the App installation (narrower than `gh`'s `gho_`) and surfaces App-install gaps early. The env sources outrank both — exporting `$GITHUB_TOKEN` always wins.
+Source 3 outranks 4 by design: the device-flow `ghu_` token is scoped to the App installation, narrower than `gh`'s `gho_`.
 
-artemis validates every bearer with `GET /user` and authorizes via `GET /user/teams` — so a bearer must be **user-scoped** (PAT, OAuth user, or App user-to-server token). A GitHub App **installation** token (the default GHA `secrets.GITHUB_TOKEN`) has no user → `403` → `CREDENTIALS` (12). `universe login` requests `read:org user:email`; `read:org` (and, under SAML SSO, an org-authorized token) is what makes team membership resolve. A `user_unauthorized` failure means the token can't prove membership — check the active source with `whoami`.
+artemis validates every bearer with `GET /user` and authorizes via `GET /user/teams`, so a bearer must be **user-scoped** — a PAT, an OAuth user token, or an App user-to-server token. A GitHub App **installation** token, the default GHA `secrets.GITHUB_TOKEN`, has no user: `403` → `CREDENTIALS` (12). `universe login` requests `read:org user:email`; `read:org`, plus an org-authorized token under SAML SSO, is what makes team membership resolve. A `user_unauthorized` failure means the token cannot prove membership — check the active source with `whoami`.
 
 **Precedence** (highest wins): CLI flags > environment variables > `platform.yaml` defaults.
 
 ## Environment
 
-| Env                         | Default                         | Scope        | Purpose                                                            |
-| --------------------------- | ------------------------------- | ------------ | ------------------------------------------------------------------ |
-| `GITHUB_TOKEN` / `GH_TOKEN` | —                               | all          | Identity sources 1–2. Must be user-scoped.                         |
-| `UNIVERSE_PROXY_URL`        | `https://uploads.freecode.camp` | all          | Point at a different artemis host (staging, mirror).               |
-| `UNIVERSE_FETCH_TIMEOUT_MS` | `30000`                         | all          | Per-request timeout to artemis, ms. `0` disables.                  |
-| `UNIVERSE_NO_UPDATE_CHECK`  | —                               | all          | `1`/`true` disables the background update check and the template version check. |
-| `UNIVERSE_UPDATE_TTL_MS`    | `3600000`                       | all          | Update-check cache TTL, ms. Lower = fresher; `0` checks every run. |
-| `UNIVERSE_DEBUG`            | —                               | all          | `1`/`true` logs raw proxy request/response. Verbose; debugging.    |
-| `NO_COLOR`                  | —                               | all          | Standard; suppresses color in the update notice.                   |
+| Env                          | Default                         | Scope        | Purpose                                                            |
+| ---------------------------- | ------------------------------- | ------------ | ------------------------------------------------------------------ |
+| `GITHUB_TOKEN` / `GH_TOKEN`  | —                               | all          | Identity sources 1–2. Must be user-scoped.                         |
+| `UNIVERSE_PROXY_URL`         | `https://uploads.freecode.camp` | all          | Point at a different artemis host (staging, mirror).               |
+| `UNIVERSE_FETCH_TIMEOUT_MS`  | `30000`                         | all          | Per-request timeout to artemis, ms. `0` disables.                  |
+| `UNIVERSE_NO_UPDATE_CHECK`   | —                               | all          | `1`/`true` disables the background update check and the template version check. |
+| `UNIVERSE_UPDATE_TTL_MS`     | `3600000`                       | all          | Update-check cache TTL, ms. Lower = fresher; `0` checks every run. |
+| `UNIVERSE_DEBUG`             | —                               | all          | `1`/`true` logs raw proxy request/response. Verbose; debugging.    |
+| `NO_COLOR`                   | —                               | all          | Standard; suppresses color in the update notice.                   |
 | `UNIVERSE_TEMPLATES_VERSION` | (baked-in)                      | `create`     | Override the template version used by `universe create`.           |
-| `UNIVERSE_GH_CLIENT_ID`     | baked-in App client id          | `login` only | Override the device-flow GitHub App (fork / self-host tenants).    |
-| `XDG_CONFIG_HOME`           | `~/.config`                     | login/logout | Base dir for the token store (`<base>/universe-cli/token`).        |
+| `UNIVERSE_GH_CLIENT_ID`      | baked-in App client id          | `login` only | Override the device-flow GitHub App (fork / self-host tenants).    |
+| `XDG_CONFIG_HOME`            | `~/.config`                     | login/logout | Base dir for the token store (`<base>/universe-cli/token`).        |
 
 The baked-in client id is **public** — the device flow uses no `client_secret`, so embedding it leaks nothing. No setting is ever read from a `.env` file.
