@@ -16,13 +16,13 @@ import { buildEnvelope } from "../output/envelope.js";
 import { exitWithCode } from "../output/exit-codes.js";
 import { emitJson, outputError } from "../output/format.js";
 
-export interface LsOptions {
+export interface ListOptions {
   json: boolean;
   /** Override site from platform.yaml. */
   site?: string;
 }
 
-export interface LsDeps {
+export interface ListDeps {
   cwd?: string;
   env?: NodeJS.ProcessEnv;
   readPlatformYaml?: (cwd: string) => Promise<string>;
@@ -74,7 +74,7 @@ function deployState(
  * `internal/handler/site.go` `deployIDPattern` — accepts hex SHAs,
  * `nogit-N` fallbacks (when the build dir isn't a git checkout), and
  * any future suffix shape. Narrower client regex (V8) silently drops
- * valid ids on `static ls`.
+ * valid ids on `static list`.
  */
 const DEPLOY_ID_RE = /^(\d{8})-(\d{6})-(\S+)$/;
 
@@ -120,7 +120,7 @@ function formatTable(deploys: DeployRow[]): string {
   return [fmt(header), ...rows.map(fmt)].join("\n");
 }
 
-export async function ls(options: LsOptions, deps: LsDeps = {}): Promise<void> {
+export async function list(options: ListOptions, deps: ListDeps = {}): Promise<void> {
   const cwd = deps.cwd ?? process.cwd();
   const env = deps.env ?? process.env;
   const readYaml = deps.readPlatformYaml ?? defaultReadPlatformYaml;
@@ -183,7 +183,7 @@ export async function ls(options: LsOptions, deps: LsDeps = {}): Promise<void> {
 
     if (options.json) {
       emitJson(
-        buildEnvelope("ls", true, {
+        buildEnvelope("list", true, {
           site,
           deploys,
           aliases: { preview: previewId, production: productionId },
@@ -199,8 +199,8 @@ export async function ls(options: LsOptions, deps: LsDeps = {}): Promise<void> {
     }
     success(formatTable(deploys));
   } catch (err) {
-    const { code, message } = wrapProxyError("ls", err);
-    outputError({ json: options.json, command: "ls" }, code, message, {
+    const { code, message } = wrapProxyError("list", err);
+    outputError({ json: options.json, command: "list" }, code, message, {
       logError: error,
     });
     exit(code);

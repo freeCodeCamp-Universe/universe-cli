@@ -352,7 +352,7 @@ function mapExitCode(status: number): number {
 
 /**
  * Format a proxy or generic error for the per-command catch path.
- * promote/rollback/ls share the same shape:
+ * promote/rollback/list share the same shape:
  *
  *   ProxyError → `<cmd> failed (<code>): <message>`
  *   CliError   → preserve message verbatim

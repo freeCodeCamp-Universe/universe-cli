@@ -37,7 +37,7 @@ describe("docs/reference.md command table", () => {
     ["universe static deploy", "staticCli", "deploy"],
     ["universe static promote", "staticCli", "promote"],
     ["universe static rollback", "staticCli", "rollback"],
-    ["universe sites ls", "sitesCli", "ls"],
+    ["universe sites list", "sitesCli", "list"],
     ["universe sites register <slug>", "sitesCli", "register <slug>"],
     ["universe sites update <slug>", "sitesCli", "update <slug>"],
     ["universe sites rm <slug>", "sitesCli", "rm <slug>"],

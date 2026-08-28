@@ -76,7 +76,7 @@ export async function rollback(options: RollbackOptions, deps: RollbackDeps = {}
   try {
     if (!options.to || options.to.trim().length === 0) {
       throw new UsageError(
-        "rollback requires --to <deployId>. Run `universe static ls` to list past deploys.",
+        "rollback requires --to <deployId>. Run `universe static list` to list past deploys.",
       );
     }
 

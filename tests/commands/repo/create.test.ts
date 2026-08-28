@@ -237,7 +237,7 @@ describe("repo create command", () => {
     expect(deps.resolveIdentity).not.toHaveBeenCalled();
   });
 
-  it("hints at `repo ls --status all` on already_exists (human mode)", async () => {
+  it("hints at `repo list --status all` on already_exists (human mode)", async () => {
     const { ProxyError } = await import("../../../src/lib/proxy-client.js");
     const proxy = mkProxy();
     proxy.createRepoRequest = vi
@@ -246,7 +246,7 @@ describe("repo create command", () => {
     const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
     await expect(create({ json: false, name: "dup", yes: true }, deps)).rejects.toThrow("__exit__");
     expect(deps.exit).toHaveBeenCalledWith(10);
-    expect(deps.logError).toHaveBeenCalledWith(expect.stringContaining("repo ls --status all"));
+    expect(deps.logError).toHaveBeenCalledWith(expect.stringContaining("repo list --status all"));
   });
 
   it("omits the hint in JSON mode (machine output stays clean)", async () => {
@@ -264,7 +264,7 @@ describe("repo create command", () => {
     await expect(create({ json: true, name: "dup", yes: true }, deps)).rejects.toThrow("__exit__");
     writeSpy.mockRestore();
     const env = JSON.parse(stdout.join("").trim());
-    expect(env.error.message).not.toContain("repo ls --status all");
+    expect(env.error.message).not.toContain("repo list --status all");
     expect(env.error.kind).toBe("already_exists");
   });
 
@@ -292,7 +292,7 @@ describe("repo create command", () => {
     await expect(create({ json: false }, deps)).rejects.toThrow("__exit__");
     expect(proxy.createRepoRequest).toHaveBeenCalled();
     expect(deps.exit).toHaveBeenCalledWith(10);
-    expect(deps.logError).toHaveBeenCalledWith(expect.stringContaining("repo ls --status all"));
+    expect(deps.logError).toHaveBeenCalledWith(expect.stringContaining("repo list --status all"));
   });
 
   it("falls back to free-text template when listRepoTemplates throws", async () => {

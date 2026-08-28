@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ls as sitesLs } from "../../src/commands/sites/ls.js";
+import { list as sitesList } from "../../src/commands/sites/list.js";
 import { type CliEnv, makeCliEnv } from "./_helpers/cli-env.js";
 import { type FakeArtemis, type SiteRow, startFakeArtemis } from "./_helpers/fake-artemis.js";
 
@@ -25,7 +25,7 @@ interface RunResult {
   envelope: Record<string, unknown> | undefined;
 }
 
-async function runSitesLs(
+async function runSitesList(
   env: NodeJS.ProcessEnv,
   options: { json: true; mine?: boolean; held?: boolean },
 ): Promise<RunResult> {
@@ -36,7 +36,7 @@ async function runSitesLs(
   });
   const captured: CapturedExit = {};
   try {
-    await sitesLs(options, {
+    await sitesList(options, {
       env,
       exit: makeExit(captured),
       logSuccess: vi.fn(),
@@ -61,7 +61,7 @@ function row(slug: string, teams = ["staff"]): SiteRow {
   };
 }
 
-describe("sites ls E2E (real proxy-client + real identity chain)", () => {
+describe("sites list E2E (real proxy-client + real identity chain)", () => {
   let server: FakeArtemis;
   let env: CliEnv;
   const token = "ghp_e2e_sls";
@@ -85,10 +85,10 @@ describe("sites ls E2E (real proxy-client + real identity chain)", () => {
     server.state.registry.set("charlie", row("charlie"));
     env = await makeCliEnv({ proxyUrl: server.url, githubToken: token });
 
-    const r = await runSitesLs(env.env, { json: true });
+    const r = await runSitesList(env.env, { json: true });
 
     expect(r.captured.code).toBeUndefined();
-    expect(r.envelope!["command"]).toBe("sites ls");
+    expect(r.envelope!["command"]).toBe("sites list");
     expect(r.envelope!["success"]).toBe(true);
     expect(r.envelope!["scope"]).toBe("all");
     expect(r.envelope!["count"]).toBe(3);
@@ -109,7 +109,7 @@ describe("sites ls E2E (real proxy-client + real identity chain)", () => {
     server.state.registry.set("charlie", row("charlie"));
     env = await makeCliEnv({ proxyUrl: server.url, githubToken: token });
 
-    const r = await runSitesLs(env.env, { json: true, mine: true });
+    const r = await runSitesList(env.env, { json: true, mine: true });
 
     expect(r.captured.code).toBeUndefined();
     expect(r.envelope!["scope"]).toBe("mine");
@@ -125,7 +125,7 @@ describe("sites ls E2E (real proxy-client + real identity chain)", () => {
   it("emits empty sites array when registry is empty", async () => {
     env = await makeCliEnv({ proxyUrl: server.url, githubToken: token });
 
-    const r = await runSitesLs(env.env, { json: true });
+    const r = await runSitesList(env.env, { json: true });
 
     expect(r.captured.code).toBeUndefined();
     expect(r.envelope!["count"]).toBe(0);
@@ -140,7 +140,7 @@ describe("sites ls E2E (real proxy-client + real identity chain)", () => {
     });
     env = await makeCliEnv({ proxyUrl: server.url, githubToken: token });
 
-    const r = await runSitesLs(env.env, { json: true });
+    const r = await runSitesList(env.env, { json: true });
 
     expect(r.captured.code).toBe(13);
     const errorBlock = r.envelope!["error"] as {
@@ -161,7 +161,7 @@ describe("sites ls E2E (real proxy-client + real identity chain)", () => {
     });
     env = await makeCliEnv({ proxyUrl: server.url, githubToken: token });
 
-    const r = await runSitesLs(env.env, { json: true, held: true });
+    const r = await runSitesList(env.env, { json: true, held: true });
 
     expect(r.captured.code).toBeUndefined();
     expect(r.envelope!["scope"]).toBe("held");
@@ -183,7 +183,7 @@ describe("sites ls E2E (real proxy-client + real identity chain)", () => {
     });
     env = await makeCliEnv({ proxyUrl: server.url, githubToken: token });
 
-    const r = await runSitesLs(env.env, { json: true });
+    const r = await runSitesList(env.env, { json: true });
 
     expect(r.envelope!["count"]).toBe(1);
     expect((r.envelope!["sites"] as SiteRow[])[0]!.slug).toBe("alpha");
@@ -192,7 +192,7 @@ describe("sites ls E2E (real proxy-client + real identity chain)", () => {
   it("refuses --held with --mine before any request reaches artemis", async () => {
     env = await makeCliEnv({ proxyUrl: server.url, githubToken: token });
 
-    const r = await runSitesLs(env.env, { json: true, held: true, mine: true });
+    const r = await runSitesList(env.env, { json: true, held: true, mine: true });
 
     expect(r.captured.code).toBe(10);
     expect((r.envelope!["error"] as { message: string }).message).toContain(

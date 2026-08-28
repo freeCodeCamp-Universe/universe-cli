@@ -89,7 +89,7 @@ describe("whoami command", () => {
     expect(env.authorizedSitesCount).toBe(2);
     expect(env.identitySource).toBe("env_GITHUB_TOKEN");
     expect(env.proxyUrl).toBe("https://uploads.freecode.camp");
-    // Regression: the full site list belongs in `sites ls --mine`, not
+    // Regression: the full site list belongs in `sites list --mine`, not
     // in the identity envelope. See deploy preflight + whoami split.
     expect(env.authorizedSites).toBeUndefined();
   });
@@ -101,9 +101,9 @@ describe("whoami command", () => {
     expect(msg).toContain("alice");
     expect(msg).toContain("env_GITHUB_TOKEN");
     expect(msg).toContain("Authorized for 2 sites");
-    expect(msg).toContain("universe sites ls --mine");
+    expect(msg).toContain("universe sites list --mine");
     // Site slugs themselves must NOT appear in whoami output — they live
-    // in `sites ls --mine` to keep whoami readable at staff scale.
+    // in `sites list --mine` to keep whoami readable at staff scale.
     expect(msg).not.toContain("news");
     expect(msg).not.toContain("certifications");
   });

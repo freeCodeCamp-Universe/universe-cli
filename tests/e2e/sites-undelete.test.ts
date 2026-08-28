@@ -133,7 +133,7 @@ describe("sites undelete E2E (real proxy-client + real identity chain)", () => {
     expect(errorBlock.message).toContain("not_found");
     expect(errorBlock.message).toContain("site is not registered");
     expect(errorBlock.message).not.toContain("site is not a reserved name");
-    expect(errorBlock.message).toContain("universe sites ls --held");
+    expect(errorBlock.message).toContain("universe sites list --held");
     expect(errorBlock.message).not.toContain("1.10.0");
   });
 

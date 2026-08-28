@@ -72,7 +72,7 @@ describe("sites undelete on a 404", () => {
     await expect(undelete({ json: false, slug: "blog" }, deps)).rejects.toThrow("__exit__");
     const msg = deps.logError.mock.calls[0]?.[0] as string;
     expect(msg).toMatch(/expired/i);
-    expect(msg).toMatch(/sites ls --held/);
+    expect(msg).toMatch(/sites list --held/);
     expect(msg).not.toMatch(/predate/i);
   });
 });

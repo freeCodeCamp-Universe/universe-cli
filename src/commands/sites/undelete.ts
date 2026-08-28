@@ -54,7 +54,7 @@ export async function undelete(
     const { code, message } = wrapProxyError(command, err);
     const hinted =
       err instanceof ProxyError && err.status === 404
-        ? `${message}\n  hint: the hold may have expired, or the slug may be wrong. Run \`universe sites ls --held\` to see the names still recoverable.`
+        ? `${message}\n  hint: the hold may have expired, or the slug may be wrong. Run \`universe sites list --held\` to see the names still recoverable.`
         : message;
     outputError({ json: options.json, command }, code, hinted, {
       logError: error,

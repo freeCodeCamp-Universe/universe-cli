@@ -168,7 +168,7 @@ describe("outputError", () => {
 
   it("includes kind and requestId in the JSON error envelope", () => {
     const stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
-    const ctx: OutputContext = { json: true, command: "repo ls" };
+    const ctx: OutputContext = { json: true, command: "repo list" };
     outputError(ctx, 12, "denied", {
       kind: "user_unauthorized",
       requestId: "req-1",

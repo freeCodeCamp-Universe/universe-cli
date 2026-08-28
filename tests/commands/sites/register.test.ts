@@ -79,7 +79,7 @@ describe("sites register command", () => {
     expect(env.teams).toEqual(["staff"]);
     expect(env.createdBy).toBe("alice");
     // identitySource is carried through to JSON envelope for parity
-    // with whoami/ls/deploy/promote/rollback.
+    // with whoami/list/deploy/promote/rollback.
     expect(env.identitySource).toBe("env_GITHUB_TOKEN");
   });
 

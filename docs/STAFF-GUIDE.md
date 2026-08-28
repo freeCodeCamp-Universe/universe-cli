@@ -62,7 +62,7 @@ universe whoami
 This prints your resolved GitHub login, **which identity source fired** (`env_GITHUB_TOKEN`, `env_GH_TOKEN`, `device_flow`, or `gh_cli`), the proxy URL, and the count of sites you can reach. For the actual list:
 
 ```sh
-universe sites ls --mine
+universe sites list --mine
 ```
 
 The split is deliberate: `whoami` stays compact even when you're on dozens of teams; the listing lives in `sites`. If `login` warns about **0 authorized sites**, the Universe CLI GitHub App likely isn't installed on the org, or you're on no team granted a site — see [Identity & SSO](#identity--sso). The identity chain in full lives in [`reference.md`](reference.md#identity).
@@ -134,7 +134,7 @@ Under `--json` the `deploy` envelope names the stamp in a `shaSource` field: `he
 ## 4. Inspect deploys
 
 ```sh
-universe static ls
+universe static list
 ```
 
 Lists recent deploys for the site in `platform.yaml`; `--site <slug>` inspects another site you can reach. You'll need an id to promote or roll back.
@@ -169,7 +169,7 @@ If you'd rather promote right after checking preview, `universe static deploy --
 
 ## 6. Roll back
 
-Rollback is an alias rewrite, not a redeploy. Pick a past id with `universe static ls`, then:
+Rollback is an alias rewrite, not a redeploy. Pick a past id with `universe static list`, then:
 
 ```sh
 universe static rollback --to 20260427-141522-abc1234
@@ -192,7 +192,7 @@ UNIVERSE_PROXY_URL=https://uploads.staging.freecode.camp universe static deploy
 There is **no in-place rename** — the proxy has no slug-rename endpoint, and the CLI never holds the R2 admin key, so it cannot move deployed bytes. A rename is "register the new slug, redeploy, drop the old one":
 
 ```sh
-universe sites ls --mine                              # note the OLD slug's teams
+universe sites list --mine                              # note the OLD slug's teams
 universe sites register <new-slug> --team=<same,teams>  # 1. claim the new slug
 ```
 
@@ -218,19 +218,19 @@ Deploy history does not carry over — the new slug starts fresh. There is no re
 `universe sites rm` takes the site offline and **holds** its name for 72 hours. It does not free the name, and it does not remove the files. Inside that window the delete is fully reversible:
 
 ```sh
-universe sites ls --held                  # every held name, each with its real deadline
-universe sites undelete <slug>            # put the site back online at the deploy it was serving
+universe sites list --held      # every held name, each with its real deadline
+universe sites undelete <slug>  # put the site back online at the deploy it was serving
 ```
 
 `undelete` restores the site and prints the two deploys it was serving, production and preview. You do not need to deploy again. The proxy returns those two pointers once and then forgets them, so keep the output if you must record what came back.
 
 Three things behave differently while a name is held:
 
-- `universe sites ls` does not show it — only `--held` does.
+- `universe sites list` does not show it — only `--held` does.
 - `universe sites register <slug>` fails, because the name is not free.
 - `universe static deploy` fails with exit 10 and names the hold. Run `undelete` first.
 
-Run `undelete` as soon as you notice the mistake. `universe sites ls --held` is the only place the real deadline appears — `sites rm` prints none. After the hold expires the name frees itself, the files are removed, and nothing can bring the site back.
+Run `undelete` as soon as you notice the mistake. `universe sites list --held` is the only place the real deadline appears — `sites rm` prints none. After the hold expires the name frees itself, the files are removed, and nothing can bring the site back.
 
 ### Free a held name early
 
@@ -257,14 +257,14 @@ The registry maps each site slug to the GitHub teams allowed to deploy it. The p
 Reads are open to any GitHub user the proxy can identify; writes require the `staff` team, except `release`, which needs the approver team.
 
 ```sh
-universe sites ls                                       # every registered site
-universe sites ls --mine                                # filter to sites you're authorized for
+universe sites list                                     # every registered site
+universe sites list --mine                              # filter to sites you're authorized for
 universe sites register <slug>                          # register; --team defaults to "staff"
 universe sites register <slug> --team=news-editors      # register with a specific team
 universe sites update <slug> --team=staff,news-editors  # REPLACE the teams list wholesale
 universe sites rm <slug>                                # take offline; the name is HELD, not freed
 universe sites undelete <slug>                          # bring it back while the name is still held
-universe sites ls --held                                # held names, with the real deadline per name
+universe sites list --held                              # held names, with the real deadline per name
 universe sites release <slug>                           # approvers: free the name now, trash the files
 ```
 
@@ -307,10 +307,10 @@ universe repo create learn-python-rpg --visibility private --template hello-univ
 Track it:
 
 ```sh
-universe repo ls                 # pending queue (default)
-universe repo ls --all           # every state — shorthand for --status all
-universe repo ls --status all    # any of pending|approved|active|rejected|failed|all
-universe repo ls --mine          # only your requests
+universe repo list               # pending queue (default)
+universe repo list --all         # every state — shorthand for --status all
+universe repo list --status all  # any of pending|approved|active|rejected|failed|all
+universe repo list --mine        # only your requests
 universe repo status <id>        # one request's full state
 ```
 
@@ -326,7 +326,7 @@ universe repo rm <id>                       # delete a request, freeing its repo
 
 If GitHub creation fails after approval (e.g. the App lacks `Contents:read` on a template), `approve` reports `approved, but repository creation failed`, exits `STORAGE` (13), and the request moves to `failed` with its name freed for a retry. A request another admin already resolved returns `409`; the guard prevents double-creation.
 
-`repo rm` deletes a request record. Use it to clear a stuck `active` row whose GitHub repo no longer exists (an `active` request is the only terminal state that still holds the name claim; `failed`/`rejected` already freed their name on resolution, so `repo rm` on those just removes a leftover record). It removes only the queue record, never a GitHub repo. Creating over a stale `active` name also self-heals: artemis verifies the repo is gone and reconciles the claim (the stale row is marked `failed`, not deleted, so its audit trail survives). Find the blocking record with `universe repo ls --all`.
+`repo rm` deletes a request record. Use it to clear a stuck `active` row whose GitHub repo no longer exists (an `active` request is the only terminal state that still holds the name claim; `failed`/`rejected` already freed their name on resolution, so `repo rm` on those just removes a leftover record). It removes only the queue record, never a GitHub repo. Creating over a stale `active` name also self-heals: artemis verifies the repo is gone and reconciles the claim (the stale row is marked `failed`, not deleted, so its audit trail survives). Find the blocking record with `universe repo list --all`.
 
 ## CI & automation
 

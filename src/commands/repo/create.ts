@@ -204,7 +204,7 @@ export async function create(
           `  Repository:  ${row.owner}/${row.name}`,
           `  Visibility:  ${row.visibility}`,
           ...(row.template ? [`  Template:    ${row.template}`] : []),
-          `  Status:      ${row.status} — run \`universe repo ls\` to review`,
+          `  Status:      ${row.status} — run \`universe repo list\` to review`,
         ].join("\n"),
       );
     }
@@ -212,7 +212,7 @@ export async function create(
     const { code, message, kind, requestId } = wrapProxyError(command, err);
     const display =
       kind === "already_exists" && !options.json
-        ? `${message}\n  → run \`universe repo ls --status all\` to find the existing request (it may be active or failed)`
+        ? `${message}\n  → run \`universe repo list --status all\` to find the existing request (it may be active or failed)`
         : message;
     outputError({ json: options.json, command }, code, display, {
       logError: error,

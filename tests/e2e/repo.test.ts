@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { approve } from "../../src/commands/repo/approve.js";
 import { create } from "../../src/commands/repo/create.js";
-import { ls } from "../../src/commands/repo/ls.js";
+import { list } from "../../src/commands/repo/list.js";
 import { reject } from "../../src/commands/repo/reject.js";
 import { rm } from "../../src/commands/repo/rm.js";
 import { status } from "../../src/commands/repo/status.js";
@@ -72,7 +72,7 @@ describe("repo E2E (real proxy-client + real identity chain)", () => {
     await server.close();
   });
 
-  it("runs the create → ls → approve → status lifecycle", async () => {
+  it("runs the create → list → approve → status lifecycle", async () => {
     const created = await run(
       create as never,
       { json: true, name: "learn-python-rpg", visibility: "private" },
@@ -83,7 +83,7 @@ describe("repo E2E (real proxy-client + real identity chain)", () => {
     const id = created.envelope!["id"] as string;
     expect(id).toMatch(/^req_/);
 
-    const listed = await run(ls as never, { json: true }, env.env);
+    const listed = await run(list as never, { json: true }, env.env);
     expect(listed.envelope!["count"]).toBe(1);
     expect(listed.envelope!["status"]).toBe("pending");
     const requests = listed.envelope!["requests"] as Array<{ name: string }>;

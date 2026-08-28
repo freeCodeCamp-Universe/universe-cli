@@ -82,8 +82,8 @@ src/
   cli.ts              # commander entry + command wiring
   errors.ts           # typed error envelope
   index.ts            # bin entry → cli.ts
-  commands/           # per-verb handlers (deploy, promote, rollback, ls, login, …)
-  commands/repo/      # repo-request queue: create/ls/approve/reject/status, _shared, schema (zod)
+  commands/           # per-verb handlers (deploy, promote, rollback, list, login, …)
+  commands/repo/      # repo-request queue: create/list/approve/reject/status, _shared, schema (zod)
   deploy/             # upload pipeline (walk, ignore, progress)
   lib/                # platform-yaml, identity, proxy-client, constants
   output/             # exit-codes, JSON envelopes, terminal formatters
@@ -115,7 +115,7 @@ Contracts, not style preferences.
 - **Site-name validation:** `SITE_NAME_PATTERN` in `src/lib/platform-yaml.schema.ts`. **Repo-name validation:** `REPO_NAME_RE` in `src/commands/repo/schema.ts` — byte-identical to artemis `reporequest.NameRE`; keep them in lockstep, a mismatch lets bad names bypass preflight.
 - **`platform.yaml` schema** (`src/lib/platform-yaml.schema.ts`), shape `{site, build?, deploy}`. Strict — unknown keys reject.
 - **Identity is a 4-source chain** (`src/lib/identity.ts`); see [reference.md](reference.md#identity). No secrets, no `.env` reads — credentials come from the chain or `UNIVERSE_PROXY_URL`, never from disk.
-- **Repo authz is org-scoped to `freeCodeCamp-Universe`:** create/ls/status → `staff`; approve/reject → the approver team. artemis probes membership against `GH_REPO_ORG` (distinct from the site-registry `GH_ORG`).
+- **Repo authz is org-scoped to `freeCodeCamp-Universe`:** create/list/status → `staff`; approve/reject → the approver team. artemis probes membership against `GH_REPO_ORG` (distinct from the site-registry `GH_ORG`).
 - **Packaging:** the npm tarball ships `dist/` + `README.md` + `LICENSE`. SEA artifacts (`sea-config.json` + `entitlements.plist` + ad-hoc macOS `codesign`) build the four signed binaries attached to Releases. Release is OIDC-only (Trusted Publisher, no `NPM_TOKEN`) — see [RELEASING.md](RELEASING.md).
 - **E2E layer** (`tests/e2e/`, inside `pnpm test`): in-process tests call handlers directly against a stateful `fake-artemis.ts`; a spawned-binary smoke boots `dist/index.cjs` to catch loader/tsdown/commander regressions; per-test `mkdtemp` `XDG_CONFIG_HOME` keeps runs parallel-safe. `pnpm test:smoke` hits the live proxy (gated on `UNIVERSE_E2E_REAL=1`; needs a pre-registered `UNIVERSE_REAL_SITE`).
 

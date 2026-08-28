@@ -4,11 +4,11 @@ import { deploy } from "./commands/deploy.js";
 import { init } from "./commands/init.js";
 import { login } from "./commands/login.js";
 import { logout } from "./commands/logout.js";
-import { ls } from "./commands/ls.js";
+import { list } from "./commands/list.js";
 import { promote } from "./commands/promote.js";
 import { rollback } from "./commands/rollback.js";
 import { whoami } from "./commands/whoami.js";
-import { ls as sitesLs } from "./commands/sites/ls.js";
+import { list as sitesList } from "./commands/sites/list.js";
 import { register as sitesRegister } from "./commands/sites/register.js";
 import { release as sitesRelease } from "./commands/sites/release.js";
 import { rm as sitesRm } from "./commands/sites/rm.js";
@@ -16,11 +16,11 @@ import { undelete as sitesUndelete } from "./commands/sites/undelete.js";
 import { update as sitesUpdate } from "./commands/sites/update.js";
 import { approve as repoApprove } from "./commands/repo/approve.js";
 import { create as repoCreate } from "./commands/repo/create.js";
-import { ls as repoLs } from "./commands/repo/ls.js";
+import { list as repoList } from "./commands/repo/list.js";
 import { reject as repoReject } from "./commands/repo/reject.js";
 import { rm as repoRm } from "./commands/repo/rm.js";
 import { status as repoStatus } from "./commands/repo/status.js";
-import { ls as auditLs } from "./commands/audit/ls.js";
+import { list as auditList } from "./commands/audit/list.js";
 import { type OutputContext, outputError } from "./output/format.js";
 import { EXIT_USAGE, exitWithCode } from "./output/exit-codes.js";
 import { CliError } from "./errors.js";
@@ -118,20 +118,21 @@ export async function run(argv = process.argv): Promise<void> {
     });
 
   sitesCli
-    .command("ls")
+    .command("list")
+    .alias("ls")
     .description("List sites in the registry")
     .option("--mine", "Filter to sites your GitHub identity is authorized for")
     .option("--held", "List names held by a delete instead of active sites")
     .action(async (_opts, cmd: Command) => {
       const opts = cmd.optsWithGlobals<{ json?: boolean; mine?: boolean; held?: boolean }>();
       try {
-        await sitesLs({
+        await sitesList({
           json: opts.json ?? false,
           mine: opts.mine ?? false,
           held: opts.held ?? false,
         });
       } catch (err: unknown) {
-        handleActionError("sites ls", opts.json ?? false, err);
+        handleActionError("sites list", opts.json ?? false, err);
       }
     });
 
@@ -222,7 +223,8 @@ export async function run(argv = process.argv): Promise<void> {
     });
 
   repoCli
-    .command("ls")
+    .command("list")
+    .alias("ls")
     .description("List repo requests (default: pending)")
     .option("--status <status>", "pending | approved | active | rejected | failed | all")
     .option("--mine", "Only requests you submitted")
@@ -235,14 +237,14 @@ export async function run(argv = process.argv): Promise<void> {
         all?: boolean;
       }>();
       try {
-        await repoLs({
+        await repoList({
           json: opts.json ?? false,
           status: opts.status,
           mine: opts.mine ?? false,
           all: opts.all ?? false,
         });
       } catch (err: unknown) {
-        handleActionError("repo ls", opts.json ?? false, err);
+        handleActionError("repo list", opts.json ?? false, err);
       }
     });
 
@@ -378,18 +380,19 @@ export async function run(argv = process.argv): Promise<void> {
     });
 
   staticCli
-    .command("ls")
+    .command("list")
+    .alias("ls")
     .description("List recent deploys for a site")
     .option("--site <site>", "Override site from platform.yaml")
     .action(async (_opts, cmd: Command) => {
       const opts = cmd.optsWithGlobals<{ json?: boolean; site?: string }>();
       try {
-        await ls({
+        await list({
           json: opts.json ?? false,
           site: opts.site,
         });
       } catch (err: unknown) {
-        handleActionError("ls", opts.json ?? false, err);
+        handleActionError("list", opts.json ?? false, err);
       }
     });
 
@@ -502,7 +505,8 @@ export async function run(argv = process.argv): Promise<void> {
     });
 
   auditCli
-    .command("ls")
+    .command("list")
+    .alias("ls")
     .description("List durable audit events (who did what)")
     .option("--actor <login>", "Filter by GitHub actor")
     .option("--action <action>", "Filter by action (e.g. repo.approve)")
@@ -519,7 +523,7 @@ export async function run(argv = process.argv): Promise<void> {
         limit?: number;
       }>();
       try {
-        await auditLs({
+        await auditList({
           json: opts.json ?? false,
           actor: opts.actor,
           action: opts.action,
@@ -528,7 +532,7 @@ export async function run(argv = process.argv): Promise<void> {
           limit: opts.limit,
         });
       } catch (err: unknown) {
-        handleActionError("audit ls", opts.json ?? false, err);
+        handleActionError("audit list", opts.json ?? false, err);
       }
     });
 

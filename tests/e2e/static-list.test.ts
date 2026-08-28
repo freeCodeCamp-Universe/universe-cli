@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ls } from "../../src/commands/ls.js";
+import { list } from "../../src/commands/list.js";
 import { type CliEnv, makeCliEnv } from "./_helpers/cli-env.js";
 import { type FakeArtemis, startFakeArtemis } from "./_helpers/fake-artemis.js";
 
@@ -31,7 +31,7 @@ interface RunResult {
   logInfo: ReturnType<typeof vi.fn>;
 }
 
-async function runLsJson(
+async function runListJson(
   env: NodeJS.ProcessEnv,
   options: { json: true; site?: string },
   cwd?: string,
@@ -46,7 +46,7 @@ async function runLsJson(
   const logError = vi.fn();
   const logInfo = vi.fn();
   try {
-    await ls(options, {
+    await list(options, {
       cwd: cwd ?? process.cwd(),
       env,
       exit: makeExit(captured),
@@ -79,10 +79,10 @@ function siteRow(slug: string): {
   };
 }
 
-describe("static ls E2E (real proxy-client + real identity chain)", () => {
+describe("static list E2E (real proxy-client + real identity chain)", () => {
   let server: FakeArtemis;
   let env: CliEnv;
-  const token = "ghp_e2e_ls";
+  const token = "ghp_e2e_list";
   const projectDirs: string[] = [];
 
   beforeEach(async () => {
@@ -115,10 +115,10 @@ describe("static ls E2E (real proxy-client + real identity chain)", () => {
     server.state.aliases.production.set("my-site", "20260228-120000-def5678");
     env = await makeCliEnv({ proxyUrl: server.url, githubToken: token });
 
-    const r = await runLsJson(env.env, { json: true, site: "my-site" });
+    const r = await runListJson(env.env, { json: true, site: "my-site" });
 
     expect(r.captured.code).toBeUndefined();
-    expect(r.envelope!["command"]).toBe("ls");
+    expect(r.envelope!["command"]).toBe("list");
     expect(r.envelope!["success"]).toBe(true);
     expect(r.envelope!["site"]).toBe("my-site");
     const deploys = r.envelope!["deploys"] as Array<Record<string, unknown>>;
@@ -154,7 +154,7 @@ describe("static ls E2E (real proxy-client + real identity chain)", () => {
     server.state.registry.set("my-site", siteRow("my-site"));
     env = await makeCliEnv({ proxyUrl: server.url, githubToken: token });
 
-    const r = await runLsJson(env.env, { json: true, site: "my-site" });
+    const r = await runListJson(env.env, { json: true, site: "my-site" });
 
     expect(r.captured.code).toBeUndefined();
     expect(r.envelope!["success"]).toBe(true);
@@ -168,7 +168,7 @@ describe("static ls E2E (real proxy-client + real identity chain)", () => {
     });
     env = await makeCliEnv({ proxyUrl: server.url, githubToken: token });
 
-    const r = await runLsJson(env.env, { json: true, site: "ghost" });
+    const r = await runListJson(env.env, { json: true, site: "ghost" });
 
     expect(r.captured.code).toBe(10);
     const errorBlock = r.envelope!["error"] as {
@@ -191,7 +191,7 @@ describe("static ls E2E (real proxy-client + real identity chain)", () => {
     server.state.registry.set("locked", siteRow("locked"));
     env = await makeCliEnv({ proxyUrl: server.url, githubToken: token });
 
-    const r = await runLsJson(env.env, { json: true, site: "locked" });
+    const r = await runListJson(env.env, { json: true, site: "locked" });
 
     expect(r.captured.code).toBe(12);
     const errorBlock = r.envelope!["error"] as {
@@ -222,7 +222,7 @@ describe("static ls E2E (real proxy-client + real identity chain)", () => {
       "utf-8",
     );
 
-    const r = await runLsJson(env.env, { json: true, site: "from-flag" }, projectDir);
+    const r = await runListJson(env.env, { json: true, site: "from-flag" }, projectDir);
 
     expect(r.captured.code).toBeUndefined();
     expect(r.envelope!["site"]).toBe("from-flag");

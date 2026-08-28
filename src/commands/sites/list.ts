@@ -5,7 +5,7 @@ import { exitWithCode } from "../../output/exit-codes.js";
 import { emitJson, outputError } from "../../output/format.js";
 import { setupClient, UsageError, type SitesCommandDeps } from "./_shared.js";
 
-export interface SitesLsOptions {
+export interface SitesListOptions {
   json: boolean;
   /** When true, intersect the registry with the caller's authorized sites. */
   mine?: boolean;
@@ -29,8 +29,8 @@ function formatTable(rows: SiteRow[], held = false): string {
   return [fmt(headers), ...cells.map(fmt)].join("\n");
 }
 
-export async function ls(options: SitesLsOptions, deps: SitesCommandDeps = {}): Promise<void> {
-  const command = "sites ls";
+export async function list(options: SitesListOptions, deps: SitesCommandDeps = {}): Promise<void> {
+  const command = "sites list";
   const success = deps.logSuccess ?? ((s: string) => log.message(s));
   const error = deps.logError ?? ((s: string) => log.error(s));
   const exit = deps.exit ?? exitWithCode;

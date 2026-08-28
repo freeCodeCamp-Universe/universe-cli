@@ -130,7 +130,7 @@ vi.mock("../src/commands/promote.js", () => ({
 vi.mock("../src/commands/rollback.js", () => ({
   rollback: vi.fn(),
 }));
-vi.mock("../src/commands/sites/ls.js", () => ({ ls: vi.fn() }));
+vi.mock("../src/commands/sites/list.js", () => ({ list: vi.fn() }));
 vi.mock("../src/commands/sites/release.js", () => ({ release: vi.fn() }));
 vi.mock("../src/commands/login.js", () => ({
   login: vi.fn(),
@@ -142,31 +142,37 @@ vi.mock("../src/commands/whoami.js", () => ({
   whoami: vi.fn(),
 }));
 vi.mock("../src/commands/repo/create.js", () => ({ create: vi.fn() }));
-vi.mock("../src/commands/repo/ls.js", () => ({ ls: vi.fn() }));
+vi.mock("../src/commands/repo/list.js", () => ({ list: vi.fn() }));
 vi.mock("../src/commands/repo/approve.js", () => ({ approve: vi.fn() }));
 vi.mock("../src/commands/repo/reject.js", () => ({ reject: vi.fn() }));
 vi.mock("../src/commands/repo/status.js", () => ({ status: vi.fn() }));
+vi.mock("../src/commands/list.js", () => ({ list: vi.fn() }));
+vi.mock("../src/commands/audit/list.js", () => ({ list: vi.fn() }));
 
 import { deploy } from "../src/commands/deploy.js";
 import { login } from "../src/commands/login.js";
 import { logout } from "../src/commands/logout.js";
 import { whoami } from "../src/commands/whoami.js";
 import { create as repoCreate } from "../src/commands/repo/create.js";
-import { ls as repoLs } from "../src/commands/repo/ls.js";
+import { list as repoList } from "../src/commands/repo/list.js";
 import { approve as repoApprove } from "../src/commands/repo/approve.js";
 import { promote } from "../src/commands/promote.js";
-import { ls as sitesLs } from "../src/commands/sites/ls.js";
+import { list as sitesList } from "../src/commands/sites/list.js";
 import { release as sitesRelease } from "../src/commands/sites/release.js";
+import { list as staticList } from "../src/commands/list.js";
+import { list as auditList } from "../src/commands/audit/list.js";
 const mockDeploy = vi.mocked(deploy);
 const mockLogin = vi.mocked(login);
 const mockLogout = vi.mocked(logout);
 const mockWhoami = vi.mocked(whoami);
 const mockRepoCreate = vi.mocked(repoCreate);
-const mockRepoLs = vi.mocked(repoLs);
+const mockRepoList = vi.mocked(repoList);
 const mockRepoApprove = vi.mocked(repoApprove);
 const mockPromote = vi.mocked(promote);
-const mockSitesLs = vi.mocked(sitesLs);
+const mockSitesList = vi.mocked(sitesList);
 const mockSitesRelease = vi.mocked(sitesRelease);
+const mockStaticList = vi.mocked(staticList);
+const mockAuditList = vi.mocked(auditList);
 
 describe("top-level error handling", () => {
   beforeEach(() => {
@@ -293,12 +299,12 @@ describe("universe static namespace", () => {
     vi.restoreAllMocks();
   });
 
-  it("static --help lists subcommands (deploy, promote, rollback, ls)", () => {
+  it("static --help lists subcommands (deploy, promote, rollback, list)", () => {
     run(["node", "universe", "static", "--help"]);
     expect(output).toContain("deploy");
     expect(output).toContain("promote");
     expect(output).toContain("rollback");
-    expect(output).toContain("ls");
+    expect(output).toContain("list|ls");
   });
 
   it("static deploy --help shows deploy-specific options", () => {
@@ -358,6 +364,31 @@ describe("universe static namespace", () => {
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(mockPromote).toHaveBeenCalledWith(expect.objectContaining({ allowDirty: false }));
   });
+
+  it("routes the `ls` alias to the static list handler", async () => {
+    mockStaticList.mockResolvedValue(undefined);
+    run(["node", "universe", "static", "ls", "--site", "blog"]);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(mockStaticList).toHaveBeenCalledWith(expect.objectContaining({ site: "blog" }));
+  });
+});
+
+describe("universe audit namespace", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(process, "exit").mockImplementation((() => {}) as never);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("routes the `ls` alias to the audit list handler", async () => {
+    mockAuditList.mockResolvedValue(undefined);
+    run(["node", "universe", "audit", "ls", "--actor", "alice"]);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(mockAuditList).toHaveBeenCalledWith(expect.objectContaining({ actor: "alice" }));
+  });
 });
 
 describe("universe sites flag wiring", () => {
@@ -366,14 +397,21 @@ describe("universe sites flag wiring", () => {
   });
 
   it("maps --held to held, and defaults it false", async () => {
-    mockSitesLs.mockResolvedValue(undefined);
+    mockSitesList.mockResolvedValue(undefined);
+    run(["node", "universe", "sites", "list", "--held"]);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(mockSitesList).toHaveBeenCalledWith(expect.objectContaining({ held: true }));
+    mockSitesList.mockClear();
+    run(["node", "universe", "sites", "list"]);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(mockSitesList).toHaveBeenCalledWith(expect.objectContaining({ held: false }));
+  });
+
+  it("routes the `ls` alias to the sites list handler", async () => {
+    mockSitesList.mockResolvedValue(undefined);
     run(["node", "universe", "sites", "ls", "--held"]);
     await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(mockSitesLs).toHaveBeenCalledWith(expect.objectContaining({ held: true }));
-    mockSitesLs.mockClear();
-    run(["node", "universe", "sites", "ls"]);
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(mockSitesLs).toHaveBeenCalledWith(expect.objectContaining({ held: false }));
+    expect(mockSitesList).toHaveBeenCalledWith(expect.objectContaining({ held: true }));
   });
 
   it("maps --yes to yes on release, and defaults it false so the prompt still fires", async () => {
@@ -410,10 +448,10 @@ describe("universe repo namespace", () => {
     vi.restoreAllMocks();
   });
 
-  it("repo --help lists subcommands (create, ls, approve, reject, status)", () => {
+  it("repo --help lists subcommands (create, list, approve, reject, status)", () => {
     run(["node", "universe", "repo", "--help"]);
     expect(output).toContain("create");
-    expect(output).toContain("ls");
+    expect(output).toContain("list|ls");
     expect(output).toContain("approve");
     expect(output).toContain("reject");
     expect(output).toContain("status");
@@ -427,10 +465,17 @@ describe("universe repo namespace", () => {
   });
 
   it("global --json BEFORE 'repo' still routes to repoCli", async () => {
-    mockRepoLs.mockResolvedValue(undefined);
-    run(["node", "universe", "--json", "repo", "ls"]);
+    mockRepoList.mockResolvedValue(undefined);
+    run(["node", "universe", "--json", "repo", "list"]);
     await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(mockRepoLs).toHaveBeenCalledWith(expect.objectContaining({ json: true }));
+    expect(mockRepoList).toHaveBeenCalledWith(expect.objectContaining({ json: true }));
+  });
+
+  it("routes the `ls` alias to the repo list handler", async () => {
+    mockRepoList.mockResolvedValue(undefined);
+    run(["node", "universe", "repo", "ls", "--mine"]);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(mockRepoList).toHaveBeenCalledWith(expect.objectContaining({ mine: true }));
   });
 
   it("repo create passes the positional name + flags", async () => {
