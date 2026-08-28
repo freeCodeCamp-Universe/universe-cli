@@ -129,6 +129,34 @@ describe("whoami command", () => {
     expect(deps.logError).toHaveBeenCalledWith(expect.stringContaining("bad token"));
   });
 
+  it("exits with EXIT_USAGE for a generic TypeError, not EXIT_CREDENTIALS", async () => {
+    const deps = mkDeps({
+      createProxyClient: vi.fn().mockReturnValue({
+        whoami: vi.fn().mockRejectedValue(new TypeError("fetch failed")),
+      }),
+    });
+    await expect(whoami({ json: false }, deps)).rejects.toThrow("__exit__");
+    expect(deps.exit).toHaveBeenCalledWith(10); // EXIT_USAGE
+    expect(deps.logError).toHaveBeenCalledWith(expect.stringContaining("fetch failed"));
+  });
+
+  it("surfaces user_unauthorized hint via wrapProxyError", async () => {
+    const deps = mkDeps({
+      createProxyClient: vi.fn().mockReturnValue({
+        whoami: vi
+          .fn()
+          .mockRejectedValue(
+            new ProxyError(403, "user_unauthorized", "caller is not on the required team"),
+          ),
+      }),
+    });
+    await expect(whoami({ json: false }, deps)).rejects.toThrow("__exit__");
+    expect(deps.exit).toHaveBeenCalledWith(12);
+    const msg = (deps.logError.mock.calls[0]?.[0] as string) ?? "";
+    expect(msg).toContain("whoami failed (user_unauthorized)");
+    expect(msg).toContain("read:org");
+  });
+
   it("emits error envelope in JSON mode on proxy failure", async () => {
     const stdout: string[] = [];
     const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {

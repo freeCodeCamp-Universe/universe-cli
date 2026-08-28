@@ -2,7 +2,6 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { log, spinner } from "@clack/prompts";
 import {
-  CliError,
   ConfigError,
   CredentialError,
   GitError,
@@ -32,7 +31,7 @@ import {
 } from "../lib/proxy-client.js";
 import { uploadFiles as defaultUploadFiles } from "../lib/upload.js";
 import { buildEnvelope } from "../output/envelope.js";
-import { EXIT_USAGE, exitWithCode } from "../output/exit-codes.js";
+import { exitWithCode } from "../output/exit-codes.js";
 import { emitJson, outputError } from "../output/format.js";
 
 export interface DeployOptions {
@@ -490,22 +489,7 @@ export async function deploy(options: DeployOptions, deps: DeployDeps = {}): Pro
       );
     }
   } catch (err) {
-    let code: number;
-    let message: string;
-    let kind: string | undefined;
-    let requestId: string | undefined;
-    if (err instanceof ProxyError) {
-      ({ code, message, kind, requestId } = wrapProxyError("deploy", err));
-    } else if (err instanceof CliError) {
-      code = err.exitCode;
-      message = err.message;
-    } else if (err instanceof Error) {
-      code = EXIT_USAGE;
-      message = err.message;
-    } else {
-      code = EXIT_USAGE;
-      message = String(err);
-    }
+    const { code, message, kind, requestId } = wrapProxyError("deploy", err);
     outputError({ json: options.json, command: "deploy" }, code, message, {
       logError: error,
       kind,
