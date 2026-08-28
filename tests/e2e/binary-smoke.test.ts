@@ -37,6 +37,7 @@ function resetState(server: FakeArtemis): void {
   server.state.tokens.clear();
   server.state.failures.clear();
   server.state.registry.clear();
+  server.state.reservations.clear();
   server.state.deploysBySite.clear();
   server.state.deploys.clear();
   server.state.deployJwts.clear();
@@ -48,6 +49,7 @@ function resetState(server: FakeArtemis): void {
   server.state.tokens.set(TOKEN, {
     login: "alice",
     authorizedSites: [SITE],
+    approver: true,
   });
 }
 
@@ -67,7 +69,7 @@ async function makeProject(
   return { dir, cleanup: () => rm(dir, { recursive: true, force: true }) };
 }
 
-describe("binary smoke matrix (10 verbs × 1 happy-path)", () => {
+describe("binary smoke matrix — static + sites verbs against the built binary", () => {
   let server: FakeArtemis;
   let env: CliEnv;
   const projects: Array<{ cleanup: () => Promise<void> }> = [];
@@ -185,6 +187,82 @@ describe("binary smoke matrix (10 verbs × 1 happy-path)", () => {
     expect(r.exitCode, `stderr=${r.stderr}\nstdout=${r.stdout}`).toBe(0);
     expect((JSON.parse(r.stdout.trim()) as { command: string }).command).toBe("sites rm");
   }, 60_000);
+
+  it("static deploy --json --allow-dirty (preview)", async () => {
+    resetState(server);
+    server.state.registry.set(SITE, row(SITE));
+    const project = await makeProject(SITE, { "index.html": "<html></html>" });
+    projects.push(project);
+    const r = await runBinary(
+      ["static", "deploy", "--json", "--allow-dirty"],
+      env.env,
+      project.dir,
+    );
+    expect(r.exitCode, `stderr=${r.stderr}\nstdout=${r.stdout}`).toBe(0);
+    expect((JSON.parse(r.stdout.trim()) as { command: string }).command).toBe("deploy");
+  }, 60_000);
+
+  it("sites rm → ls --held → undelete round-trip", async () => {
+    resetState(server);
+    server.state.registry.set(SITE, row(SITE));
+    server.state.aliases.production.set(SITE, "20260101-090000-prod111");
+
+    const removed = await runBinary(["sites", "rm", SITE, "--json"], env.env);
+    expect(removed.exitCode, `stderr=${removed.stderr}`).toBe(0);
+
+    const held = await runBinary(["sites", "ls", "--held", "--json"], env.env);
+    expect(held.exitCode, `stderr=${held.stderr}\nstdout=${held.stdout}`).toBe(0);
+    const heldEnvelope = JSON.parse(held.stdout.trim()) as {
+      command: string;
+      scope: string;
+      sites: Array<{ slug: string; reservedUntil?: string }>;
+    };
+    expect(heldEnvelope.command).toBe("sites ls");
+    expect(heldEnvelope.scope).toBe("held");
+    expect(heldEnvelope.sites.map((siteRow) => siteRow.slug)).toEqual([SITE]);
+    expect(heldEnvelope.sites[0]!.reservedUntil).toBeTruthy();
+
+    const active = await runBinary(["sites", "ls", "--json"], env.env);
+    expect((JSON.parse(active.stdout.trim()) as { count: number }).count).toBe(0);
+
+    const restored = await runBinary(["sites", "undelete", SITE, "--json"], env.env);
+    expect(restored.exitCode, `stderr=${restored.stderr}\nstdout=${restored.stdout}`).toBe(0);
+    const restoredEnvelope = JSON.parse(restored.stdout.trim()) as {
+      command: string;
+      prevProduction: string;
+    };
+    expect(restoredEnvelope.command).toBe("sites undelete");
+    expect(restoredEnvelope.prevProduction).toBe("20260101-090000-prod111");
+    expect(server.state.aliases.production.get(SITE)).toBe("20260101-090000-prod111");
+  }, 120_000);
+
+  it("sites release --json --yes <slug>", async () => {
+    resetState(server);
+    server.state.registry.set(SITE, row(SITE));
+    const removed = await runBinary(["sites", "rm", SITE, "--json"], env.env);
+    expect(removed.exitCode, `stderr=${removed.stderr}`).toBe(0);
+
+    const r = await runBinary(["sites", "release", SITE, "--json", "--yes"], env.env);
+    expect(r.exitCode, `stderr=${r.stderr}\nstdout=${r.stdout}`).toBe(0);
+    const envelope = JSON.parse(r.stdout.trim()) as { command: string; status: string };
+    expect(envelope.command).toBe("sites release");
+    expect(envelope.status).toBe("released");
+    expect(server.state.registry.has(SITE)).toBe(false);
+  }, 120_000);
+
+  it("static deploy against a held name exits 10, not 12", async () => {
+    resetState(server);
+    server.state.registry.set(SITE, row(SITE));
+    const project = await makeProject(SITE, { "index.html": "<html></html>" });
+    projects.push(project);
+    const removed = await runBinary(["sites", "rm", SITE, "--json"], env.env);
+    expect(removed.exitCode, `stderr=${removed.stderr}`).toBe(0);
+
+    const r = await runBinary(["static", "deploy", "--json"], env.env, project.dir);
+    expect(r.exitCode).toBe(10);
+    const envelope = JSON.parse(r.stdout.trim()) as { error: { message: string } };
+    expect(envelope.error.message).toContain("its name is held");
+  }, 120_000);
 
   it("logout --json (idempotent — no token to remove)", async () => {
     const logoutEnv = await makeCliEnv({

@@ -14,22 +14,38 @@ function documentedFlags(command: string): string[] {
   return [...flags.matchAll(/`(--[a-z-]+)/g)].map((m) => m[1] as string);
 }
 
-function cliFlags(command: string): string[] {
-  const start = cli.indexOf(`.command("${command}")`);
-  expect(start, `no cli.ts command for ${command}`).toBeGreaterThan(-1);
+function escapeRegExp(literal: string): string {
+  return literal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function cliFlags(group: string, command: string): string[] {
+  const anchor = new RegExp(
+    `\\b${group}\\b[\\s\\S]{0,40}?\\.command\\("${escapeRegExp(command)}"\\)`,
+  );
+  const match = anchor.exec(cli);
+  expect(match, `no cli.ts command for ${group} ${command}`).not.toBeNull();
+  const start = cli.indexOf(".command(", match!.index);
   const next = cli.indexOf(".command(", start + 1);
   const block = cli.slice(start, next === -1 ? undefined : next);
-  return [...block.matchAll(/\.option\(\s*"(--[a-z-]+)/g)].map((m) => m[1] as string);
+  return [...block.matchAll(/\.option\(\s*"([^"]+)"/g)]
+    .flatMap((m) => [...(m[1] as string).matchAll(/(--[a-z-]+)/g)])
+    .map((m) => m[1] as string);
 }
 
 describe("docs/reference.md command table", () => {
-  for (const [documented, implemented] of [
-    ["universe static deploy", "deploy"],
-    ["universe static promote", "promote"],
-    ["universe static rollback", "rollback"],
+  for (const [documented, group, implemented] of [
+    ["universe static deploy", "staticCli", "deploy"],
+    ["universe static promote", "staticCli", "promote"],
+    ["universe static rollback", "staticCli", "rollback"],
+    ["universe sites ls", "sitesCli", "ls"],
+    ["universe sites register <slug>", "sitesCli", "register <slug>"],
+    ["universe sites update <slug>", "sitesCli", "update <slug>"],
+    ["universe sites rm <slug>", "sitesCli", "rm <slug>"],
+    ["universe sites undelete <slug>", "sitesCli", "undelete <slug>"],
+    ["universe sites release <slug>", "sitesCli", "release <slug>"],
   ] as const) {
-    it(`lists every ${implemented} flag the CLI defines`, () => {
-      const declared = cliFlags(implemented);
+    it(`lists every ${documented} flag the CLI defines`, () => {
+      const declared = cliFlags(group, implemented);
       const listed = documentedFlags(documented);
       const missing = declared.filter((flag) => !listed.includes(flag));
       expect(missing, `undocumented in reference.md: ${missing.join(", ")}`).toHaveLength(0);

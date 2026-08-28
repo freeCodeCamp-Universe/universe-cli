@@ -151,7 +151,7 @@ describe("sites register E2E (real proxy-client + real identity chain)", () => {
     };
     expect(errorBlock.code).toBe(10);
     expect(errorBlock.message).toContain("already_exists");
-    expect(errorBlock.message).toContain("blog");
+    expect(errorBlock.message).toContain("site is already registered");
   });
 
   it("exits EXIT_CREDENTIALS on 403 user_unauthorized", async () => {

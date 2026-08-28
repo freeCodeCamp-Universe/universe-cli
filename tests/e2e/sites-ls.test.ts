@@ -27,7 +27,7 @@ interface RunResult {
 
 async function runSitesLs(
   env: NodeJS.ProcessEnv,
-  options: { json: true; mine?: boolean },
+  options: { json: true; mine?: boolean; held?: boolean },
 ): Promise<RunResult> {
   const chunks: string[] = [];
   const spy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
@@ -150,5 +150,54 @@ describe("sites ls E2E (real proxy-client + real identity chain)", () => {
     expect(errorBlock.code).toBe(13);
     expect(errorBlock.message).toContain("registry_read_failed");
     expect(errorBlock.message).toContain("valkey down");
+  });
+
+  it("--held asks for state=reserved and lists only the held names", async () => {
+    server.state.registry.set("alpha", row("alpha"));
+    server.state.registry.set("blog", {
+      ...row("blog"),
+      state: "reserved",
+      reservedUntil: "2026-05-15T12:00:00Z",
+    });
+    env = await makeCliEnv({ proxyUrl: server.url, githubToken: token });
+
+    const r = await runSitesLs(env.env, { json: true, held: true });
+
+    expect(r.captured.code).toBeUndefined();
+    expect(r.envelope!["scope"]).toBe("held");
+    expect(r.envelope!["count"]).toBe(1);
+    const sites = r.envelope!["sites"] as SiteRow[];
+    expect(sites[0]!.slug).toBe("blog");
+    expect(sites[0]!.reservedUntil).toBe("2026-05-15T12:00:00Z");
+
+    expect(server.callLog).toHaveLength(1);
+    expect(server.callLog[0].path).toBe("/api/sites?state=reserved");
+  });
+
+  it("the default list drops a held name, so only --held can find it", async () => {
+    server.state.registry.set("alpha", row("alpha"));
+    server.state.registry.set("blog", {
+      ...row("blog"),
+      state: "reserved",
+      reservedUntil: "2026-05-15T12:00:00Z",
+    });
+    env = await makeCliEnv({ proxyUrl: server.url, githubToken: token });
+
+    const r = await runSitesLs(env.env, { json: true });
+
+    expect(r.envelope!["count"]).toBe(1);
+    expect((r.envelope!["sites"] as SiteRow[])[0]!.slug).toBe("alpha");
+  });
+
+  it("refuses --held with --mine before any request reaches artemis", async () => {
+    env = await makeCliEnv({ proxyUrl: server.url, githubToken: token });
+
+    const r = await runSitesLs(env.env, { json: true, held: true, mine: true });
+
+    expect(r.captured.code).toBe(10);
+    expect((r.envelope!["error"] as { message: string }).message).toContain(
+      "--held cannot combine with --mine",
+    );
+    expect(server.callLog).toHaveLength(0);
   });
 });

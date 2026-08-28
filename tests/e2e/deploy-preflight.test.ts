@@ -156,4 +156,78 @@ describe("static deploy preflight E2E (build never runs on auth failure)", () =>
     const deployCalls = server.callLog.filter((c) => c.path.startsWith("/api/deploy/"));
     expect(deployCalls).toHaveLength(0);
   });
+
+  it("a held name fails with the hold, not with 'unauthorized', and skips the build", async () => {
+    const token = "ghp_e2e_held";
+    server.state.tokens.set(token, { login: "alice", authorizedSites: ["my-site"] });
+    server.state.registry.set("my-site", {
+      slug: "my-site",
+      teams: ["staff"],
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-01T00:00:00Z",
+      createdBy: "alice",
+      state: "reserved",
+      reservedUntil: "2026-05-15T12:00:00Z",
+    });
+    env = await makeCliEnv({ proxyUrl: server.url, githubToken: token });
+    const project = await makeProject({
+      site: "my-site",
+      files: { "index.html": "<html></html>" },
+    });
+    projects.push(project);
+
+    const r = await runDeployWithBuildStub(env.env, project.dir);
+
+    expect(r.captured.code).toBe(10);
+    const errorBlock = r.envelope!["error"] as { code: number; message: string };
+    expect(errorBlock.message).toContain("was deleted and its name is held");
+    expect(errorBlock.message).toContain("2026-05-15T12:00:00Z");
+    expect(errorBlock.message).not.toContain("sites register");
+
+    expect(r.buildCalls).toBe(0);
+    expect(server.callLog.filter((c) => c.path.startsWith("/api/deploy/"))).toHaveLength(0);
+    expect(server.callLog.map((c) => c.path)).toContain("/api/sites?state=reserved");
+  });
+
+  it("names the unanswered filter when artemis cannot resolve the hold", async () => {
+    const token = "ghp_e2e_probe";
+    server.state.tokens.set(token, { login: "alice", authorizedSites: ["other-site"] });
+    server.state.failures.set("GET /api/sites?state=reserved", {
+      status: 502,
+      code: "registry_read_failed",
+      message: "valkey down",
+    });
+    env = await makeCliEnv({ proxyUrl: server.url, githubToken: token });
+    const project = await makeProject({
+      site: "my-site",
+      files: { "index.html": "<html></html>" },
+    });
+    projects.push(project);
+
+    const r = await runDeployWithBuildStub(env.env, project.dir);
+
+    expect(r.captured.code).toBe(12);
+    const errorBlock = r.envelope!["error"] as { code: number; message: string };
+    expect(errorBlock.message).toContain("did not answer the held-name filter");
+    expect(errorBlock.message).toContain("universe sites ls --held");
+    expect(r.buildCalls).toBe(0);
+  });
+
+  it("keeps the plain unauthorized error when no name is held", async () => {
+    const token = "ghp_e2e_free";
+    server.state.tokens.set(token, { login: "alice", authorizedSites: ["other-site"] });
+    env = await makeCliEnv({ proxyUrl: server.url, githubToken: token });
+    const project = await makeProject({
+      site: "my-site",
+      files: { "index.html": "<html></html>" },
+    });
+    projects.push(project);
+
+    const r = await runDeployWithBuildStub(env.env, project.dir);
+
+    expect(r.captured.code).toBe(12);
+    const errorBlock = r.envelope!["error"] as { code: number; message: string };
+    expect(errorBlock.message).not.toContain("held-name filter");
+    expect(errorBlock.message).not.toContain("its name is held");
+  });
 });

@@ -15,6 +15,7 @@ import type { AddressInfo } from "node:net";
 export interface TokenRecord {
   login: string;
   authorizedSites: string[];
+  approver?: boolean;
 }
 
 /** Mirrors `SiteRow` in `src/lib/proxy-client.ts` (artemis registry shape). */
@@ -24,6 +25,14 @@ export interface SiteRow {
   createdAt: string;
   updatedAt: string;
   createdBy: string;
+  state?: "active" | "reserved";
+  reservedUntil?: string;
+}
+
+export interface ReservationRecord {
+  prevProduction: string;
+  prevPreview: string;
+  reservedUntil: string;
 }
 
 /** Mirrors `DeploySummary` in `src/lib/proxy-client.ts`. */
@@ -87,6 +96,7 @@ export interface FakeArtemisState {
   tokens: Map<string, TokenRecord>;
   failures: Map<string, FailureInjection>;
   registry: Map<string, SiteRow>;
+  reservations: Map<string, ReservationRecord>;
   deploysBySite: Map<string, DeploySummary[]>;
   deploys: Map<string, DeployRecord>;
   deployJwts: Map<string, DeployJwtRecord>;
@@ -125,6 +135,7 @@ export async function startFakeArtemis(): Promise<FakeArtemis> {
     tokens: new Map(),
     failures: new Map(),
     registry: new Map(),
+    reservations: new Map(),
     deploysBySite: new Map(),
     deploys: new Map(),
     deployJwts: new Map(),
@@ -165,6 +176,8 @@ export async function startFakeArtemis(): Promise<FakeArtemis> {
   };
 }
 
+const SLUG_RE = /^[a-z][a-z0-9-]{0,62}$/;
+
 async function readBody(req: IncomingMessage): Promise<string> {
   const chunks: Buffer[] = [];
   for await (const chunk of req) {
@@ -204,12 +217,15 @@ async function handle(
     }
     logAndSend(callLog, method, path, authorization, body, res, 200, {
       login: record.login,
-      authorizedSites: record.authorizedSites,
+      authorizedSites: record.authorizedSites.filter(
+        (slug) => state.registry.get(slug)?.state !== "reserved",
+      ),
     });
     return;
   }
 
-  if (method === "GET" && path === "/api/sites") {
+  const sitesListMatch = /^\/api\/sites(\?.*)?$/.exec(path);
+  if (method === "GET" && sitesListMatch) {
     const token = parseBearer(authorization);
     const record = token ? state.tokens.get(token) : undefined;
     if (!record) {
@@ -218,7 +234,16 @@ async function handle(
       });
       return;
     }
-    const rows = Array.from(state.registry.values());
+    const wanted = new URLSearchParams(sitesListMatch[1] ?? "").get("state") ?? "";
+    if (wanted !== "" && wanted !== "active" && wanted !== "reserved") {
+      logAndSend(callLog, method, path, authorization, body, res, 400, {
+        error: { code: "invalid_state", message: "state must be active or reserved" },
+      });
+      return;
+    }
+    const rows = Array.from(state.registry.values())
+      .map((r) => ({ ...r, state: r.state ?? "active" }))
+      .filter((r) => (r.state === "reserved") === (wanted === "reserved"));
     logAndSend(callLog, method, path, authorization, body, res, 200, rows);
     return;
   }
@@ -282,12 +307,20 @@ async function handle(
       });
       return;
     }
-    if (state.registry.has(slug)) {
+    const claimed = state.registry.get(slug);
+    if (claimed) {
       logAndSend(callLog, method, path, authorization, body, res, 409, {
-        error: {
-          code: "already_exists",
-          message: `site '${slug}' is already registered`,
-        },
+        error:
+          claimed.state === "reserved"
+            ? {
+                code: "site_reserved",
+                message:
+                  "site name is reserved after a delete; undelete it or wait for the reclaim",
+              }
+            : {
+                code: "already_exists",
+                message: "site is already registered",
+              },
       });
       return;
     }
@@ -299,6 +332,7 @@ async function handle(
       createdAt: now,
       updatedAt: now,
       createdBy: record.login,
+      state: "active",
     };
     state.registry.set(slug, row);
     logAndSend(callLog, method, path, authorization, body, res, 201, row);
@@ -328,6 +362,17 @@ async function handle(
     if (!site || !sha) {
       logAndSend(callLog, method, path, authorization, body, res, 400, {
         error: { code: "bad_request", message: "site and sha are required" },
+      });
+      return;
+    }
+    const initRow = state.registry.get(site);
+    if (initRow?.state === "reserved") {
+      logAndSend(callLog, method, path, authorization, body, res, 409, {
+        error: {
+          code: "site_reserved",
+          message: "site name is reserved after a delete; undelete it or wait for the reclaim",
+          reservedUntil: initRow.reservedUntil,
+        },
       });
       return;
     }
@@ -677,6 +722,16 @@ async function handle(
       });
       return;
     }
+    if (method === "PATCH" && existing.state === "reserved") {
+      logAndSend(callLog, method, path, authorization, body, res, 409, {
+        error: {
+          code: "site_reserved",
+          message: "site name is reserved after a delete; undelete it or wait for the reclaim",
+          reservedUntil: existing.reservedUntil,
+        },
+      });
+      return;
+    }
     if (method === "PATCH") {
       let parsed: { teams?: unknown };
       try {
@@ -705,10 +760,94 @@ async function handle(
       logAndSend(callLog, method, path, authorization, body, res, 200, updated);
       return;
     }
-    state.registry.delete(slug);
+    if (existing.state !== "reserved") {
+      state.reservations.set(slug, {
+        prevProduction: state.aliases.production.get(slug) ?? "",
+        prevPreview: state.aliases.preview.get(slug) ?? "",
+        reservedUntil: "2026-05-15T12:00:00Z",
+      });
+      state.registry.set(slug, {
+        ...existing,
+        state: "reserved",
+        reservedUntil: "2026-05-15T12:00:00Z",
+        updatedAt: "2026-05-12T12:00:00Z",
+      });
+      state.aliases.production.delete(slug);
+      state.aliases.preview.delete(slug);
+    }
     res.statusCode = 204;
     res.end();
     callLog.push({ method, path, authorization, status: 204, body });
+    return;
+  }
+
+  const undeleteMatch = /^\/api\/site\/([^/]+)\/undelete$/.exec(path);
+  const releaseMatch = /^\/api\/site\/([^/]+)\/release$/.exec(path);
+  const lifecycleMatch = undeleteMatch ?? releaseMatch;
+  if (method === "POST" && lifecycleMatch) {
+    const slug = decodeURIComponent(lifecycleMatch[1]!);
+    const token = parseBearer(authorization);
+    const record = token ? state.tokens.get(token) : undefined;
+    if (!record) {
+      logAndSend(callLog, method, path, authorization, body, res, 401, {
+        error: { code: "unauth", message: "bad token" },
+      });
+      return;
+    }
+    if (!SLUG_RE.test(slug)) {
+      logAndSend(callLog, method, path, authorization, body, res, 400, {
+        error: {
+          code: "invalid_slug",
+          message: "slug must be 1-63 chars, lowercase letter first, then [a-z0-9-]",
+        },
+      });
+      return;
+    }
+    if (releaseMatch && !record.approver) {
+      logAndSend(callLog, method, path, authorization, body, res, 403, {
+        error: { code: "user_unauthorized", message: "caller is not on the required team" },
+      });
+      return;
+    }
+    const held = state.registry.get(slug);
+    const pins = state.reservations.get(slug);
+    if (!held || held.state !== "reserved" || !pins) {
+      logAndSend(callLog, method, path, authorization, body, res, 404, {
+        error: {
+          code: "not_found",
+          message: undeleteMatch ? "site is not registered" : "site is not a reserved name",
+        },
+      });
+      return;
+    }
+    if (undeleteMatch) {
+      state.registry.set(slug, {
+        slug: held.slug,
+        teams: held.teams,
+        createdAt: held.createdAt,
+        updatedAt: "2026-05-12T12:00:00Z",
+        createdBy: held.createdBy,
+        state: "active",
+      });
+      state.reservations.delete(slug);
+      if (pins.prevProduction) state.aliases.production.set(slug, pins.prevProduction);
+      if (pins.prevPreview) state.aliases.preview.set(slug, pins.prevPreview);
+      logAndSend(callLog, method, path, authorization, body, res, 200, {
+        slug,
+        prevProduction: pins.prevProduction,
+        prevPreview: pins.prevPreview,
+      });
+      return;
+    }
+    const moved = (state.deploysBySite.get(slug) ?? []).length;
+    state.registry.delete(slug);
+    state.reservations.delete(slug);
+    state.deploysBySite.delete(slug);
+    logAndSend(callLog, method, path, authorization, body, res, 200, {
+      slug,
+      status: "released",
+      moved,
+    });
     return;
   }
 

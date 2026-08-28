@@ -87,13 +87,62 @@ describe("sites rm E2E (real proxy-client + real identity chain)", () => {
     expect(r.envelope!["slug"]).toBe("blog");
     expect(r.envelope!["deleted"]).toBe(true);
 
-    expect(server.state.registry.has("blog")).toBe(false);
+    expect(server.state.registry.get("blog")?.state).toBe("reserved");
+    expect(server.state.registry.get("blog")?.reservedUntil).toBeTruthy();
 
     expect(server.callLog).toHaveLength(1);
     const call = server.callLog[0];
     expect(call.method).toBe("DELETE");
     expect(call.path).toBe("/api/site/blog");
     expect(call.status).toBe(204);
+  });
+
+  it("stashes the alias pointers so undelete can restore them", async () => {
+    server.state.registry.set("blog", {
+      slug: "blog",
+      teams: ["staff"],
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-01T00:00:00Z",
+      createdBy: "bob",
+    });
+    server.state.aliases.production.set("blog", "20260101-090000-prod111");
+    server.state.aliases.preview.set("blog", "20260102-090000-prev222");
+    env = await makeCliEnv({ proxyUrl: server.url, githubToken: token });
+
+    const r = await runRm(env.env, { json: true, slug: "blog" });
+
+    expect(r.captured.code).toBeUndefined();
+    expect(server.state.reservations.get("blog")).toEqual({
+      prevProduction: "20260101-090000-prod111",
+      prevPreview: "20260102-090000-prev222",
+      reservedUntil: "2026-05-15T12:00:00Z",
+    });
+    expect(server.state.aliases.production.has("blog")).toBe(false);
+    expect(server.state.aliases.preview.has("blog")).toBe(false);
+  });
+
+  it("is idempotent: a second rm keeps the deadline and the saved pointers", async () => {
+    server.state.registry.set("blog", {
+      slug: "blog",
+      teams: ["staff"],
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-01T00:00:00Z",
+      createdBy: "bob",
+    });
+    server.state.aliases.production.set("blog", "20260101-090000-prod111");
+    env = await makeCliEnv({ proxyUrl: server.url, githubToken: token });
+
+    await runRm(env.env, { json: true, slug: "blog" });
+    const firstHold = { ...server.state.registry.get("blog")! };
+    const firstPins = { ...server.state.reservations.get("blog")! };
+
+    const second = await runRm(env.env, { json: true, slug: "blog" });
+
+    expect(second.captured.code).toBeUndefined();
+    expect(server.callLog.at(-1)!.status).toBe(204);
+    expect(server.state.registry.get("blog")).toEqual(firstHold);
+    expect(server.state.reservations.get("blog")).toEqual(firstPins);
+    expect(server.state.reservations.get("blog")!.prevProduction).toBe("20260101-090000-prod111");
   });
 
   it("exits EXIT_USAGE on 404 not_registered", async () => {
