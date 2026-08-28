@@ -548,6 +548,31 @@ describe("deploy command (proxy plane)", () => {
       expect(deps.logError).toHaveBeenCalledWith(expect.stringContaining("no team"));
     });
 
+    it("refuses an empty --dir instead of publishing the repo root", async () => {
+      const proxy = mkProxy();
+      const deps = mkDeps({
+        createProxyClient: vi.fn().mockReturnValue(proxy),
+      });
+      await expect(
+        deploy({ json: false, dir: "", allowDirty: true }, deps),
+      ).rejects.toThrow("__exit__");
+      expect(deps.exit).toHaveBeenCalledWith(11);
+      expect(proxy.deployInit).not.toHaveBeenCalled();
+      expect(deps.logError).toHaveBeenCalledWith(expect.stringMatching(/--dir/));
+    });
+
+    it("refuses a whitespace-only --dir the same way", async () => {
+      const proxy = mkProxy();
+      const deps = mkDeps({
+        createProxyClient: vi.fn().mockReturnValue(proxy),
+      });
+      await expect(
+        deploy({ json: false, dir: "   ", allowDirty: true }, deps),
+      ).rejects.toThrow("__exit__");
+      expect(deps.exit).toHaveBeenCalledWith(11);
+      expect(proxy.deployInit).not.toHaveBeenCalled();
+    });
+
     it("names the hold, not a permissions failure, when the site was deleted", async () => {
       const proxy = mkProxy();
       proxy.whoami.mockResolvedValue({ login: "raisedadead", authorizedSites: [] });

@@ -222,6 +222,10 @@ export async function deploy(options: DeployOptions, deps: DeployDeps = {}): Pro
   const exit = deps.exit ?? exitWithCode;
 
   try {
+    if (options.dir !== undefined && options.dir.trim() === "") {
+      throw new ConfigError("--dir needs a path; an empty value would publish the repository root");
+    }
+
     const identity = await resolveId({ env });
     if (!identity) {
       throw new CredentialError(
