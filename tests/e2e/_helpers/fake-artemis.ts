@@ -112,6 +112,19 @@ export interface FakeArtemisState {
   repoRequests: Map<string, RepoRow>;
   /** templates returned by GET /api/repo/templates. */
   repoTemplates: string[];
+  auditEvents: AuditEventRow[];
+}
+
+export interface AuditEventRow {
+  id: number;
+  occurredAt: string;
+  actor: string;
+  action: string;
+  site?: string;
+  deployId?: string;
+  outcome: string;
+  requestId?: string;
+  detail?: Record<string, unknown>;
 }
 
 export interface CallLogEntry {
@@ -144,6 +157,7 @@ export async function startFakeArtemis(): Promise<FakeArtemis> {
     finalizeFailure: null,
     repoRequests: new Map(),
     repoTemplates: [],
+    auditEvents: [],
   };
   const callLog: CallLogEntry[] = [];
 
@@ -848,6 +862,38 @@ async function handle(
       status: "released",
       moved,
     });
+    return;
+  }
+
+  if (method === "GET" && path.split("?")[0] === "/api/audit") {
+    const token = parseBearer(authorization);
+    const record = token ? state.tokens.get(token) : undefined;
+    if (!record) {
+      logAndSend(callLog, method, path, authorization, body, res, 401, {
+        error: { code: "unauth", message: "bad token" },
+      });
+      return;
+    }
+    if (!record.approver) {
+      logAndSend(callLog, method, path, authorization, body, res, 403, {
+        error: { code: "user_unauthorized", message: "caller is not on the required team" },
+      });
+      return;
+    }
+    const q = new URLSearchParams(path.split("?")[1] ?? "");
+    let rows = [...state.auditEvents];
+    const site = q.get("site");
+    if (site) rows = rows.filter((r) => r.site === site);
+    const actor = q.get("actor");
+    if (actor) rows = rows.filter((r) => r.actor === actor);
+    const action = q.get("action");
+    if (action) rows = rows.filter((r) => r.action === action);
+    const since = q.get("since");
+    if (since) rows = rows.filter((r) => r.occurredAt >= since);
+    const offset = Number(q.get("offset") ?? "0");
+    const limit = q.get("limit");
+    rows = rows.slice(offset, limit === null ? undefined : offset + Number(limit));
+    logAndSend(callLog, method, path, authorization, body, res, 200, rows);
     return;
   }
 

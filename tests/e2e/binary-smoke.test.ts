@@ -18,6 +18,13 @@ import { runBinary } from "./_helpers/spawn-cli.js";
  * accept a custom fetch override, and there's no env hook for the
  * device-flow base URL in src/lib/device-flow.ts (recorded as a
  * deferred capability gap; T15 covers login fully in-process).
+ *
+ * Create is intentionally absent — its scaffold path shells out to
+ * `docker cp` (src/commands/create/package-manager/docker-runner.ts),
+ * so a spawned run is
+ * machine-dependent even with UNIVERSE_TEMPLATES_DIR pointing at
+ * tests/fixtures/templates. Covered in-process by
+ * tests/commands/create/index.test.ts.
  */
 
 const TOKEN = "ghp_e2e_smoke";
@@ -45,6 +52,9 @@ function resetState(server: FakeArtemis): void {
   server.state.aliases.production.clear();
   server.state.uploadFailPaths.clear();
   server.state.finalizeFailure = null;
+  server.state.repoRequests.clear();
+  server.state.repoTemplates.length = 0;
+  server.state.auditEvents.length = 0;
   server.callLog.length = 0;
   server.state.tokens.set(TOKEN, {
     login: "alice",
@@ -69,7 +79,7 @@ async function makeProject(
   return { dir, cleanup: () => rm(dir, { recursive: true, force: true }) };
 }
 
-describe("binary smoke matrix — static + sites verbs against the built binary", () => {
+describe("binary smoke matrix — CLI verbs against the built binary", () => {
   let server: FakeArtemis;
   let env: CliEnv;
   const projects: Array<{ cleanup: () => Promise<void> }> = [];
@@ -80,13 +90,29 @@ describe("binary smoke matrix — static + sites verbs against the built binary"
   }, 120_000);
 
   afterAll(async () => {
-    await env.cleanup();
-    await server.close();
-    while (projects.length > 0) {
-      const p = projects.pop()!;
-      await p.cleanup();
+    try {
+      await env.cleanup();
+    } finally {
+      try {
+        await server.close();
+      } finally {
+        await Promise.allSettled(projects.splice(0).map((p) => p.cleanup()));
+      }
     }
   });
+
+  function seedRepoRequest(id: string): void {
+    server.state.repoRequests.set(id, {
+      id,
+      name: `smoke-${id}`,
+      owner: "freeCodeCamp-Universe",
+      visibility: "private",
+      status: "pending",
+      requestedBy: "alice",
+      createdAt: "2026-05-29T12:00:00Z",
+      updatedAt: "2026-05-29T12:00:00Z",
+    });
+  }
 
   it("whoami --json", async () => {
     resetState(server);
@@ -263,6 +289,77 @@ describe("binary smoke matrix — static + sites verbs against the built binary"
     const envelope = JSON.parse(r.stdout.trim()) as { error: { message: string } };
     expect(envelope.error.message).toContain("its name is held");
   }, 120_000);
+
+  it("repo create --json --yes <name>", async () => {
+    resetState(server);
+    const r = await runBinary(["repo", "create", "smoke-repo", "--json", "--yes"], env.env);
+    expect(r.exitCode, `stderr=${r.stderr}\nstdout=${r.stdout}`).toBe(0);
+    expect((JSON.parse(r.stdout.trim()) as { command: string }).command).toBe("repo create");
+  }, 60_000);
+
+  it("repo ls --json", async () => {
+    resetState(server);
+    seedRepoRequest("req_1");
+    const r = await runBinary(["repo", "ls", "--json"], env.env);
+    expect(r.exitCode, `stderr=${r.stderr}\nstdout=${r.stdout}`).toBe(0);
+    expect((JSON.parse(r.stdout.trim()) as { command: string }).command).toBe("repo ls");
+  }, 60_000);
+
+  it("repo status --json <id>", async () => {
+    resetState(server);
+    seedRepoRequest("req_1");
+    const r = await runBinary(["repo", "status", "req_1", "--json"], env.env);
+    expect(r.exitCode, `stderr=${r.stderr}\nstdout=${r.stdout}`).toBe(0);
+    expect((JSON.parse(r.stdout.trim()) as { command: string }).command).toBe("repo status");
+  }, 60_000);
+
+  it("repo approve --json --yes <id>", async () => {
+    resetState(server);
+    seedRepoRequest("req_1");
+    const r = await runBinary(["repo", "approve", "req_1", "--json", "--yes"], env.env);
+    expect(r.exitCode, `stderr=${r.stderr}\nstdout=${r.stdout}`).toBe(0);
+    expect((JSON.parse(r.stdout.trim()) as { command: string }).command).toBe("repo approve");
+    expect(server.state.repoRequests.get("req_1")!.status).toBe("active");
+  }, 60_000);
+
+  it("repo reject --json --yes <id>", async () => {
+    resetState(server);
+    seedRepoRequest("req_1");
+    const r = await runBinary(
+      ["repo", "reject", "req_1", "--json", "--yes", "--reason", "duplicate"],
+      env.env,
+    );
+    expect(r.exitCode, `stderr=${r.stderr}\nstdout=${r.stdout}`).toBe(0);
+    expect((JSON.parse(r.stdout.trim()) as { command: string }).command).toBe("repo reject");
+    expect(server.state.repoRequests.get("req_1")!.status).toBe("rejected");
+  }, 60_000);
+
+  it("repo rm --json --yes <id>", async () => {
+    resetState(server);
+    seedRepoRequest("req_1");
+    const r = await runBinary(["repo", "rm", "req_1", "--json", "--yes"], env.env);
+    expect(r.exitCode, `stderr=${r.stderr}\nstdout=${r.stdout}`).toBe(0);
+    expect((JSON.parse(r.stdout.trim()) as { command: string }).command).toBe("repo rm");
+    expect(server.state.repoRequests.has("req_1")).toBe(false);
+  }, 60_000);
+
+  it("audit ls --json", async () => {
+    resetState(server);
+    server.state.auditEvents.push({
+      id: 1,
+      occurredAt: "2026-05-29T12:00:00Z",
+      actor: "alice",
+      action: "site.deploy",
+      site: SITE,
+      deployId: "20260101-090000-aaa1111",
+      outcome: "ok",
+    });
+    const r = await runBinary(["audit", "ls", "--json"], env.env);
+    expect(r.exitCode, `stderr=${r.stderr}\nstdout=${r.stdout}`).toBe(0);
+    const envelope = JSON.parse(r.stdout.trim()) as { command: string; count: number };
+    expect(envelope.command).toBe("audit ls");
+    expect(envelope.count).toBe(1);
+  }, 60_000);
 
   it("logout --json (idempotent — no token to remove)", async () => {
     const logoutEnv = await makeCliEnv({

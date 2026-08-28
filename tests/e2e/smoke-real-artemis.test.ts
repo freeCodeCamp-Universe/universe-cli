@@ -4,6 +4,9 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { deploy } from "../../src/commands/deploy.js";
 import { ls as staticLs } from "../../src/commands/ls.js";
+import { ls as sitesLs } from "../../src/commands/sites/ls.js";
+import { rm as sitesRm } from "../../src/commands/sites/rm.js";
+import { undelete as sitesUndelete } from "../../src/commands/sites/undelete.js";
 import { whoami } from "../../src/commands/whoami.js";
 
 /**
@@ -20,8 +23,9 @@ import { whoami } from "../../src/commands/whoami.js";
  *   UNIVERSE_REAL_SITE  — pre-registered throwaway slug owned by the
  *                         operator (e.g. `test`, source repo
  *                         `freeCodeCamp-Universe/test-universe`). Must
- *                         already exist in the artemis registry; the
- *                         smoke does not register or delete sites.
+ *                         already exist in the artemis registry. Case 5
+ *                         deletes and restores this site: it serves 404
+ *                         for the whole rm → undelete window.
  *
  * Optional env:
  *   UNIVERSE_REAL_TOKEN     — GitHub token authorized for the test site.
@@ -44,6 +48,12 @@ import { whoami } from "../../src/commands/whoami.js";
  *                         alias fails to flip on the artemis side, or
  *                         the CDN serves stale content past the deploy,
  *                         this test goes RED.
+ *   5. sites rm → ls --held → undelete — the reservation lifecycle
+ *      round-trips against the real registry, and the restored
+ *      prevProduction must equal the pre-rm production deployId.
+ *      afterAll owns the restore: whenever the rm succeeded and the
+ *      undelete has not, teardown re-runs the undelete. If even that
+ *      is lost (SIGKILL), recover with `universe sites undelete <slug>`.
  *
  * The smoke leaves preview + production deploys behind in artemis. R2
  * bytes age out via the post-GA cleanup cron; deployId rows accumulate.
@@ -78,7 +88,9 @@ interface RunResult {
   envelope: Record<string, unknown> | undefined;
 }
 
-async function captureJsonRun(fn: () => Promise<void>): Promise<RunResult> {
+async function captureJsonRun(
+  fn: (exit: (code: number) => never) => Promise<void>,
+): Promise<RunResult> {
   const chunks: string[] = [];
   const spy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
     chunks.push(String(chunk));
@@ -86,7 +98,7 @@ async function captureJsonRun(fn: () => Promise<void>): Promise<RunResult> {
   });
   const captured: CapturedExit = {};
   try {
-    await fn();
+    await fn(makeExit(captured));
   } catch (err) {
     if (!(err instanceof Error) || !("__exit__" in err)) throw err;
   }
@@ -107,7 +119,8 @@ function makeEnv(): NodeJS.ProcessEnv {
 }
 
 describe.skipIf(!REAL_E2E)("real-artemis smoke (opt-in)", () => {
-  let projectDir: string | undefined;
+  const projectDirs: string[] = [];
+  let heldSlug: string | undefined;
   const marker = `smoke-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
   beforeAll(() => {
@@ -119,19 +132,29 @@ describe.skipIf(!REAL_E2E)("real-artemis smoke (opt-in)", () => {
   });
 
   afterAll(async () => {
-    if (projectDir) {
-      await rm(projectDir, { recursive: true, force: true });
+    if (heldSlug) {
+      const slug = heldSlug;
+      heldSlug = undefined;
+      await captureJsonRun((exit) =>
+        sitesUndelete(
+          { json: true, slug },
+          { env: makeEnv(), exit, logSuccess: vi.fn(), logError: vi.fn() },
+        ),
+      );
+    }
+    while (projectDirs.length > 0) {
+      await rm(projectDirs.pop()!, { recursive: true, force: true });
     }
   });
 
   it("whoami resolves token and includes the test site in authorizedSites", async () => {
     const env = makeEnv();
-    const r = await captureJsonRun(() =>
+    const r = await captureJsonRun((exit) =>
       whoami(
         { json: true },
         {
           env,
-          exit: makeExit({}),
+          exit,
           logSuccess: vi.fn(),
           logError: vi.fn(),
         },
@@ -145,12 +168,12 @@ describe.skipIf(!REAL_E2E)("real-artemis smoke (opt-in)", () => {
 
   it("static ls returns an array shape for the test site", async () => {
     const env = makeEnv();
-    const r = await captureJsonRun(() =>
+    const r = await captureJsonRun((exit) =>
       staticLs(
         { json: true, site: REAL_SITE! },
         {
           env,
-          exit: makeExit({}),
+          exit,
           logSuccess: vi.fn(),
           logInfo: vi.fn(),
           logError: vi.fn(),
@@ -163,7 +186,8 @@ describe.skipIf(!REAL_E2E)("real-artemis smoke (opt-in)", () => {
   }, 30_000);
 
   it("deploy (preview) — new deployId lands on top of `ls`", async () => {
-    projectDir = await mkdtemp(join(tmpdir(), "universe-cli-smoke-prev-"));
+    const projectDir = await mkdtemp(join(tmpdir(), "universe-cli-smoke-prev-"));
+    projectDirs.push(projectDir);
     const distDir = join(projectDir, "dist");
     await mkdir(distDir, { recursive: true });
     await writeFile(join(projectDir, "platform.yaml"), `site: ${REAL_SITE}\n`, "utf-8");
@@ -174,13 +198,13 @@ describe.skipIf(!REAL_E2E)("real-artemis smoke (opt-in)", () => {
     );
 
     const env = makeEnv();
-    const r = await captureJsonRun(() =>
+    const r = await captureJsonRun((exit) =>
       deploy(
         { json: true, promote: false },
         {
-          cwd: projectDir!,
+          cwd: projectDir,
           env,
-          exit: makeExit({}),
+          exit,
           logSuccess: vi.fn(),
           logInfo: vi.fn(),
           logWarn: vi.fn(),
@@ -193,12 +217,12 @@ describe.skipIf(!REAL_E2E)("real-artemis smoke (opt-in)", () => {
     const newDeployId = r.envelope!["deployId"] as string;
     expect(newDeployId).toMatch(/^\d{8}-\d{6}-\S+$/);
 
-    const lsResult = await captureJsonRun(() =>
+    const lsResult = await captureJsonRun((exit) =>
       staticLs(
         { json: true, site: REAL_SITE! },
         {
           env,
-          exit: makeExit({}),
+          exit,
           logSuccess: vi.fn(),
           logInfo: vi.fn(),
           logError: vi.fn(),
@@ -212,7 +236,8 @@ describe.skipIf(!REAL_E2E)("real-artemis smoke (opt-in)", () => {
   }, 120_000);
 
   it("deploy --promote — production alias serves the new marker (alpha)", async () => {
-    projectDir = await mkdtemp(join(tmpdir(), "universe-cli-smoke-prod-"));
+    const projectDir = await mkdtemp(join(tmpdir(), "universe-cli-smoke-prod-"));
+    projectDirs.push(projectDir);
     const distDir = join(projectDir, "dist");
     await mkdir(distDir, { recursive: true });
     await writeFile(join(projectDir, "platform.yaml"), `site: ${REAL_SITE}\n`, "utf-8");
@@ -224,13 +249,13 @@ describe.skipIf(!REAL_E2E)("real-artemis smoke (opt-in)", () => {
     );
 
     const env = makeEnv();
-    const r = await captureJsonRun(() =>
+    const r = await captureJsonRun((exit) =>
       deploy(
         { json: true, promote: true },
         {
-          cwd: projectDir!,
+          cwd: projectDir,
           env,
-          exit: makeExit({}),
+          exit,
           logSuccess: vi.fn(),
           logInfo: vi.fn(),
           logWarn: vi.fn(),
@@ -245,12 +270,12 @@ describe.skipIf(!REAL_E2E)("real-artemis smoke (opt-in)", () => {
     expect(newDeployId).toMatch(/^\d{8}-\d{6}-\S+$/);
     expect(publicUrl).toMatch(/^https:\/\//);
 
-    const lsResult = await captureJsonRun(() =>
+    const lsResult = await captureJsonRun((exit) =>
       staticLs(
         { json: true, site: REAL_SITE! },
         {
           env,
-          exit: makeExit({}),
+          exit,
           logSuccess: vi.fn(),
           logInfo: vi.fn(),
           logError: vi.fn(),
@@ -270,6 +295,48 @@ describe.skipIf(!REAL_E2E)("real-artemis smoke (opt-in)", () => {
       );
     }
   }, 300_000);
+
+  it("sites rm → ls --held → undelete round-trip on the test site", async () => {
+    const env = makeEnv();
+    const deps = (exit: (code: number) => never) => ({
+      env,
+      exit,
+      logSuccess: vi.fn(),
+      logError: vi.fn(),
+    });
+
+    const before = await captureJsonRun((exit) =>
+      staticLs(
+        { json: true, site: REAL_SITE! },
+        { env, exit, logSuccess: vi.fn(), logInfo: vi.fn(), logError: vi.fn() },
+      ),
+    );
+    const beforeDeploys = before.envelope!["deploys"] as Array<{
+      deployId: string;
+      state: string | null;
+    }>;
+    const prodBefore = beforeDeploys.find((d) => d.state?.includes("production"))?.deployId ?? "";
+
+    const removed = await captureJsonRun((exit) =>
+      sitesRm({ json: true, slug: REAL_SITE! }, deps(exit)),
+    );
+    expect(removed.captured.code).toBeUndefined();
+    expect(removed.envelope!["success"]).toBe(true);
+    heldSlug = REAL_SITE;
+
+    const held = await captureJsonRun((exit) => sitesLs({ json: true, held: true }, deps(exit)));
+    expect(held.captured.code).toBeUndefined();
+    const rows = held.envelope!["sites"] as Array<{ slug: string; reservedUntil?: string }>;
+    expect(rows.map((r) => r.slug)).toContain(REAL_SITE);
+
+    const restored = await captureJsonRun((exit) =>
+      sitesUndelete({ json: true, slug: REAL_SITE! }, deps(exit)),
+    );
+    expect(restored.captured.code).toBeUndefined();
+    expect(restored.envelope!["success"]).toBe(true);
+    expect(restored.envelope!["prevProduction"]).toBe(prodBefore);
+    heldSlug = undefined;
+  }, 120_000);
 });
 
 interface FetchResult {
