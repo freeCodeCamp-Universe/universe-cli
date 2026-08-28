@@ -48,7 +48,7 @@ function mkDeps(overrides: Record<string, unknown> = {}) {
     createProxyClient: vi.fn().mockReturnValue(mkProxy()),
     logMessage: vi.fn(),
     logError: vi.fn(),
-    exit: vi.fn().mockImplementation((_c: number) => {
+    exit: vi.fn((_c: number): never => {
       throw new Error("__exit__");
     }),
     ...overrides,

@@ -29,12 +29,29 @@ Every `universe` command, flag, exit code, and environment variable. Task walkth
 
 | Command                    | Flags                                  | Purpose                                                                                                                           |
 | -------------------------- | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `universe static deploy`   | `--promote`, `--dir <path>`, `--json`  | Build (if `build.command` set) and upload to **preview**. `--promote` finalizes as production.                                    |
-| `universe static promote`  | `--from <deployId>`, `--json`          | Re-point production at the current preview, or at `--from`.                                                                       |
+| `universe static deploy`   | `--promote`, `--dir <path>`, `--no-reuse`, `--allow-dirty`, `--json` | Build (if `build.command` set) and upload to **preview**. `--promote` finalizes as production.                                    |
+| `universe static promote`  | `--from <deployId>`, `--allow-dirty`, `--json` | Re-point production at the current preview, or at `--from`. Never reads git state and never rebuilds.                             |
 | `universe static rollback` | `--to <deployId>` (required), `--json` | Rewrite the production alias to a past deploy id.                                                                                 |
 | `universe static ls`       | `--site <slug>`, `--json`              | Recent deploys for the `platform.yaml` site, or `--site`. A `STATE` column flags `preview` / `production` / `preview+production`. |
 
-Deploy ids are `YYYYMMDD-HHMMSS-<gitsha>` (or `nogit-<ts>` outside a git repo). `deploy --promote` is idempotent on an unchanged commit: when the working tree is clean and the current preview deploy is already at `HEAD`, it promotes that exact build (the one you previewed) instead of rebuilding and re-uploading a duplicate — the `--json` envelope flags this with `reusedPreview: true`. `promote`/`rollback` send a compare-and-swap guard; a concurrent change returns `alias_drift` (interactive retry, or exit 10 + `current` field under `--json`). `static ls` cross-references the preview and production aliases so each row shows whether it is the current `preview`, `production`, both, or neither (a superseded build); `--json` adds a per-deploy `state` plus a top-level `aliases` object. Source: `src/commands/{deploy,promote,rollback,ls}.ts`.
+Deploy ids are `YYYYMMDD-HHMMSS-<sha7>`. artemis truncates the sha to seven characters, so the CLI mints every non-commit sha at exactly seven characters. Four stamps exist, and the `--json` envelope names the one in force through `shaSource`:
+
+| `shaSource` | sha sent                | when                                            | needs `--allow-dirty` |
+| ----------- | ----------------------- | ----------------------------------------------- | --------------------- |
+| `head`      | the full HEAD hash      | clean tree, no `--dir`                          | no                    |
+| `dirty`     | `dty` + 4 random base36 | working tree has uncommitted changes            | yes                   |
+| `dirover`   | `dov` + 4 random base36 | `--dir` overrode `build.output` on a clean tree | yes                   |
+| `synthetic` | `nog` + 4 random base36 | not a git repository                            | no                    |
+
+The stamps are checked in the order `synthetic`, `dirty`, `dirover`, `head`, and the first match wins — so a `--dir` build on a dirty tree stamps `dirty`, and `dirover` needs both a commit and a clean tree. The three sentinels are deliberately not hex, so no commit hash can ever prefix-match one, and their four random characters draw from a 36^4 space: two deploys in the same second collide with probability about 1 in 1.7 million. artemis mints the id without a collision check, so that residual chance is the whole guard.
+
+Without `--allow-dirty`, `static deploy` refuses a dirty tree or a `--dir` override and exits with code 15, and `static promote` refuses a `dty`/`dov`-stamped deploy id the same way. With the flag both proceed, print a warning, and the stamp still replaces the sha. The `nog` stamp needs no flag: a directory without git has no clean state to hold it to. Because a sentinel replaces the commit, the id alone no longer says which commit produced the build, so the `--json` envelope keeps the commit in a `headSha` field and the text summary prints a `Commit:` line, so the mapping survives in CI logs even though artemis records only the stamped sha. `headSha` is absent when the stamp is `head` (the sha already is the commit) and outside a git repository (there is no commit).
+
+`deploy --promote` is idempotent on an unchanged commit: when the working tree is clean and the current preview is already at `HEAD`, it promotes that exact build — the one you previewed — instead of rebuilding and re-uploading a duplicate. The `--json` envelope always carries `reusedPreview` — `true` on that fast path, `false` on a rebuild — and `fileCount` and `totalSize` count what **this invocation uploaded**, so both read `0` on the fast path; the promoted deploy still holds its original files. Two things defeat reuse. Any stamp other than `head` opts out in both directions: the preview cannot be reused, and the build cannot be reused later. `--no-reuse` opts out manually for one invocation — reach for it when the build reads an input git cannot see, such as an environment variable or a gitignored file, because a clean tree at the same commit does not prove the same bytes: `git status --porcelain` stays empty and nothing detects the difference. `--no-reuse` does not change the deploy id, and `--promote` never repoints the preview alias, so a later bare `deploy --promote` at the same commit can still reuse the older preview. One legacy gap remains: previews minted by a CLI older than this change carry a commit sha even when they were built from a dirty tree, so the fast path can still match one. That window closes for a site once it has deployed with a CLI carrying these stamps.
+
+`static promote` is a pure alias rewrite. It never reads git state and never rebuilds, so it promotes whatever the preview alias holds. Promoting any sentinel-stamped deploy — `dty`, `dov` or `nog` — prints a warning in the text summary, and `--json` reports the stamp in `shaSource` instead. Otherwise `shaSource` is `unverified`: `promote` reads only the deploy id, so it can recognise a stamp this CLI minted but can never prove that a hex sha really came from a clean tree at that commit. Only the `deploy` envelope reports `head`.
+
+`promote`/`rollback` send a compare-and-swap guard; a concurrent change returns `alias_drift` (interactive retry, or exit 10 + `current` field under `--json`). `static ls` cross-references the preview and production aliases so each row shows whether it is the current `preview`, `production`, both, or neither (a superseded build); `--json` adds a per-deploy `state` plus a top-level `aliases` object. Source: `src/commands/{deploy,promote,rollback,ls}.ts`, `src/deploy/stamp.ts`.
 
 ### `sites` — registry (staff-gated writes)
 
@@ -71,7 +88,7 @@ Stable contract — `src/output/exit-codes.ts`. Callers import the constants, ne
 | 11   | `CONFIG`      | `platform.yaml` missing/invalid, or build output dir missing/not a directory.                  |
 | 12   | `CREDENTIALS` | Auth failed (401/403) — re-`login`, or the token is not user-scoped.                           |
 | 13   | `STORAGE`     | Server/network failure (5xx, timeout, 422), or a symlink escape.                               |
-| 15   | `GIT`         | No files to deploy (empty upload set after the ignore filter). Git itself is not required.     |
+| 15   | `GIT`         | No files to deploy (empty upload set after the ignore filter), or a `dty`/`dov` deploy or promote refused without `--allow-dirty`. Git itself is not required. |
 | 18   | `CONFIRM`     | Confirmation declined (answered no, or `--yes` absent).                                        |
 | 19   | `PARTIAL`     | Some files failed to upload; the deploy was not finalized.                                     |
 

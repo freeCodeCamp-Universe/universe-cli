@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { confirm, isCancel, log } from "@clack/prompts";
-import { ConfigError, CredentialError } from "../errors.js";
+import { ConfigError, CredentialError, GitError } from "../errors.js";
 import { DEFAULT_PROXY_URL } from "../lib/constants.js";
 import { resolveIdentity as defaultResolveIdentity } from "../lib/identity.js";
 import { parsePlatformYaml, type PlatformYamlV2 } from "../lib/platform-yaml.js";
@@ -13,6 +13,7 @@ import {
   type ProxyClient,
   type ProxyClientConfig,
 } from "../lib/proxy-client.js";
+import { deployIdSentinelSource } from "../deploy/stamp.js";
 import { buildEnvelope } from "../output/envelope.js";
 import { exitWithCode } from "../output/exit-codes.js";
 import { emitJson, outputError } from "../output/format.js";
@@ -21,6 +22,7 @@ export interface PromoteOptions {
   json: boolean;
   /** Promote a specific deploy id instead of the current preview alias. */
   from?: string;
+  allowDirty?: boolean;
 }
 
 export interface PromoteDeps {
@@ -30,6 +32,7 @@ export interface PromoteDeps {
   resolveIdentity?: typeof defaultResolveIdentity;
   createProxyClient?: (cfg: ProxyClientConfig) => ProxyClient;
   logSuccess?: (msg: string) => void;
+  logWarn?: (msg: string) => void;
   logError?: (msg: string) => void;
   exit?: (code: number) => never;
   promptConfirm?: (msg: string) => Promise<boolean>;
@@ -63,6 +66,15 @@ async function readAndParseConfig(
   return r.value;
 }
 
+function assertPromotable(deployId: string, allowDirty: boolean): void {
+  const sentinel = deployIdSentinelSource(deployId);
+  if ((sentinel === "dirty" || sentinel === "dirover") && !allowDirty) {
+    throw new GitError(
+      `${deployId} is stamped ${sentinel} — it was not built from a commit at HEAD. Pass --allow-dirty to promote it anyway.`,
+    );
+  }
+}
+
 export async function promote(options: PromoteOptions, deps: PromoteDeps = {}): Promise<void> {
   const cwd = deps.cwd ?? process.cwd();
   const env = deps.env ?? process.env;
@@ -70,6 +82,7 @@ export async function promote(options: PromoteOptions, deps: PromoteDeps = {}): 
   const resolveId = deps.resolveIdentity ?? defaultResolveIdentity;
   const mkClient = deps.createProxyClient ?? defaultCreateProxyClient;
   const success = deps.logSuccess ?? ((s: string) => log.success(s));
+  const warn = deps.logWarn ?? ((s: string) => log.warn(s));
   const error = deps.logError ?? ((s: string) => log.error(s));
   const exit = deps.exit ?? exitWithCode;
   const promptConfirm = deps.promptConfirm ?? defaultPromptConfirm;
@@ -93,6 +106,7 @@ export async function promote(options: PromoteOptions, deps: PromoteDeps = {}): 
 
     let result: { url: string; deployId: string };
     if (options.from) {
+      assertPromotable(options.from, options.allowDirty ?? false);
       // Per ADR-016: artemis promote endpoint copies preview alias to
       // production. To promote a *specific* prior deploy id, the alias
       // must be rewritten directly — the rollback endpoint is the
@@ -134,6 +148,7 @@ export async function promote(options: PromoteOptions, deps: PromoteDeps = {}): 
       if (preview === null) {
         throw new ConfigError("no preview alias to promote — run `universe static deploy` first");
       }
+      assertPromotable(preview.deployId, options.allowDirty ?? false);
       const prod = await client.getAlias({
         site: config.site,
         mode: "production",
@@ -165,12 +180,20 @@ export async function promote(options: PromoteOptions, deps: PromoteDeps = {}): 
       }
     }
 
+    const sentinel = deployIdSentinelSource(result.deployId);
+    if (sentinel !== null && !options.json) {
+      warn(
+        `${result.deployId} is stamped ${sentinel}, so this production build is not reproducible from a commit.`,
+      );
+    }
+
     if (options.json) {
       emitJson(
         buildEnvelope("promote", true, {
           deployId: result.deployId,
           url: result.url,
           site: config.site,
+          shaSource: sentinel ?? "unverified",
           identitySource: identity.source,
         }),
       );

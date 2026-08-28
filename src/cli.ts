@@ -291,17 +291,23 @@ export async function run(argv = process.argv): Promise<void> {
     .description("Deploy static site via the artemis proxy")
     .option("--promote", "Finalize as production (default: preview)")
     .option("--dir <path>", "Override build.output dir from platform.yaml")
+    .option("--no-reuse", "Always rebuild; never promote an existing preview")
+    .option("--allow-dirty", "Deploy files that do not match a clean HEAD (dirty tree or --dir)")
     .action(async (_opts, cmd: Command) => {
       const opts = cmd.optsWithGlobals<{
         json?: boolean;
         promote?: boolean;
         dir?: string;
+        reuse?: boolean;
+        allowDirty?: boolean;
       }>();
       try {
         await deploy({
           json: opts.json ?? false,
           promote: opts.promote ?? false,
           dir: opts.dir,
+          noReuse: opts.reuse === false,
+          allowDirty: opts.allowDirty ?? false,
         });
       } catch (err: unknown) {
         handleActionError("deploy", opts.json ?? false, err);
@@ -312,12 +318,14 @@ export async function run(argv = process.argv): Promise<void> {
     .command("promote")
     .description("Promote the current preview to production")
     .option("--from <deployId>", "Promote a specific past deploy id (alias rewrite)")
+    .option("--allow-dirty", "Promote a deploy stamped from a dirty tree or a --dir override")
     .action(async (_opts, cmd: Command) => {
-      const opts = cmd.optsWithGlobals<{ json?: boolean; from?: string }>();
+      const opts = cmd.optsWithGlobals<{ json?: boolean; from?: string; allowDirty?: boolean }>();
       try {
         await promote({
           json: opts.json ?? false,
           from: opts.from,
+          allowDirty: opts.allowDirty ?? false,
         });
       } catch (err: unknown) {
         handleActionError("promote", opts.json ?? false, err);

@@ -10,6 +10,7 @@ import {
   StorageError,
 } from "../errors.js";
 import { getGitState as defaultGetGitState, type GitState } from "../deploy/git.js";
+import { stampSha } from "../deploy/stamp.js";
 import { hasRootIndex, missingRootIndexMessage } from "../deploy/index-check.js";
 import { walkFiles as defaultWalkFiles } from "../deploy/walk.js";
 import { runBuild as defaultRunBuild } from "../lib/build.js";
@@ -35,6 +36,8 @@ export interface DeployOptions {
   promote?: boolean;
   /** Override `build.output` from platform.yaml (matches `--dir` flag). */
   dir?: string;
+  noReuse?: boolean;
+  allowDirty?: boolean;
 }
 
 /**
@@ -55,7 +58,7 @@ export interface DeployDeps {
   readPlatformYaml?: (cwd: string) => Promise<string>;
   resolveIdentity?: typeof defaultResolveIdentity;
   createProxyClient?: (cfg: ProxyClientConfig) => ProxyClient;
-  getGitState?: () => GitState;
+  getGitState?: (cwd: string) => GitState;
   runBuild?: typeof defaultRunBuild;
   walkFiles?: typeof defaultWalkFiles;
   uploadFiles?: typeof defaultUploadFiles;
@@ -87,10 +90,6 @@ async function readAndParseConfig(
   const r = parsePlatformYaml(raw);
   if (!r.ok) throw new ConfigError(r.error);
   return r.value;
-}
-
-function syntheticSha(): string {
-  return `nogit-${Date.now().toString(36)}`;
 }
 
 function deployIdSha(deployId: string): string | null {
@@ -248,13 +247,33 @@ export async function deploy(options: DeployOptions, deps: DeployDeps = {}): Pro
       );
     }
 
-    const git = gitState();
-    if (git.dirty && !options.json) {
-      warn("git working tree is dirty — uncommitted changes will not be reflected.");
+    const git = gitState(cwd);
+    const { sha, source: shaSource } = stampSha(git, options.dir !== undefined);
+    const provenance = shaSource === "head" || git.hash === null ? {} : { headSha: git.hash };
+    if (shaSource === "dirty" && !options.allowDirty) {
+      throw new GitError(
+        "git working tree is dirty — refusing to deploy uncommitted files. Commit them, or pass --allow-dirty to deploy anyway.",
+      );
     }
-    const sha = git.hash ?? syntheticSha();
+    if (shaSource === "dirover" && !options.allowDirty) {
+      throw new GitError(
+        "--dir replaces build.output, so the upload cannot be traced to HEAD. Pass --allow-dirty to deploy it anyway.",
+      );
+    }
+    if (git.dirty && !options.json) {
+      warn(`git working tree is dirty — this deploy is stamped ${sha}, not the HEAD commit.`);
+    }
+    if (shaSource === "dirover" && !options.json) {
+      warn(`--dir replaced build.output — this deploy is stamped ${sha}, not the HEAD commit.`);
+    }
 
-    if (options.promote && !git.dirty && git.hash) {
+    if (
+      options.promote &&
+      !git.dirty &&
+      git.hash &&
+      options.dir === undefined &&
+      !options.noReuse
+    ) {
       let preview: { deployId: string } | null = null;
       try {
         preview = await client.getAlias({
@@ -283,6 +302,9 @@ export async function deploy(options: DeployOptions, deps: DeployDeps = {}): Pro
               mode: "production",
               site: config.site,
               sha,
+              shaSource,
+              fileCount: 0,
+              totalSize: 0,
               reusedPreview: true,
               identitySource: identity.source,
             }),
@@ -413,6 +435,9 @@ export async function deploy(options: DeployOptions, deps: DeployDeps = {}): Pro
           mode: finalizeResult.mode,
           site: config.site,
           sha,
+          shaSource,
+          ...provenance,
+          reusedPreview: false,
           fileCount: uploadResult.fileCount,
           totalSize: uploadResult.totalSize,
           identitySource: identity.source,
@@ -432,6 +457,9 @@ export async function deploy(options: DeployOptions, deps: DeployDeps = {}): Pro
           `  Files:    ${uploadResult.fileCount}`,
           `  Size:     ${sizeKB} KB`,
           `  Mode:     ${mode}`,
+          ...(git.hash !== null && shaSource !== "head"
+            ? [`  Commit:   ${git.hash} (stamped ${shaSource})`]
+            : []),
           `  URL:      ${finalizeResult.url}`,
           ``,
           nextLine,

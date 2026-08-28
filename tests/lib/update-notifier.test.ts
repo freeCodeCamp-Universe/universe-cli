@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from "vitest";
 import { mkdtemp, readFile, rm, writeFile, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -445,7 +445,7 @@ describe("runRefreshWorker", () => {
 
 describe("installExitNotice", () => {
   let handlers: Record<string, () => void>;
-  let onSpy: ReturnType<typeof vi.spyOn>;
+  let onSpy: MockInstance;
 
   function capture(current: string): void {
     handlers = {};

@@ -114,13 +114,20 @@ Either way:
 universe static deploy
 ```
 
-On success the proxy returns a deploy id (`YYYYMMDD-HHMMSS-<gitsha>`) and a preview URL. Outside a git repo the id stamps `nogit-<timestamp>` instead — git is **not** required; a dirty tree only prints a warning.
+On success the proxy returns a deploy id (`YYYYMMDD-HHMMSS-<sha7>`) and a preview URL. The sha is the `HEAD` commit when the tree is clean and `build.output` was not overridden. Otherwise the CLI stamps a sentinel in its place, and a later `--promote` at that commit rebuilds instead of promoting the earlier build:
+
+- `dty…` — the working tree was dirty. This needs `--allow-dirty`; without the flag the deploy stops with exit code 15.
+- `dov…` — `--dir` overrode `build.output` on a clean tree. This needs `--allow-dirty` too. A dirty tree stamps `dty…` even with `--dir`.
+- `nog…` — not a git repository. Git is **not** required.
+
+Under `--json` the `deploy` envelope names the stamp in a `shaSource` field: `head`, `dirty`, `dirover` or `synthetic`. Read that field in CI rather than pattern-matching the sha. Note that `shaSource: head` means the CLI had a commit and a clean tree, not that the build is reproducible — an environment variable or a gitignored file can change the build while git sees nothing.
 
 | Flag           | Effect                                                                          |
 | -------------- | ------------------------------------------------------------------------------- |
-| `--dir <path>` | Upload from `<path>` instead of `build.output`.                                 |
+| `--dir <path>` | Upload from `<path>` instead of `build.output`. Stamps the id `dov…`.           |
 | `--promote`    | Finalize as **production** in one step. Reserve for emergencies / automated CI. |
 | `--json`       | Machine-readable envelope; required for CI.                                     |
+| `--no-reuse`   | Always rebuild; never promote an existing preview. Applies to this run only.    |
 
 **What gets uploaded:** the CLI walks `build.output`, drops `deploy.ignore` matches, and uploads the rest — 6 files in parallel, content type inferred from extension. A symlink resolving outside the output directory aborts the deploy (`STORAGE`, 13). An empty set after filtering fails with `No files to deploy` (`GIT`, 15). If any file fails mid-upload the deploy exits `PARTIAL` (19) **without** flipping the alias — re-run `deploy` (each run mints a fresh id, so retries are safe).
 
@@ -156,7 +163,9 @@ universe static promote --from 20260511-091422-abc1234
 
 `--from` rewrites **only** the production alias (it uses the rollback primitive); preview is left untouched.
 
-If you'd rather promote right after checking preview, `universe static deploy --promote` works too — and when your tree is clean and the preview is already at the current commit, it promotes that same build instead of uploading a duplicate. So `deploy` → check preview → `deploy --promote` ships exactly what you reviewed, with no second deploy of the same hash.
+`promote` never reads git state and never rebuilds. It ships whatever the preview alias holds. It refuses a `dty…` or `dov…` build unless you pass `--allow-dirty`. With the flag, or for `nog…`, `promote` warns that production will not map to a commit, and `--json` reports the stamp in `shaSource`. For anything else `shaSource` is `unverified`, because `promote` reads only the deploy id. A preview minted by a CLI older than these stamps carries a commit sha even when it was built from a dirty tree, and neither `promote` nor the reuse fast path can tell. Re-deploy from a clean tree when production must be traceable to a commit.
+
+If you'd rather promote right after checking preview, `universe static deploy --promote` works too — and when your tree is clean and the preview is already at the current commit, it promotes that same build instead of uploading a duplicate. So `deploy` → check preview → `deploy --promote` ships exactly what you reviewed, with no second deploy of the same hash. Pass `--no-reuse` to force a fresh build when the build reads an input git cannot see. It applies to that one command, does not change the deploy id, and `--promote` never repoints the preview alias, so a later bare `deploy --promote` at the same commit can still promote the older preview. Run `deploy` without `--promote` first to refresh preview when that matters.
 
 ## 6. Roll back
 
@@ -336,7 +345,10 @@ A `user_unauthorized` failure means the token can't prove team membership — mi
 | `Already logged in. …`              | Stored token exists. `universe logout` first, or `--force` to replace.                                                                                         |
 | `Site '<slug>' is not registered …` | The error inlines a "Did you mean?" hint plus the `sites register` / `sites update` commands. Registered but no access? Ask a `staff` member to add your team. |
 | `No files to deploy under <dir>`    | Output dir empty after the `deploy.ignore` filter. Check the build produced files in `build.output` (or `--dir`). Exits `GIT` (15).                            |
-| Deploy id shows `nogit-…`           | Not in a git repo — git isn't required; run from inside one for a sha-stamped id.                                                                              |
+| Deploy id shows `nog…`              | Not in a git repo — git isn't required; run from inside one for a sha-stamped id.                                                                              |
+| Deploy id shows `dty…`              | The working tree had uncommitted changes. Commit them and re-deploy for a sha-stamped id. A dirty deploy needs `--allow-dirty`.                                |
+| Deploy id shows `dov…`              | `--dir` overrode `build.output`. Drop `--dir` and set `build.output` in `platform.yaml` for a sha-stamped id. A `--dir` deploy needs `--allow-dirty`.          |
+| Need the commit behind a sentinel id | The `--json` envelope carries it in `headSha`, and the text summary prints a `Commit:` line. artemis stores only the stamped sha.                             |
 | `user_unauthorized`                 | Token lacks `read:org` / SSO authorization, or a low-scope `$GITHUB_TOKEN` is shadowing your login token. `universe whoami`, then re-authorize or unset it.    |
 | Wrong identity resolved             | `universe whoami` shows which source fired. Env tokens (`env_GITHUB_TOKEN`/`env_GH_TOKEN`) outrank your `device_flow` login token — unset them for that shell. |
 
