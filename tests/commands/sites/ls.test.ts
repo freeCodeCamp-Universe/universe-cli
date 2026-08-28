@@ -117,3 +117,156 @@ describe("sites ls command", () => {
     expect(deps.logError).toHaveBeenCalledWith(expect.stringContaining("registry_read_failed"));
   });
 });
+
+describe("sites ls --held", () => {
+  it("asks the server for reserved rows", async () => {
+    const proxy = {
+      listSites: vi.fn().mockResolvedValue([]),
+    };
+    const deps = {
+      env: {} as NodeJS.ProcessEnv,
+      resolveIdentity: vi.fn().mockResolvedValue({ token: "ghp_x", source: "env_GITHUB_TOKEN" }),
+      createProxyClient: vi.fn().mockReturnValue(proxy),
+      logSuccess: vi.fn(),
+      logError: vi.fn(),
+      exit: vi.fn((_c: number): never => {
+        throw new Error("__exit__");
+      }),
+    };
+    await ls({ json: false, held: true }, deps);
+    expect(proxy.listSites).toHaveBeenCalledWith({ state: "reserved" });
+  });
+
+  it("omits the query when not asking for held names, so 1.9.1 still answers", async () => {
+    const proxy = { listSites: vi.fn().mockResolvedValue([]) };
+    const deps = {
+      env: {} as NodeJS.ProcessEnv,
+      resolveIdentity: vi.fn().mockResolvedValue({ token: "ghp_x", source: "env_GITHUB_TOKEN" }),
+      createProxyClient: vi.fn().mockReturnValue(proxy),
+      logSuccess: vi.fn(),
+      logError: vi.fn(),
+      exit: vi.fn((_c: number): never => {
+        throw new Error("__exit__");
+      }),
+    };
+    await ls({ json: false }, deps);
+    expect(proxy.listSites).toHaveBeenCalledWith(undefined);
+  });
+});
+
+describe("sites ls --held against a pre-1.10.2 artemis", () => {
+  function heldDeps(rows: unknown[]) {
+    const proxy = { listSites: vi.fn().mockResolvedValue(rows), whoami: vi.fn() };
+    return {
+      proxy,
+      deps: {
+        env: {} as NodeJS.ProcessEnv,
+        resolveIdentity: vi.fn().mockResolvedValue({ token: "ghp_x", source: "env_GITHUB_TOKEN" }),
+        createProxyClient: vi.fn().mockReturnValue(proxy),
+        logSuccess: vi.fn(),
+        logError: vi.fn(),
+        exit: vi.fn((_c: number): never => {
+          throw new Error("__exit__");
+        }),
+      },
+    };
+  }
+
+  it("refuses rather than presenting the whole active registry as held", async () => {
+    const { deps } = heldDeps([
+      { slug: "alpha", teams: ["staff"], createdAt: "t", updatedAt: "t", createdBy: "alice" },
+    ]);
+    await expect(ls({ json: false, held: true }, deps)).rejects.toThrow("__exit__");
+    expect(deps.logError).toHaveBeenCalledWith(expect.stringMatching(/1\.10\.2|does not support/i));
+  });
+
+  it("an empty answer is unambiguous on every version, because none can answer empty while withholding held names", async () => {
+    const { deps } = heldDeps([]);
+    await ls({ json: false, held: true }, deps);
+    expect(deps.exit).not.toHaveBeenCalled();
+    expect(deps.logSuccess).toHaveBeenCalledWith("No names are held by a delete.");
+  });
+
+  it("rejects --held with --mine, which the snapshot can never answer", async () => {
+    const { deps } = heldDeps([]);
+    await expect(ls({ json: false, held: true, mine: true }, deps)).rejects.toThrow("__exit__");
+    expect(deps.exit).toHaveBeenCalledWith(10);
+  });
+});
+
+describe("sites ls --held against artemis 1.10.0 and 1.10.1", () => {
+  function mk(rows: unknown[]) {
+    const proxy = { listSites: vi.fn().mockResolvedValue(rows), whoami: vi.fn() };
+    return {
+      proxy,
+      deps: {
+        env: {} as NodeJS.ProcessEnv,
+        resolveIdentity: vi.fn().mockResolvedValue({ token: "ghp_x", source: "env_GITHUB_TOKEN" }),
+        createProxyClient: vi.fn().mockReturnValue(proxy),
+        logSuccess: vi.fn(),
+        logError: vi.fn(),
+        exit: vi.fn((_c: number): never => {
+          throw new Error("__exit__");
+        }),
+      },
+    };
+  }
+
+  it("refuses when the server carries state but did not honour the filter", async () => {
+    const { deps } = mk([
+      {
+        slug: "alpha",
+        teams: ["staff"],
+        createdAt: "t",
+        updatedAt: "t",
+        createdBy: "a",
+        state: "active",
+      },
+      {
+        slug: "held",
+        teams: ["staff"],
+        createdAt: "t",
+        updatedAt: "t",
+        createdBy: "a",
+        state: "reserved",
+      },
+    ]);
+    await expect(ls({ json: false, held: true }, deps)).rejects.toThrow("__exit__");
+    expect(deps.logError).toHaveBeenCalledWith(expect.stringMatching(/did not filter|1\.10\.2/i));
+  });
+
+  it("accepts a response where every row is reserved", async () => {
+    const { deps } = mk([
+      {
+        slug: "held",
+        teams: ["staff"],
+        createdAt: "t",
+        updatedAt: "t",
+        createdBy: "a",
+        state: "reserved",
+      },
+    ]);
+    await ls({ json: false, held: true }, deps);
+    expect(deps.exit).not.toHaveBeenCalled();
+  });
+
+  it("renders a plain ls of active sites byte-identically to a pre-1.10.0 server", async () => {
+    const base = { slug: "alpha", teams: ["staff"], createdAt: "t", updatedAt: "t", createdBy: "a" };
+
+    const legacy = mk([base]);
+    await ls({ json: false }, legacy.deps);
+    const legacyOut = legacy.deps.logSuccess.mock.calls
+      .map((c: unknown[]) => String(c[0]))
+      .join("\n");
+
+    const modern = mk([{ ...base, state: "active" }]);
+    await ls({ json: false }, modern.deps);
+    const modernOut = modern.deps.logSuccess.mock.calls
+      .map((c: unknown[]) => String(c[0]))
+      .join("\n");
+
+    expect(modernOut).toBe(legacyOut);
+    expect(modernOut).not.toContain("STATE");
+    expect(modernOut).not.toContain("HELD UNTIL");
+  });
+});

@@ -98,3 +98,14 @@ describe("sites rm command", () => {
     expect(deps.logError).toHaveBeenCalledWith(expect.stringContaining("user_unauthorized"));
   });
 });
+
+describe("sites rm wording", () => {
+  it("says the name is held, not removed", async () => {
+    const deps = mkDeps();
+    await rm({ json: false, slug: "blog" }, deps);
+    const printed = deps.logSuccess.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
+    expect(printed).toMatch(/72/);
+    expect(printed).toMatch(/undelete/i);
+    expect(printed).not.toMatch(/^Deleted blog$/m);
+  });
+});

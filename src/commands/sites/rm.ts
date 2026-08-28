@@ -35,10 +35,13 @@ export async function rm(options: RmOptions, deps: SitesCommandDeps = {}): Promi
     } else {
       success(
         [
-          `Deleted ${options.slug}`,
+          `${options.slug} is offline. Its name is held, not freed.`,
           ``,
-          `  Note: R2 deploy bytes are NOT removed; they age out via the`,
-          `        post-GA cleanup cron.`,
+          `  Nobody can register this name until the hold expires — 72 hours`,
+          `  unless this deployment sets SITE_RESERVATION_GRACE. After that the`,
+          `  name frees itself and the files are cleaned up.`,
+          ``,
+          `  Changed your mind?  universe sites undelete ${options.slug}`,
         ].join("\n"),
       );
     }

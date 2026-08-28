@@ -10,7 +10,9 @@ import { rollback } from "./commands/rollback.js";
 import { whoami } from "./commands/whoami.js";
 import { ls as sitesLs } from "./commands/sites/ls.js";
 import { register as sitesRegister } from "./commands/sites/register.js";
+import { release as sitesRelease } from "./commands/sites/release.js";
 import { rm as sitesRm } from "./commands/sites/rm.js";
+import { undelete as sitesUndelete } from "./commands/sites/undelete.js";
 import { update as sitesUpdate } from "./commands/sites/update.js";
 import { approve as repoApprove } from "./commands/repo/approve.js";
 import { create as repoCreate } from "./commands/repo/create.js";
@@ -24,9 +26,9 @@ import { EXIT_USAGE, exitWithCode } from "./output/exit-codes.js";
 import { CliError } from "./errors.js";
 import { installExitNotice, refreshIfStale, spawnRefresh } from "./lib/update-notifier.js";
 
-import pkg from '../package.json' with { type: 'json' }
+import pkg from "../package.json" with { type: "json" };
 
-const version = pkg.version
+const version = pkg.version;
 
 function handleActionError(command: string, json: boolean, err: unknown): void {
   const ctx: OutputContext = { json, command };
@@ -119,12 +121,14 @@ export async function run(argv = process.argv): Promise<void> {
     .command("ls")
     .description("List sites in the registry")
     .option("--mine", "Filter to sites your GitHub identity is authorized for")
+    .option("--held", "List names held by a delete instead of active sites")
     .action(async (_opts, cmd: Command) => {
-      const opts = cmd.optsWithGlobals<{ json?: boolean; mine?: boolean }>();
+      const opts = cmd.optsWithGlobals<{ json?: boolean; mine?: boolean; held?: boolean }>();
       try {
         await sitesLs({
           json: opts.json ?? false,
           mine: opts.mine ?? false,
+          held: opts.held ?? false,
         });
       } catch (err: unknown) {
         handleActionError("sites ls", opts.json ?? false, err);
@@ -153,13 +157,38 @@ export async function run(argv = process.argv): Promise<void> {
 
   sitesCli
     .command("rm <slug>")
-    .description("Remove a site from the registry (staff only)")
+    .description("Take a site offline and hold its name — 72 hours by default (staff only)")
     .action(async (slug: string, _opts, cmd: Command) => {
       const opts = cmd.optsWithGlobals<{ json?: boolean }>();
       try {
         await sitesRm({ json: opts.json ?? false, slug });
       } catch (err: unknown) {
         handleActionError("sites rm", opts.json ?? false, err);
+      }
+    });
+
+  sitesCli
+    .command("undelete <slug>")
+    .description("Bring back a site deleted while its name is still held (staff only)")
+    .action(async (slug: string, _opts, cmd: Command) => {
+      const opts = cmd.optsWithGlobals<{ json?: boolean }>();
+      try {
+        await sitesUndelete({ json: opts.json ?? false, slug });
+      } catch (err: unknown) {
+        handleActionError("sites undelete", opts.json ?? false, err);
+      }
+    });
+
+  sitesCli
+    .command("release <slug>")
+    .description("Free a held name now and trash its files — approvers only, not reversible")
+    .option("-y, --yes", "Skip the confirmation prompt")
+    .action(async (slug: string, _opts, cmd: Command) => {
+      const opts = cmd.optsWithGlobals<{ json?: boolean; yes?: boolean }>();
+      try {
+        await sitesRelease({ json: opts.json ?? false, slug, yes: opts.yes ?? false });
+      } catch (err: unknown) {
+        handleActionError("sites release", opts.json ?? false, err);
       }
     });
 
