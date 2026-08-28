@@ -27,7 +27,7 @@ export async function update(options: UpdateOptions, deps: SitesCommandDeps = {}
     const teams = parseTeamsFlag(options.team);
     if (teams.length === 0) {
       throw new UsageError(
-        "--team is required with at least one slug; use `sites rm` to remove a site",
+        "--team is required with at least one slug; use `sites remove` to remove a site",
       );
     }
     const { client, identitySource } = await setupClient(deps);

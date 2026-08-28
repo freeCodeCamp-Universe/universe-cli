@@ -148,6 +148,8 @@ vi.mock("../src/commands/repo/reject.js", () => ({ reject: vi.fn() }));
 vi.mock("../src/commands/repo/status.js", () => ({ status: vi.fn() }));
 vi.mock("../src/commands/list.js", () => ({ list: vi.fn() }));
 vi.mock("../src/commands/audit/list.js", () => ({ list: vi.fn() }));
+vi.mock("../src/commands/sites/remove.js", () => ({ remove: vi.fn() }));
+vi.mock("../src/commands/repo/remove.js", () => ({ remove: vi.fn() }));
 
 import { deploy } from "../src/commands/deploy.js";
 import { login } from "../src/commands/login.js";
@@ -161,6 +163,8 @@ import { list as sitesList } from "../src/commands/sites/list.js";
 import { release as sitesRelease } from "../src/commands/sites/release.js";
 import { list as staticList } from "../src/commands/list.js";
 import { list as auditList } from "../src/commands/audit/list.js";
+import { remove as sitesRemove } from "../src/commands/sites/remove.js";
+import { remove as repoRemove } from "../src/commands/repo/remove.js";
 const mockDeploy = vi.mocked(deploy);
 const mockLogin = vi.mocked(login);
 const mockLogout = vi.mocked(logout);
@@ -173,6 +177,8 @@ const mockSitesList = vi.mocked(sitesList);
 const mockSitesRelease = vi.mocked(sitesRelease);
 const mockStaticList = vi.mocked(staticList);
 const mockAuditList = vi.mocked(auditList);
+const mockSitesRemove = vi.mocked(sitesRemove);
+const mockRepoRemove = vi.mocked(repoRemove);
 
 describe("top-level error handling", () => {
   beforeEach(() => {
@@ -414,6 +420,13 @@ describe("universe sites flag wiring", () => {
     expect(mockSitesList).toHaveBeenCalledWith(expect.objectContaining({ held: true }));
   });
 
+  it("routes the `rm` alias to the sites remove handler", async () => {
+    mockSitesRemove.mockResolvedValue(undefined);
+    run(["node", "universe", "sites", "rm", "blog"]);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(mockSitesRemove).toHaveBeenCalledWith(expect.objectContaining({ slug: "blog" }));
+  });
+
   it("maps --yes to yes on release, and defaults it false so the prompt still fires", async () => {
     mockSitesRelease.mockResolvedValue(undefined);
     run(["node", "universe", "sites", "release", "blog", "--yes"]);
@@ -476,6 +489,13 @@ describe("universe repo namespace", () => {
     run(["node", "universe", "repo", "ls", "--mine"]);
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(mockRepoList).toHaveBeenCalledWith(expect.objectContaining({ mine: true }));
+  });
+
+  it("routes the `rm` alias to the repo remove handler", async () => {
+    mockRepoRemove.mockResolvedValue(undefined);
+    run(["node", "universe", "repo", "rm", "req_001", "--yes"]);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(mockRepoRemove).toHaveBeenCalledWith(expect.objectContaining({ id: "req_001" }));
   });
 
   it("repo create passes the positional name + flags", async () => {

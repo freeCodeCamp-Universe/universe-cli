@@ -11,14 +11,14 @@ import { whoami } from "./commands/whoami.js";
 import { list as sitesList } from "./commands/sites/list.js";
 import { register as sitesRegister } from "./commands/sites/register.js";
 import { release as sitesRelease } from "./commands/sites/release.js";
-import { rm as sitesRm } from "./commands/sites/rm.js";
+import { remove as sitesRemove } from "./commands/sites/remove.js";
 import { undelete as sitesUndelete } from "./commands/sites/undelete.js";
 import { update as sitesUpdate } from "./commands/sites/update.js";
 import { approve as repoApprove } from "./commands/repo/approve.js";
 import { create as repoCreate } from "./commands/repo/create.js";
 import { list as repoList } from "./commands/repo/list.js";
 import { reject as repoReject } from "./commands/repo/reject.js";
-import { rm as repoRm } from "./commands/repo/rm.js";
+import { remove as repoRemove } from "./commands/repo/remove.js";
 import { status as repoStatus } from "./commands/repo/status.js";
 import { list as auditList } from "./commands/audit/list.js";
 import { type OutputContext, outputError } from "./output/format.js";
@@ -157,14 +157,15 @@ export async function run(argv = process.argv): Promise<void> {
     });
 
   sitesCli
-    .command("rm <slug>")
+    .command("remove <slug>")
+    .alias("rm")
     .description("Take a site offline and hold its name — 72 hours by default (staff only)")
     .action(async (slug: string, _opts, cmd: Command) => {
       const opts = cmd.optsWithGlobals<{ json?: boolean }>();
       try {
-        await sitesRm({ json: opts.json ?? false, slug });
+        await sitesRemove({ json: opts.json ?? false, slug });
       } catch (err: unknown) {
-        handleActionError("sites rm", opts.json ?? false, err);
+        handleActionError("sites remove", opts.json ?? false, err);
       }
     });
 
@@ -301,19 +302,20 @@ export async function run(argv = process.argv): Promise<void> {
     });
 
   repoCli
-    .command("rm <id>")
+    .command("remove <id>")
+    .alias("rm")
     .description("Delete a request, freeing its repo name (admin only)")
     .option("--yes", "Skip confirmation prompts (required for non-TTY/CI)")
     .action(async (id: string, _opts, cmd: Command) => {
       const opts = cmd.optsWithGlobals<{ json?: boolean; yes?: boolean }>();
       try {
-        await repoRm({
+        await repoRemove({
           json: opts.json ?? false,
           id,
           yes: opts.yes ?? false,
         });
       } catch (err: unknown) {
-        handleActionError("repo rm", opts.json ?? false, err);
+        handleActionError("repo remove", opts.json ?? false, err);
       }
     });
 

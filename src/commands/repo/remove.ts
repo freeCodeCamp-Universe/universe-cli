@@ -6,14 +6,17 @@ import { exitWithCode } from "../../output/exit-codes.js";
 import { emitJson, outputError } from "../../output/format.js";
 import { defaultRepoPrompts, type RepoCommandDeps, setupClient, UsageError } from "./_shared.js";
 
-export interface RepoRmOptions {
+export interface RepoRemoveOptions {
   json: boolean;
   id: string;
   yes?: boolean;
 }
 
-export async function rm(options: RepoRmOptions, deps: RepoCommandDeps = {}): Promise<void> {
-  const command = "repo rm";
+export async function remove(
+  options: RepoRemoveOptions,
+  deps: RepoCommandDeps = {},
+): Promise<void> {
+  const command = "repo remove";
   const success = deps.logSuccess ?? ((s: string) => log.success(s));
   const error = deps.logError ?? ((s: string) => log.error(s));
   const exit = deps.exit ?? exitWithCode;
@@ -38,7 +41,7 @@ export async function rm(options: RepoRmOptions, deps: RepoCommandDeps = {}): Pr
         message: `Delete the ${cur.status} request for "${cur.name}" (${cur.id})? This frees the repo name.`,
       });
       if (prompts.isCancel(ok) || ok === false) {
-        throw new ConfirmError("repo rm cancelled");
+        throw new ConfirmError("repo remove cancelled");
       }
     }
 

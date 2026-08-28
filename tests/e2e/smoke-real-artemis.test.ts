@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { deploy } from "../../src/commands/deploy.js";
 import { list as staticList } from "../../src/commands/list.js";
 import { list as sitesList } from "../../src/commands/sites/list.js";
-import { rm as sitesRm } from "../../src/commands/sites/rm.js";
+import { remove as sitesRemove } from "../../src/commands/sites/remove.js";
 import { undelete as sitesUndelete } from "../../src/commands/sites/undelete.js";
 import { whoami } from "../../src/commands/whoami.js";
 
@@ -25,7 +25,7 @@ import { whoami } from "../../src/commands/whoami.js";
  *                         `freeCodeCamp-Universe/test-universe`). Must
  *                         already exist in the artemis registry. Case 5
  *                         deletes and restores this site: it serves 404
- *                         for the whole rm → undelete window.
+ *                         for the whole remove → undelete window.
  *
  * Optional env:
  *   UNIVERSE_REAL_TOKEN     — GitHub token authorized for the test site.
@@ -48,10 +48,10 @@ import { whoami } from "../../src/commands/whoami.js";
  *                         alias fails to flip on the artemis side, or
  *                         the CDN serves stale content past the deploy,
  *                         this test goes RED.
- *   5. sites rm → list --held → undelete — the reservation lifecycle
+ *   5. sites remove → list --held → undelete — the reservation lifecycle
  *      round-trips against the real registry, and the restored
- *      prevProduction must equal the pre-rm production deployId.
- *      afterAll owns the restore: whenever the rm succeeded and the
+ *      prevProduction must equal the pre-remove production deployId.
+ *      afterAll owns the restore: whenever the remove succeeded and the
  *      undelete has not, teardown re-runs the undelete. If even that
  *      is lost (SIGKILL), recover with `universe sites undelete <slug>`.
  *
@@ -296,7 +296,7 @@ describe.skipIf(!REAL_E2E)("real-artemis smoke (opt-in)", () => {
     }
   }, 300_000);
 
-  it("sites rm → list --held → undelete round-trip on the test site", async () => {
+  it("sites remove → list --held → undelete round-trip on the test site", async () => {
     const env = makeEnv();
     const deps = (exit: (code: number) => never) => ({
       env,
@@ -318,7 +318,7 @@ describe.skipIf(!REAL_E2E)("real-artemis smoke (opt-in)", () => {
     const prodBefore = beforeDeploys.find((d) => d.state?.includes("production"))?.deployId ?? "";
 
     const removed = await captureJsonRun((exit) =>
-      sitesRm({ json: true, slug: REAL_SITE! }, deps(exit)),
+      sitesRemove({ json: true, slug: REAL_SITE! }, deps(exit)),
     );
     expect(removed.captured.code).toBeUndefined();
     expect(removed.envelope!["success"]).toBe(true);

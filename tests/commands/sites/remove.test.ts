@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { rm } from "../../../src/commands/sites/rm.js";
+import { remove } from "../../../src/commands/sites/remove.js";
 
 function mkProxy() {
   return {
@@ -34,17 +34,17 @@ function mkDeps(overrides: Record<string, unknown> = {}) {
   };
 }
 
-describe("sites rm command", () => {
+describe("sites remove command", () => {
   it("calls deleteSite with slug", async () => {
     const deps = mkDeps();
-    await rm({ json: false, slug: "blog" }, deps);
+    await remove({ json: false, slug: "blog" }, deps);
     const proxy = deps.createProxyClient.mock.results[0]?.value;
     expect(proxy.deleteSite).toHaveBeenCalledWith({ slug: "blog" });
   });
 
   it("rejects empty slug with EXIT_USAGE", async () => {
     const deps = mkDeps();
-    await expect(rm({ json: false, slug: "" }, deps)).rejects.toThrow("__exit__");
+    await expect(remove({ json: false, slug: "" }, deps)).rejects.toThrow("__exit__");
     expect(deps.exit).toHaveBeenCalledWith(10);
     expect(deps.logError).toHaveBeenCalledWith(expect.stringMatching(/slug is required/i));
   });
@@ -57,11 +57,11 @@ describe("sites rm command", () => {
     });
 
     const deps = mkDeps();
-    await rm({ json: true, slug: "blog" }, deps);
+    await remove({ json: true, slug: "blog" }, deps);
     writeSpy.mockRestore();
 
     const env = JSON.parse(stdout.join("").trim());
-    expect(env.command).toBe("sites rm");
+    expect(env.command).toBe("sites remove");
     expect(env.success).toBe(true);
     expect(env.slug).toBe("blog");
     expect(env.deleted).toBe(true);
@@ -79,7 +79,7 @@ describe("sites rm command", () => {
     const deps = mkDeps({
       createProxyClient: vi.fn().mockReturnValue(proxy),
     });
-    await expect(rm({ json: false, slug: "ghost" }, deps)).rejects.toThrow("__exit__");
+    await expect(remove({ json: false, slug: "ghost" }, deps)).rejects.toThrow("__exit__");
     expect(deps.exit).toHaveBeenCalledWith(10);
     expect(deps.logError).toHaveBeenCalledWith(expect.stringContaining("not_found"));
   });
@@ -93,16 +93,16 @@ describe("sites rm command", () => {
     const deps = mkDeps({
       createProxyClient: vi.fn().mockReturnValue(proxy),
     });
-    await expect(rm({ json: false, slug: "blog" }, deps)).rejects.toThrow("__exit__");
+    await expect(remove({ json: false, slug: "blog" }, deps)).rejects.toThrow("__exit__");
     expect(deps.exit).toHaveBeenCalledWith(12);
     expect(deps.logError).toHaveBeenCalledWith(expect.stringContaining("user_unauthorized"));
   });
 });
 
-describe("sites rm wording", () => {
+describe("sites remove wording", () => {
   it("says the name is held, not removed", async () => {
     const deps = mkDeps();
-    await rm({ json: false, slug: "blog" }, deps);
+    await remove({ json: false, slug: "blog" }, deps);
     const printed = deps.logSuccess.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
     expect(printed).toMatch(/72/);
     expect(printed).toMatch(/undelete/i);

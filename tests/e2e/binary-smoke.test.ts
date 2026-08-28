@@ -214,12 +214,20 @@ describe("binary smoke matrix — CLI verbs against the built binary", () => {
     expect((JSON.parse(r.stdout.trim()) as { command: string }).command).toBe("sites update");
   }, 60_000);
 
-  it("sites rm --json <slug>", async () => {
+  it("sites remove --json <slug>", async () => {
+    resetState(server);
+    server.state.registry.set(SITE, row(SITE));
+    const r = await runBinary(["sites", "remove", SITE, "--json"], env.env);
+    expect(r.exitCode, `stderr=${r.stderr}\nstdout=${r.stdout}`).toBe(0);
+    expect((JSON.parse(r.stdout.trim()) as { command: string }).command).toBe("sites remove");
+  }, 60_000);
+
+  it("sites rm --json routes through the alias and still reports `sites remove`", async () => {
     resetState(server);
     server.state.registry.set(SITE, row(SITE));
     const r = await runBinary(["sites", "rm", SITE, "--json"], env.env);
     expect(r.exitCode, `stderr=${r.stderr}\nstdout=${r.stdout}`).toBe(0);
-    expect((JSON.parse(r.stdout.trim()) as { command: string }).command).toBe("sites rm");
+    expect((JSON.parse(r.stdout.trim()) as { command: string }).command).toBe("sites remove");
   }, 60_000);
 
   it("static deploy --json --allow-dirty (preview)", async () => {
@@ -236,12 +244,12 @@ describe("binary smoke matrix — CLI verbs against the built binary", () => {
     expect((JSON.parse(r.stdout.trim()) as { command: string }).command).toBe("deploy");
   }, 60_000);
 
-  it("sites rm → list --held → undelete round-trip", async () => {
+  it("sites remove → list --held → undelete round-trip", async () => {
     resetState(server);
     server.state.registry.set(SITE, row(SITE));
     server.state.aliases.production.set(SITE, "20260101-090000-prod111");
 
-    const removed = await runBinary(["sites", "rm", SITE, "--json"], env.env);
+    const removed = await runBinary(["sites", "remove", SITE, "--json"], env.env);
     expect(removed.exitCode, `stderr=${removed.stderr}`).toBe(0);
 
     const held = await runBinary(["sites", "list", "--held", "--json"], env.env);
@@ -273,7 +281,7 @@ describe("binary smoke matrix — CLI verbs against the built binary", () => {
   it("sites release --json --yes <slug>", async () => {
     resetState(server);
     server.state.registry.set(SITE, row(SITE));
-    const removed = await runBinary(["sites", "rm", SITE, "--json"], env.env);
+    const removed = await runBinary(["sites", "remove", SITE, "--json"], env.env);
     expect(removed.exitCode, `stderr=${removed.stderr}`).toBe(0);
 
     const r = await runBinary(["sites", "release", SITE, "--json", "--yes"], env.env);
@@ -289,7 +297,7 @@ describe("binary smoke matrix — CLI verbs against the built binary", () => {
     server.state.registry.set(SITE, row(SITE));
     const project = await makeProject(SITE, { "index.html": "<html></html>" });
     projects.push(project);
-    const removed = await runBinary(["sites", "rm", SITE, "--json"], env.env);
+    const removed = await runBinary(["sites", "remove", SITE, "--json"], env.env);
     expect(removed.exitCode, `stderr=${removed.stderr}`).toBe(0);
 
     const r = await runBinary(["static", "deploy", "--json"], env.env, project.dir);
@@ -342,12 +350,12 @@ describe("binary smoke matrix — CLI verbs against the built binary", () => {
     expect(server.state.repoRequests.get("req_1")!.status).toBe("rejected");
   }, 60_000);
 
-  it("repo rm --json --yes <id>", async () => {
+  it("repo remove --json --yes <id>", async () => {
     resetState(server);
     seedRepoRequest("req_1");
-    const r = await runBinary(["repo", "rm", "req_1", "--json", "--yes"], env.env);
+    const r = await runBinary(["repo", "remove", "req_1", "--json", "--yes"], env.env);
     expect(r.exitCode, `stderr=${r.stderr}\nstdout=${r.stdout}`).toBe(0);
-    expect((JSON.parse(r.stdout.trim()) as { command: string }).command).toBe("repo rm");
+    expect((JSON.parse(r.stdout.trim()) as { command: string }).command).toBe("repo remove");
     expect(server.state.repoRequests.has("req_1")).toBe(false);
   }, 60_000);
 

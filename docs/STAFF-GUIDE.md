@@ -32,6 +32,7 @@ Steps 1–3 set an app up once; 4–5 repeat every release. If your repo exists 
 **Reference**
 
 - [Common scenarios](#common-scenarios)
+- [Audit trail](#audit-trail) — who did what, and when
 - [CI & automation](#ci--automation)
 - [Identity & SSO](#identity--sso)
 - [When something breaks](#when-something-breaks)
@@ -199,23 +200,23 @@ universe sites register <new-slug> --team=<same,teams>  # 1. claim the new slug
 Then point the repo at it and ship:
 
 ```sh
-universe init --force --site <new-slug>   # rewrite platform.yaml `site:` (or edit it by hand)
-universe static deploy                    # 2. deploy under <new-slug>
+universe init --force --site <new-slug>  # rewrite platform.yaml `site:` (or edit it by hand)
+universe static deploy                   # 2. deploy under <new-slug>
 # check https://<new-slug>.preview.freecode.camp
-universe static promote                   # 3. go live on https://<new-slug>.freecode.camp
+universe static promote                  # 3. go live on https://<new-slug>.freecode.camp
 ```
 
 Once the new hostname serves correctly and you've updated any DNS, links, and CI referencing the old name:
 
 ```sh
-universe sites rm <old-slug>              # 4. drop the old entry; the old name stays held for the grace period
+universe sites remove <old-slug>  # 4. drop the old entry; the old name stays held for the grace period
 ```
 
 Deploy history does not carry over — the new slug starts fresh. There is no redirect from the old hostname, so cut over links once production is verified.
 
 ### Recover a deleted site
 
-`universe sites rm` takes the site offline and **holds** its name for 72 hours. It does not free the name, and it does not remove the files. Inside that window the delete is fully reversible:
+`universe sites remove` takes the site offline and **holds** its name for 72 hours. It does not free the name, and it does not remove the files. Inside that window the delete is fully reversible:
 
 ```sh
 universe sites list --held      # every held name, each with its real deadline
@@ -230,14 +231,14 @@ Three things behave differently while a name is held:
 - `universe sites register <slug>` fails, because the name is not free.
 - `universe static deploy` fails with exit 10 and names the hold. Run `undelete` first.
 
-Run `undelete` as soon as you notice the mistake. `universe sites list --held` is the only place the real deadline appears — `sites rm` prints none. After the hold expires the name frees itself, the files are removed, and nothing can bring the site back.
+Run `undelete` as soon as you notice the mistake. `universe sites list --held` is the only place the real deadline appears — `sites remove` prints none. After the hold expires the name frees itself, the files are removed, and nothing can bring the site back.
 
 ### Free a held name early
 
 `universe sites release <slug>` frees the name **and** trashes the site's files in one step. Use it for a takedown, or when a re-registration cannot wait for the hold to expire.
 
 ```sh
-universe sites release <slug>             # prompts first; pass --yes to skip the prompt
+universe sites release <slug>  # prompts first; pass --yes to skip the prompt
 ```
 
 It is not reversible, and `undelete` cannot follow it. It needs the approver team, not `staff` — ask infra if the call returns a permissions error.
@@ -262,7 +263,7 @@ universe sites list --mine                              # filter to sites you're
 universe sites register <slug>                          # register; --team defaults to "staff"
 universe sites register <slug> --team=news-editors      # register with a specific team
 universe sites update <slug> --team=staff,news-editors  # REPLACE the teams list wholesale
-universe sites rm <slug>                                # take offline; the name is HELD, not freed
+universe sites remove <slug>                            # take offline; the name is HELD, not freed
 universe sites undelete <slug>                          # bring it back while the name is still held
 universe sites list --held                              # held names, with the real deadline per name
 universe sites release <slug>                           # approvers: free the name now, trash the files
@@ -319,14 +320,29 @@ universe repo status <id>        # one request's full state
 Resolving requests requires the approver team (`gh-artemis-approvers`). Approval creates the repo synchronously, so the outcome is inline:
 
 ```sh
-universe repo approve <id>                 # confirms, then creates via the Apollo-11 App
+universe repo approve <id>  # confirms, then creates via the Apollo-11 App
 universe repo reject <id> --reason "out of scope"
-universe repo rm <id>                       # delete a request, freeing its repo name
+universe repo remove <id>   # delete a request, freeing its repo name
 ```
 
 If GitHub creation fails after approval (e.g. the App lacks `Contents:read` on a template), `approve` reports `approved, but repository creation failed`, exits `STORAGE` (13), and the request moves to `failed` with its name freed for a retry. A request another admin already resolved returns `409`; the guard prevents double-creation.
 
-`repo rm` deletes a request record. Use it to clear a stuck `active` row whose GitHub repo no longer exists (an `active` request is the only terminal state that still holds the name claim; `failed`/`rejected` already freed their name on resolution, so `repo rm` on those just removes a leftover record). It removes only the queue record, never a GitHub repo. Creating over a stale `active` name also self-heals: artemis verifies the repo is gone and reconciles the claim (the stale row is marked `failed`, not deleted, so its audit trail survives). Find the blocking record with `universe repo list --all`.
+`repo remove` deletes a request record. Use it to clear a stuck `active` row whose GitHub repo no longer exists (an `active` request is the only terminal state that still holds the name claim; `failed`/`rejected` already freed their name on resolution, so `repo remove` on those just removes a leftover record). It removes only the queue record, never a GitHub repo. Creating over a stale `active` name also self-heals: artemis verifies the repo is gone and reconciles the claim (the stale row is marked `failed`, not deleted, so its audit trail survives). Find the blocking record with `universe repo list --all`.
+
+## Audit trail
+
+Every **successful** write is recorded durably — a denial writes no row, and an audit-write failure never fails your command. Read the trail back with `universe audit list`:
+
+```sh
+universe audit list                               # the 100 most recent events
+universe audit list --actor <github-login>        # everything one person did
+universe audit list --action repo.approve         # one kind of event
+universe audit list --site <slug>                 # everything that touched one site
+universe audit list --since 2026-08-01T00:00:00Z  # events at or after a timestamp
+universe audit list --limit 500                   # 500 is the cap
+```
+
+The filters combine. The table shows when, who, what action, which target, and the outcome. Use `--json` when you need the full event, including its `requestId` — that is the id to quote when you ask a platform admin to trace a failure.
 
 ## CI & automation
 
@@ -359,7 +375,7 @@ universe repo approve "$id" --yes --json
 # promote: with --json a concurrent change exits 10 with a `current` field
 out=$(universe static promote --json) || true
 current=$(printf '%s' "$out" | jq -r '.current // empty')
-[ -n "$current" ] && universe static promote --json   # re-read + retry
+[ -n "$current" ] && universe static promote --json  # re-read + retry
 ```
 
 Useful CI env: `UNIVERSE_PROXY_URL` (staging), `UNIVERSE_FETCH_TIMEOUT_MS` (default 30000; `0` disables), `UNIVERSE_NO_UPDATE_CHECK=1` (silence the update notice). Full list in [`reference.md`](reference.md#environment).

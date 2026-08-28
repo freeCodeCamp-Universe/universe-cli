@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { rm } from "../../../src/commands/repo/rm.js";
+import { remove } from "../../../src/commands/repo/remove.js";
 
 function repoRow(over: Record<string, unknown> = {}) {
   return {
@@ -53,7 +53,7 @@ function mkDeps(overrides: Record<string, unknown> = {}) {
   };
 }
 
-describe("repo rm command", () => {
+describe("repo remove command", () => {
   it("deletes in JSON mode without prompting", async () => {
     const stdout: string[] = [];
     const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((c: unknown) => {
@@ -61,14 +61,14 @@ describe("repo rm command", () => {
       return true;
     });
     const deps = mkDeps();
-    await rm({ json: true, id: "req_001" }, deps);
+    await remove({ json: true, id: "req_001" }, deps);
     writeSpy.mockRestore();
 
     const proxy = deps.createProxyClient.mock.results[0]?.value;
     expect(proxy.deleteRepoRequest).toHaveBeenCalledWith({ id: "req_001" });
     expect(proxy.getRepoRequest).not.toHaveBeenCalled();
     const env = JSON.parse(stdout.join("").trim());
-    expect(env.command).toBe("repo rm");
+    expect(env.command).toBe("repo remove");
     expect(env.success).toBe(true);
     expect(env.deleted).toBe(true);
     expect(env.id).toBe("req_001");
@@ -77,7 +77,7 @@ describe("repo rm command", () => {
 
   it("requires an id", async () => {
     const deps = mkDeps();
-    await expect(rm({ json: false, id: "" }, deps)).rejects.toThrow("__exit__");
+    await expect(remove({ json: false, id: "" }, deps)).rejects.toThrow("__exit__");
     expect(deps.exit).toHaveBeenCalledWith(10);
   });
 
@@ -94,7 +94,7 @@ describe("repo rm command", () => {
       isTTY: true,
       prompts,
     });
-    await rm({ json: false, id: "req_001" }, deps);
+    await remove({ json: false, id: "req_001" }, deps);
     expect(proxy.getRepoRequest).toHaveBeenCalledWith("req_001");
     expect(prompts.confirm).toHaveBeenCalledTimes(1);
     expect(proxy.deleteRepoRequest).toHaveBeenCalledWith({ id: "req_001" });
@@ -115,7 +115,7 @@ describe("repo rm command", () => {
       isTTY: true,
       prompts,
     });
-    await expect(rm({ json: false, id: "req_001" }, deps)).rejects.toThrow("__exit__");
+    await expect(remove({ json: false, id: "req_001" }, deps)).rejects.toThrow("__exit__");
     expect(proxy.deleteRepoRequest).not.toHaveBeenCalled();
     expect(deps.exit).toHaveBeenCalledWith(18);
   });
@@ -123,7 +123,7 @@ describe("repo rm command", () => {
   it("requires --yes in a non-interactive (non-TTY) session", async () => {
     const proxy = mkProxy();
     const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
-    await expect(rm({ json: false, id: "req_001" }, deps)).rejects.toThrow("__exit__");
+    await expect(remove({ json: false, id: "req_001" }, deps)).rejects.toThrow("__exit__");
     expect(proxy.deleteRepoRequest).not.toHaveBeenCalled();
     expect(deps.exit).toHaveBeenCalledWith(10);
   });
@@ -145,7 +145,7 @@ describe("repo rm command", () => {
       isTTY: true,
       prompts,
     });
-    await expect(rm({ json: false, id: "ghost" }, deps)).rejects.toThrow("__exit__");
+    await expect(remove({ json: false, id: "ghost" }, deps)).rejects.toThrow("__exit__");
     expect(deps.exit).toHaveBeenCalledWith(10);
     expect(prompts.confirm).not.toHaveBeenCalled();
     expect(proxy.deleteRepoRequest).not.toHaveBeenCalled();
@@ -163,7 +163,7 @@ describe("repo rm command", () => {
       .fn()
       .mockRejectedValue(new ProxyError(404, "not_found", "no such request"));
     const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
-    await expect(rm({ json: true, id: "ghost" }, deps)).rejects.toThrow("__exit__");
+    await expect(remove({ json: true, id: "ghost" }, deps)).rejects.toThrow("__exit__");
     writeSpy.mockRestore();
     expect(deps.exit).toHaveBeenCalledWith(10);
     const env = JSON.parse(stdout.join("").trim());
@@ -180,7 +180,7 @@ describe("repo rm command", () => {
       .fn()
       .mockRejectedValue(new ProxyError(403, "user_unauthorized", "forbidden"));
     const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
-    await expect(rm({ json: true, id: "req_001" }, deps)).rejects.toThrow("__exit__");
+    await expect(remove({ json: true, id: "req_001" }, deps)).rejects.toThrow("__exit__");
     expect(deps.exit).toHaveBeenCalledWith(12);
   });
 
@@ -191,7 +191,7 @@ describe("repo rm command", () => {
       .fn()
       .mockRejectedValue(new ProxyError(502, "repo_store_failed", "bad gateway"));
     const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
-    await expect(rm({ json: true, id: "req_001" }, deps)).rejects.toThrow("__exit__");
+    await expect(remove({ json: true, id: "req_001" }, deps)).rejects.toThrow("__exit__");
     expect(deps.exit).toHaveBeenCalledWith(13);
   });
 });

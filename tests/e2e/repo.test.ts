@@ -3,7 +3,7 @@ import { approve } from "../../src/commands/repo/approve.js";
 import { create } from "../../src/commands/repo/create.js";
 import { list } from "../../src/commands/repo/list.js";
 import { reject } from "../../src/commands/repo/reject.js";
-import { rm } from "../../src/commands/repo/rm.js";
+import { remove } from "../../src/commands/repo/remove.js";
 import { status } from "../../src/commands/repo/status.js";
 import { type CliEnv, makeCliEnv } from "./_helpers/cli-env.js";
 import { type FakeArtemis, startFakeArtemis } from "./_helpers/fake-artemis.js";
@@ -130,7 +130,7 @@ describe("repo E2E (real proxy-client + real identity chain)", () => {
     const created = await run(create as never, { json: true, name: "tmp-del" }, env.env);
     const id = created.envelope!["id"] as string;
 
-    const removed = await run(rm as never, { json: true, id }, env.env);
+    const removed = await run(remove as never, { json: true, id }, env.env);
     expect(removed.captured.code).toBeUndefined();
     expect(removed.envelope!["deleted"]).toBe(true);
     expect(server.state.repoRequests.has(id)).toBe(false);

@@ -83,7 +83,9 @@ src/
   errors.ts           # typed error envelope
   index.ts            # bin entry → cli.ts
   commands/           # per-verb handlers (deploy, promote, rollback, list, login, …)
-  commands/repo/      # repo-request queue: create/list/approve/reject/status, _shared, schema (zod)
+  commands/sites/     # site registry: register/list/update/remove/undelete/release, _shared, schema (zod)
+  commands/repo/      # repo-request queue: create/list/approve/reject/status/remove, _shared, schema (zod)
+  commands/audit/     # audit trail: list, _shared, schema (zod)
   deploy/             # upload pipeline (walk, ignore, progress)
   lib/                # platform-yaml, identity, proxy-client, constants
   output/             # exit-codes, JSON envelopes, terminal formatters
