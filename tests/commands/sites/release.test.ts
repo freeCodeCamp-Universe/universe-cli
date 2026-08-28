@@ -50,6 +50,31 @@ describe("sites release command", () => {
     expect(proxy.releaseSite).toHaveBeenCalledWith({ slug: "blog" });
   });
 
+  it("emits the release result in the JSON envelope", async () => {
+    const stdout: string[] = [];
+    const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+      stdout.push(String(chunk));
+      return true;
+    });
+    const deps = mkDeps();
+    await release({ json: true, slug: "blog", yes: true }, deps);
+    writeSpy.mockRestore();
+    const env = JSON.parse(stdout.join(""));
+    expect(env.slug).toBe("blog");
+    expect(env.status).toBe("released");
+    expect(env.moved).toBe(42);
+    expect(env.success).toBe(true);
+  });
+
+  it("names the object count and that undelete cannot undo it", async () => {
+    const deps = mkDeps();
+    await release({ json: false, slug: "blog", yes: true }, deps);
+    const printed = deps.logSuccess.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
+    expect(printed).toContain("blog");
+    expect(printed).toContain("42");
+    expect(printed).toMatch(/not recoverable|undelete/i);
+  });
+
   it("rejects an empty slug with EXIT_USAGE", async () => {
     const deps = mkDeps();
     await expect(release({ json: false, slug: "", yes: true }, deps)).rejects.toThrow("__exit__");

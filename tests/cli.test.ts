@@ -130,6 +130,8 @@ vi.mock("../src/commands/promote.js", () => ({
 vi.mock("../src/commands/rollback.js", () => ({
   rollback: vi.fn(),
 }));
+vi.mock("../src/commands/sites/ls.js", () => ({ ls: vi.fn() }));
+vi.mock("../src/commands/sites/release.js", () => ({ release: vi.fn() }));
 vi.mock("../src/commands/login.js", () => ({
   login: vi.fn(),
 }));
@@ -152,6 +154,9 @@ import { whoami } from "../src/commands/whoami.js";
 import { create as repoCreate } from "../src/commands/repo/create.js";
 import { ls as repoLs } from "../src/commands/repo/ls.js";
 import { approve as repoApprove } from "../src/commands/repo/approve.js";
+import { promote } from "../src/commands/promote.js";
+import { ls as sitesLs } from "../src/commands/sites/ls.js";
+import { release as sitesRelease } from "../src/commands/sites/release.js";
 const mockDeploy = vi.mocked(deploy);
 const mockLogin = vi.mocked(login);
 const mockLogout = vi.mocked(logout);
@@ -159,6 +164,9 @@ const mockWhoami = vi.mocked(whoami);
 const mockRepoCreate = vi.mocked(repoCreate);
 const mockRepoLs = vi.mocked(repoLs);
 const mockRepoApprove = vi.mocked(repoApprove);
+const mockPromote = vi.mocked(promote);
+const mockSitesLs = vi.mocked(sitesLs);
+const mockSitesRelease = vi.mocked(sitesRelease);
 
 describe("top-level error handling", () => {
   beforeEach(() => {
@@ -327,6 +335,56 @@ describe("universe static namespace", () => {
     run(["node", "universe", "static", "deploy", "--promote"]);
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(mockDeploy).toHaveBeenCalledWith(expect.objectContaining({ noReuse: false }));
+  });
+
+  it("maps --allow-dirty to allowDirty on deploy, and defaults it false", async () => {
+    mockDeploy.mockResolvedValue(undefined);
+    run(["node", "universe", "static", "deploy", "--allow-dirty"]);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(mockDeploy).toHaveBeenCalledWith(expect.objectContaining({ allowDirty: true }));
+    mockDeploy.mockClear();
+    run(["node", "universe", "static", "deploy"]);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(mockDeploy).toHaveBeenCalledWith(expect.objectContaining({ allowDirty: false }));
+  });
+
+  it("maps --allow-dirty to allowDirty on promote, and defaults it false", async () => {
+    mockPromote.mockResolvedValue(undefined);
+    run(["node", "universe", "static", "promote", "--allow-dirty"]);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(mockPromote).toHaveBeenCalledWith(expect.objectContaining({ allowDirty: true }));
+    mockPromote.mockClear();
+    run(["node", "universe", "static", "promote"]);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(mockPromote).toHaveBeenCalledWith(expect.objectContaining({ allowDirty: false }));
+  });
+});
+
+describe("universe sites flag wiring", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("maps --held to held, and defaults it false", async () => {
+    mockSitesLs.mockResolvedValue(undefined);
+    run(["node", "universe", "sites", "ls", "--held"]);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(mockSitesLs).toHaveBeenCalledWith(expect.objectContaining({ held: true }));
+    mockSitesLs.mockClear();
+    run(["node", "universe", "sites", "ls"]);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(mockSitesLs).toHaveBeenCalledWith(expect.objectContaining({ held: false }));
+  });
+
+  it("maps --yes to yes on release, and defaults it false so the prompt still fires", async () => {
+    mockSitesRelease.mockResolvedValue(undefined);
+    run(["node", "universe", "sites", "release", "blog", "--yes"]);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(mockSitesRelease).toHaveBeenCalledWith(expect.objectContaining({ yes: true }));
+    mockSitesRelease.mockClear();
+    run(["node", "universe", "sites", "release", "blog"]);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(mockSitesRelease).toHaveBeenCalledWith(expect.objectContaining({ yes: false }));
   });
 });
 
