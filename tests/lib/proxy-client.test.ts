@@ -460,6 +460,34 @@ describe("createProxyClient", () => {
       expect(err.current).toBe("actual-id");
       expect(err.exitCode).toBe(EXIT_USAGE);
     });
+
+    it("keeps the request id and hint on an alias_drift so support can correlate it", async () => {
+      const fetchMock = vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            error: { code: "alias_drift", message: "drift detected", hint: "re-read the alias" },
+            site: "my-site",
+            current: "actual-id",
+          }),
+          {
+            status: 409,
+            headers: {
+              "content-type": "application/json",
+              "x-request-id": "req-drift-1",
+            },
+          },
+        ),
+      );
+      const client = createProxyClient({ baseUrl, getAuthToken, fetch: fetchMock });
+      const err = (await client
+        .sitePromote({ site: "my-site", deployId: "new-id", expectedCurrent: "stale-id" })
+        .catch((e: unknown) => e)) as AliasDriftError;
+      expect(err).toBeInstanceOf(AliasDriftError);
+      expect(err.current).toBe("actual-id");
+      expect(err.requestId).toBe("req-drift-1");
+      expect(err.hint).toBe("re-read the alias");
+      expect(wrapProxyError("static promote", err).requestId).toBe("req-drift-1");
+    });
   });
 
   describe("siteRollback", () => {

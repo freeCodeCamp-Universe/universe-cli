@@ -322,8 +322,8 @@ export class SiteReservedError extends ProxyError {
 export class AliasDriftError extends ProxyError {
   readonly current: string;
 
-  constructor(message: string, current: string) {
-    super(409, "alias_drift", message);
+  constructor(message: string, current: string, requestId?: string, hint?: string) {
+    super(409, "alias_drift", message, requestId, hint);
     this.current = current;
   }
 }
@@ -452,7 +452,7 @@ async function readErrorEnvelope(response: Response): Promise<ErrorEnvelopeField
 
 function throwProxyError(status: number, env: ErrorEnvelopeFields, requestId?: string): never {
   if (status === 409 && env.code === "alias_drift") {
-    throw new AliasDriftError(env.message, env.current ?? "");
+    throw new AliasDriftError(env.message, env.current ?? "", requestId, env.hint);
   }
   if (status === 409 && env.code === "site_reserved") {
     throw new SiteReservedError(env.message, env.reservedUntil, requestId, env.hint);
