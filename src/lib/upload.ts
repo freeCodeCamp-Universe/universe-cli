@@ -150,6 +150,7 @@ export async function uploadFiles(
 
   const tasks = options.files.map((file) =>
     limit(async () => {
+      if (fatal) return;
       try {
         const body = await read(file.absPath);
         await options.client.deployUpload({

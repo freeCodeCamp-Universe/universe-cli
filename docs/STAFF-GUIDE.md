@@ -129,7 +129,7 @@ Under `--json` the `deploy` envelope names the stamp in a `shaSource` field: `he
 | `--json`       | Machine-readable envelope; required for CI.                                     |
 | `--no-reuse`   | Always rebuild; never promote an existing preview. Applies to this run only.    |
 
-**What gets uploaded:** the CLI walks `build.output`, drops `deploy.ignore` matches, and uploads the rest — 6 files in parallel, content type inferred from extension. A symlink resolving outside the output directory aborts the deploy (`STORAGE`, 13). An empty set after filtering fails with `No files to deploy` (`GIT`, 15). If any file fails mid-upload the deploy exits `PARTIAL` (19) **without** flipping the alias — re-run `deploy` (each run mints a fresh id, so retries are safe).
+**What gets uploaded:** the CLI walks `build.output`, drops `deploy.ignore` matches, and uploads the rest — 6 files in parallel, content type inferred from extension. A symlink resolving outside the output directory aborts the deploy (`STORAGE`, 13). An empty set after filtering fails with `No files to deploy` (`GIT`, 15). If a file fails mid-upload the deploy exits `PARTIAL` (19) **without** flipping the alias — re-run `deploy` (each run mints a fresh id, so retries are safe). A credentials failure is the exception: the CLI stops sending new files as soon as the first one is refused and exits `CREDENTIALS` (12), because every remaining file would fail the same way.
 
 ## 4. Inspect deploys
 

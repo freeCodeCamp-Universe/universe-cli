@@ -253,6 +253,57 @@ describe("uploadFiles on an authentication failure", () => {
     ).rejects.toMatchObject({ status: 401, code: "user_unauthorized", requestId: "req-77" });
   });
 
+  it("stops uploading the rest of the tree once the credentials are known bad", async () => {
+    const authErr = new ProxyError(403, "site_unauthorized", "no team");
+    const { client, upload } = mkClient(vi.fn().mockRejectedValue(authErr));
+    const readFile = vi.fn().mockResolvedValue(Buffer.from("x"));
+
+    await expect(
+      uploadFiles(
+        {
+          client,
+          deployId: "d1",
+          jwt: "jwt1",
+          files: Array.from({ length: 25 }, (_unused, i) => ({
+            relPath: `f${i}.html`,
+            absPath: `/abs/f${i}.html`,
+          })),
+          concurrency: 1,
+        },
+        { readFile },
+      ),
+    ).rejects.toMatchObject({ status: 403 });
+
+    expect(upload).toHaveBeenCalledTimes(1);
+    expect(readFile).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports progress only for the files it actually attempted", async () => {
+    const authErr = new ProxyError(401, "user_unauthorized", "token expired");
+    const { client } = mkClient(vi.fn().mockRejectedValue(authErr));
+    const readFile = vi.fn().mockResolvedValue(Buffer.from("x"));
+    const onProgress = vi.fn();
+
+    await expect(
+      uploadFiles(
+        {
+          client,
+          deployId: "d1",
+          jwt: "jwt1",
+          files: Array.from({ length: 10 }, (_unused, i) => ({
+            relPath: `f${i}.html`,
+            absPath: `/abs/f${i}.html`,
+          })),
+          concurrency: 1,
+          onProgress,
+        },
+        { readFile },
+      ),
+    ).rejects.toMatchObject({ status: 401 });
+
+    expect(onProgress).toHaveBeenCalledTimes(1);
+  });
+
   it("still collects an ordinary per-file failure rather than throwing", async () => {
     const { client } = mkClient(vi.fn().mockRejectedValue(new Error("socket hang up")));
     const readFile = vi.fn().mockResolvedValue(Buffer.from("x"));
