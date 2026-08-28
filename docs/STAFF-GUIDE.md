@@ -213,6 +213,35 @@ universe sites rm <old-slug>              # 4. drop the old entry; the old name 
 
 Deploy history does not carry over — the new slug starts fresh. There is no redirect from the old hostname, so cut over links once production is verified.
 
+### Recover a deleted site
+
+`universe sites rm` takes the site offline and **holds** its name for 72 hours. It does not free the name, and it does not remove the files. Inside that window the delete is fully reversible:
+
+```sh
+universe sites ls --held                  # every held name, each with its real deadline
+universe sites undelete <slug>            # put the site back online at the deploy it was serving
+```
+
+`undelete` restores the site and prints the two deploys it was serving, production and preview. You do not need to deploy again. The proxy returns those two pointers once and then forgets them, so keep the output if you must record what came back.
+
+Three things behave differently while a name is held:
+
+- `universe sites ls` does not show it — only `--held` does.
+- `universe sites register <slug>` fails, because the name is not free.
+- `universe static deploy` fails with exit 10 and names the hold. Run `undelete` first.
+
+Run `undelete` as soon as you notice the mistake. `universe sites ls --held` is the only place the real deadline appears — `sites rm` prints none. After the hold expires the name frees itself, the files are removed, and nothing can bring the site back.
+
+### Free a held name early
+
+`universe sites release <slug>` frees the name **and** trashes the site's files in one step. Use it for a takedown, or when a re-registration cannot wait for the hold to expire.
+
+```sh
+universe sites release <slug>             # prompts first; pass --yes to skip the prompt
+```
+
+It is not reversible, and `undelete` cannot follow it. It needs the approver team, not `staff` — ask infra if the call returns a permissions error.
+
 ### Sign out
 
 ```sh
