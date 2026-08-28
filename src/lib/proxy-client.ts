@@ -142,6 +142,24 @@ export interface SiteRow {
   createdAt: string;
   updatedAt: string;
   createdBy: string;
+  state?: string;
+  reservedUntil?: string;
+}
+
+export interface UndeleteResult {
+  slug: string;
+  prevProduction: string;
+  prevPreview: string;
+}
+
+export interface ReleaseResult {
+  slug: string;
+  status: string;
+  moved: number;
+}
+
+export interface ListSitesQuery {
+  state?: "active" | "reserved";
 }
 
 export interface RegisterSiteRequest {
@@ -245,9 +263,11 @@ export interface ProxyClient {
   }): Promise<AliasResponse>;
   siteRollback(req: { site: string; to: string; expectedCurrent?: string }): Promise<AliasResponse>;
   registerSite(req: RegisterSiteRequest): Promise<SiteRow>;
-  listSites(): Promise<SiteRow[]>;
+  listSites(req?: ListSitesQuery): Promise<SiteRow[]>;
   updateSite(req: UpdateSiteRequest): Promise<SiteRow>;
   deleteSite(req: DeleteSiteRequest): Promise<void>;
+  undeleteSite(req: { slug: string }): Promise<UndeleteResult>;
+  releaseSite(req: { slug: string }): Promise<ReleaseResult>;
   createRepoRequest(req: CreateRepoRequestBody): Promise<RepoRow>;
   listRepoRequests(req?: ListRepoRequestsQuery): Promise<RepoRow[]>;
   listAudit(req?: ListAuditQuery): Promise<AuditRow[]>;
@@ -278,6 +298,15 @@ export class ProxyError extends CliError {
     this.exitCode = mapExitCode(status);
     this.requestId = requestId;
     this.hint = hint;
+  }
+}
+
+export class SiteReservedError extends ProxyError {
+  readonly reservedUntil?: string;
+
+  constructor(message: string, reservedUntil?: string, requestId?: string, hint?: string) {
+    super(409, "site_reserved", message, requestId, hint);
+    this.reservedUntil = reservedUntil;
   }
 }
 
@@ -334,6 +363,16 @@ export function wrapProxyError(
         "\n  hint: the active GitHub token may lack the read:org scope or SSO authorization for the org. " +
         "$GITHUB_TOKEN / $GH_TOKEN override `gh auth token` — run `universe whoami` to check the active identity source, " +
         "then unset them or re-authorize the token (Configure SSO).";
+    } else if (err instanceof SiteReservedError) {
+      message +=
+        "\n  hint: this name is held by a delete and cannot be registered yet." +
+        (err.reservedUntil ? ` The hold expires at ${err.reservedUntil}.` : "") +
+        " Run `universe sites undelete <slug>` to bring the site back, or wait for the hold to expire." +
+        (err.hint ? ` ${err.hint}` : "");
+    } else if (err.status === 410) {
+      message +=
+        "\n  hint: the site is no longer registered, so this cannot be undone from here. " +
+        "Its name may have been released, or the hold may have expired.";
     } else if (err.hint) {
       message += `\n  hint: ${err.hint}`;
     }
@@ -376,6 +415,7 @@ interface ErrorEnvelopeFields {
   message: string;
   current?: string;
   hint?: string;
+  reservedUntil?: string;
 }
 
 async function readErrorEnvelope(response: Response): Promise<ErrorEnvelopeFields> {
@@ -392,11 +432,16 @@ async function readErrorEnvelope(response: Response): Promise<ErrorEnvelopeField
   if (isProxyErrorEnvelope(raw) && raw.error) {
     const current = typeof raw.current === "string" ? raw.current : undefined;
     const hint = typeof raw.error.hint === "string" ? raw.error.hint : undefined;
+    const reservedUntil =
+      typeof (raw.error as Record<string, unknown>)["reservedUntil"] === "string"
+        ? ((raw.error as Record<string, unknown>)["reservedUntil"] as string)
+        : undefined;
     return {
       code: raw.error.code ?? `http_${status}`,
       message: raw.error.message ?? response.statusText ?? "request failed",
       ...(current === undefined ? {} : { current }),
       ...(hint === undefined ? {} : { hint }),
+      ...(reservedUntil === undefined ? {} : { reservedUntil }),
     };
   }
   return {
@@ -408,6 +453,9 @@ async function readErrorEnvelope(response: Response): Promise<ErrorEnvelopeField
 function throwProxyError(status: number, env: ErrorEnvelopeFields, requestId?: string): never {
   if (status === 409 && env.code === "alias_drift") {
     throw new AliasDriftError(env.message, env.current ?? "");
+  }
+  if (status === 409 && env.code === "site_reserved") {
+    throw new SiteReservedError(env.message, env.reservedUntil, requestId, env.hint);
   }
   throw new ProxyError(status, env.code, env.message, requestId, env.hint);
 }
@@ -641,8 +689,9 @@ export function createProxyClient(cfg: ProxyClientConfig): ProxyClient {
       });
     },
 
-    async listSites() {
-      return call<SiteRow[]>(`${base}/api/sites`, {
+    async listSites(req) {
+      const query = req?.state ? `?state=${encodeURIComponent(req.state)}` : "";
+      return call<SiteRow[]>(`${base}/api/sites${query}`, {
         method: "GET",
         headers: {
           Authorization: await userBearer(),
@@ -668,6 +717,28 @@ export function createProxyClient(cfg: ProxyClientConfig): ProxyClient {
       const url = `${base}/api/site/${encodeURIComponent(req.slug)}`;
       return call<void>(url, {
         method: "DELETE",
+        headers: {
+          Authorization: await userBearer(),
+          Accept: "application/json",
+        },
+      });
+    },
+
+    async undeleteSite(req) {
+      const url = `${base}/api/site/${encodeURIComponent(req.slug)}/undelete`;
+      return call<UndeleteResult>(url, {
+        method: "POST",
+        headers: {
+          Authorization: await userBearer(),
+          Accept: "application/json",
+        },
+      });
+    },
+
+    async releaseSite(req) {
+      const url = `${base}/api/site/${encodeURIComponent(req.slug)}/release`;
+      return call<ReleaseResult>(url, {
+        method: "POST",
         headers: {
           Authorization: await userBearer(),
           Accept: "application/json",

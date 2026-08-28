@@ -15,6 +15,8 @@ export interface SitesCommandDeps {
   logSuccess?: (msg: string) => void;
   logError?: (msg: string) => void;
   exit?: (code: number) => never;
+  confirm?: (message: string) => Promise<boolean>;
+  isTTY?: boolean;
 }
 
 /**
