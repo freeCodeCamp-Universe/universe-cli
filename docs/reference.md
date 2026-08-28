@@ -57,10 +57,14 @@ Without `--allow-dirty`, `static deploy` refuses a dirty tree or a `--dir` overr
 
 | Command                          | Flags                                | Purpose                                                         |
 | -------------------------------- | ------------------------------------ | --------------------------------------------------------------- |
-| `universe sites ls`              | `--mine`, `--json`                   | List registered sites; `--mine` filters to your authorized set. |
+| `universe sites ls`              | `--mine`, `--held`, `--json`         | List registered sites; `--mine` filters to your authorized set; `--held` lists names held by a delete (not combinable with `--mine`). |
 | `universe sites register <slug>` | `--team <name>`, `--json`            | Register a site (staff). `--team` defaults to `staff`.          |
 | `universe sites update <slug>`   | `--team <name>` (required), `--json` | Replace the teams list (staff).                                 |
-| `universe sites rm <slug>`       | `--json`                             | Delete the entry (staff). R2 bytes untouched; age out via cron. |
+| `universe sites rm <slug>`       | `--json`                             | Take the site offline and hold its name (staff). Reversible with `undelete` while the hold lasts. |
+| `universe sites undelete <slug>` | `--json`                             | Bring back a site while its name is still held (staff).         |
+| `universe sites release <slug>`  | `-y`, `--yes`, `--json`              | Free a held name now and trash its files (approvers). Not reversible. |
+
+A delete does not free the name. `rm` takes the site offline and **holds** its slug so nobody else can register it; `undelete` brings the site back and restores both alias pointers, which the server reports once and then forgets. The hold is **72 hours by default** — a deployment overrides it with `SITE_RESERVATION_GRACE`, so read the real deadline from `sites ls --held` rather than counting from the delete. When the hold expires the name frees itself and the files are cleaned up. `release` ends the hold early: it frees the name and trashes the files in one irreversible step, so it is gated on the approver team and exits 18 without `--yes` in any non-interactive mode. Registering a held name returns `409 site_reserved` and the CLI names `undelete`; the expiry rides along only on the verbs that send it, and `sites register` is not one of them, so read the deadline from `sites ls --held`. Every site-scoped path — `promote`, `rollback`, deploy init, upload, finalize, deploys, trash, alias, deploy-delete, deploy-restore — reads the same three states, so learn them once. **Held** — deleted, still inside the grace: all of them return `409 site_reserved` with the expiry, exit 10. **Gone** — the hold expired, or `release` ran: all of them answer `403 site_unauthorized`, exit 12, because the cached snapshot no longer lists the name. The write verbs among them can instead answer `410 site_gone` with a message, exit 10, for up to 60 seconds after the change — the window in which the snapshot still lists a site the registry has already dropped. **Active**: the call proceeds. A delete therefore reads as `409` while you can still undo it, and as `403` — briefly `410` — once you cannot. Server floors: `undelete` and `release` need artemis 1.10.0, and `ls --held` needs 1.10.2.
 
 `--team` is comma-separated and repeatable; values are GitHub team slugs in `freeCodeCamp-Universe`. Slug `^[a-z][a-z0-9-]{0,62}$`, team `^[a-z0-9][a-z0-9_-]{0,38}$`. There is no in-place slug **rename** (no server primitive, and the CLI can't move R2 bytes) — `register` the new slug, redeploy under it, then `rm` the old one; full recipe in [STAFF-GUIDE.md](STAFF-GUIDE.md#rename-a-site-slug). Source: `src/commands/sites/`.
 
@@ -84,7 +88,7 @@ Stable contract — `src/output/exit-codes.ts`. Callers import the constants, ne
 | Code | Name          | Meaning                                                                                        |
 | ---- | ------------- | ---------------------------------------------------------------------------------------------- |
 | 0    | `SUCCESS`     | Completed.                                                                                     |
-| 10   | `USAGE`       | Bad input — unknown flag, missing arg, or a 400/404/409 (incl. alias drift, deploy not found). |
+| 10   | `USAGE`       | Bad input — unknown flag, missing arg, or a 400/404/409/410 (incl. alias drift, deploy not found, site released). |
 | 11   | `CONFIG`      | `platform.yaml` missing/invalid, or build output dir missing/not a directory.                  |
 | 12   | `CREDENTIALS` | Auth failed (401/403) — re-`login`, or the token is not user-scoped.                           |
 | 13   | `STORAGE`     | Server/network failure (5xx, timeout, 422), or a symlink escape.                               |

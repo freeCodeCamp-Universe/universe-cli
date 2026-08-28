@@ -208,7 +208,7 @@ universe static promote                   # 3. go live on https://<new-slug>.fre
 Once the new hostname serves correctly and you've updated any DNS, links, and CI referencing the old name:
 
 ```sh
-universe sites rm <old-slug>              # 4. drop the old entry; its R2 bytes age out via cron
+universe sites rm <old-slug>              # 4. drop the old entry; the old name stays held for the grace period
 ```
 
 Deploy history does not carry over — the new slug starts fresh. There is no redirect from the old hostname, so cut over links once production is verified.
@@ -225,7 +225,7 @@ Deletes the stored token. The next invocation needs `universe login` again, unle
 
 The registry maps each site slug to the GitHub teams allowed to deploy it. The proxy owns and enforces it server-side; `platform.yaml` only names the slug. **A new slug must be registered before its first deploy** — an unregistered slug fails with `Site '<slug>' is not registered`.
 
-Reads are open to any GitHub user the proxy can identify; writes require the `staff` team.
+Reads are open to any GitHub user the proxy can identify; writes require the `staff` team, except `release`, which needs the approver team.
 
 ```sh
 universe sites ls                                       # every registered site
@@ -233,7 +233,10 @@ universe sites ls --mine                                # filter to sites you're
 universe sites register <slug>                          # register; --team defaults to "staff"
 universe sites register <slug> --team=news-editors      # register with a specific team
 universe sites update <slug> --team=staff,news-editors  # REPLACE the teams list wholesale
-universe sites rm <slug>                                # delete entry (R2 bytes age out via cron)
+universe sites rm <slug>                                # take offline; the name is HELD, not freed
+universe sites undelete <slug>                          # bring it back while the name is still held
+universe sites ls --held                                # held names, with the real deadline per name
+universe sites release <slug>                           # approvers: free the name now, trash the files
 ```
 
 `update` replaces the team list, so to grant a team include the current ones alongside it. `--team` is a comma-separated, repeatable list of GitHub **team slugs** in `freeCodeCamp-Universe`.
