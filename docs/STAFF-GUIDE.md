@@ -120,9 +120,7 @@ On success the proxy returns a deploy id (`YYYYMMDD-HHMMSS-<sha7>`) and a previe
 - `dov…` — `--dir` overrode `build.output` on a clean tree. This needs `--allow-dirty` too. A dirty tree stamps `dty…` even with `--dir`.
 - `nog…` — not a git repository. Git is **not** required.
 
-Under `--json` the `deploy` envelope names the stamp in a `shaSource` field: `head`, `dirty`, `dirover` or `synthetic`. Read that field in CI rather than pattern-matching the sha.
-
-A clean tree still does not prove the same bytes — an environment variable or a gitignored file can change the build while git sees nothing. `shaSource: head` means the CLI had a commit and a clean tree, not that the build is reproducible.
+Under `--json` the `deploy` envelope names the stamp in a `shaSource` field: `head`, `dirty`, `dirover` or `synthetic`. Read that field in CI rather than pattern-matching the sha. Note that `shaSource: head` means the CLI had a commit and a clean tree, not that the build is reproducible — an environment variable or a gitignored file can change the build while git sees nothing.
 
 | Flag           | Effect                                                                          |
 | -------------- | ------------------------------------------------------------------------------- |
@@ -167,9 +165,7 @@ universe static promote --from 20260511-091422-abc1234
 
 `promote` never reads git state and never rebuilds. It ships whatever the preview alias holds. It refuses a `dty…` or `dov…` build unless you pass `--allow-dirty`. With the flag, or for `nog…`, `promote` warns that production will not map to a commit, and `--json` reports the stamp in `shaSource`. For anything else `shaSource` is `unverified`, because `promote` reads only the deploy id. A preview minted by a CLI older than these stamps carries a commit sha even when it was built from a dirty tree, and neither `promote` nor the reuse fast path can tell. Re-deploy from a clean tree when production must be traceable to a commit.
 
-If you'd rather promote right after checking preview, `universe static deploy --promote` works too — and when your tree is clean and the preview is already at the current commit, it promotes that same build instead of uploading a duplicate. So `deploy` → check preview → `deploy --promote` ships exactly what you reviewed, with no second deploy of the same hash.
-
-Pass `--no-reuse` when the build reads something git cannot see, such as an environment variable or a gitignored file. It applies to that one command. It does not change the deploy id, and `--promote` never repoints the preview alias, so a later bare `deploy --promote` at the same commit can still promote the older preview. Run `deploy` without `--promote` first to refresh preview when that matters.
+If you'd rather promote right after checking preview, `universe static deploy --promote` works too — and when your tree is clean and the preview is already at the current commit, it promotes that same build instead of uploading a duplicate. So `deploy` → check preview → `deploy --promote` ships exactly what you reviewed, with no second deploy of the same hash. Pass `--no-reuse` to force a fresh build when the build reads an input git cannot see. It applies to that one command, does not change the deploy id, and `--promote` never repoints the preview alias, so a later bare `deploy --promote` at the same commit can still promote the older preview. Run `deploy` without `--promote` first to refresh preview when that matters.
 
 ## 6. Roll back
 
