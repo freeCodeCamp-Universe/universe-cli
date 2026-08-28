@@ -546,6 +546,22 @@ describe("deploy command (proxy plane)", () => {
       expect(deps.logError).toHaveBeenCalledWith(expect.stringContaining("no team"));
     });
 
+    it("surfaces the hold deadline when the site name is held", async () => {
+      const { SiteReservedError } = await import("../../src/lib/proxy-client.js");
+      const proxy = mkProxy();
+      proxy.deployInit.mockRejectedValue(
+        new SiteReservedError("site name is reserved", "2026-08-31T09:00:00Z", "req-xyz"),
+      );
+      const deps = mkDeps({
+        createProxyClient: vi.fn().mockReturnValue(proxy),
+      });
+      await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
+      expect(deps.exit).toHaveBeenCalledWith(10);
+      const msg = deps.logError.mock.calls[0]?.[0] as string;
+      expect(msg).toContain("2026-08-31T09:00:00Z");
+      expect(msg).toMatch(/undelete/);
+    });
+
     it("propagates ProxyError from deployFinalize", async () => {
       const proxy = mkProxy();
       proxy.deployFinalize.mockRejectedValue(new ProxyError(422, "verify_failed", "missing"));

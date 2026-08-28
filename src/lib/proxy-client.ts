@@ -299,6 +299,10 @@ export class ProxyError extends CliError {
     this.requestId = requestId;
     this.hint = hint;
   }
+
+  withMessage(message: string): ProxyError {
+    return new ProxyError(this.status, this.code, message, this.requestId, this.hint);
+  }
 }
 
 export class SiteReservedError extends ProxyError {
@@ -307,6 +311,10 @@ export class SiteReservedError extends ProxyError {
   constructor(message: string, reservedUntil?: string, requestId?: string, hint?: string) {
     super(409, "site_reserved", message, requestId, hint);
     this.reservedUntil = reservedUntil;
+  }
+
+  override withMessage(message: string): SiteReservedError {
+    return new SiteReservedError(message, this.reservedUntil, this.requestId, this.hint);
   }
 }
 
@@ -325,6 +333,10 @@ export class AliasDriftError extends ProxyError {
   constructor(message: string, current: string, requestId?: string, hint?: string) {
     super(409, "alias_drift", message, requestId, hint);
     this.current = current;
+  }
+
+  override withMessage(message: string): AliasDriftError {
+    return new AliasDriftError(message, this.current, this.requestId, this.hint);
   }
 }
 

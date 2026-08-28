@@ -23,6 +23,7 @@ import {
   createProxyClient as defaultCreateProxyClient,
   parseFetchTimeoutMs,
   ProxyError,
+  wrapProxyError,
   type ProxyClient,
   type ProxyClientConfig,
 } from "../lib/proxy-client.js";
@@ -104,7 +105,7 @@ function deployIdSha(deployId: string): string | null {
  */
 function rethrowProxy(prefix: string, err: unknown): never {
   if (err instanceof ProxyError) {
-    throw new ProxyError(err.status, err.code, `${prefix} (${err.code}): ${err.message}`);
+    throw err.withMessage(`${prefix} (${err.code}): ${err.message}`);
   }
   if (err instanceof Error) throw new StorageError(`${prefix}: ${err.message}`);
   throw new StorageError(`${prefix}: ${String(err)}`);
@@ -470,8 +471,7 @@ export async function deploy(options: DeployOptions, deps: DeployDeps = {}): Pro
     let code: number;
     let message: string;
     if (err instanceof ProxyError) {
-      code = err.exitCode;
-      message = err.message;
+      ({ code, message } = wrapProxyError("deploy", err));
     } else if (err instanceof CliError) {
       code = err.exitCode;
       message = err.message;

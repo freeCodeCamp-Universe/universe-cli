@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SiteReservedError, wrapProxyError } from "../../src/lib/proxy-client.js";
+import { AliasDriftError, SiteReservedError, wrapProxyError } from "../../src/lib/proxy-client.js";
 
 describe("409 site_reserved", () => {
   it("does not read as a credentials failure and names the recovery verb", () => {
@@ -33,5 +33,25 @@ describe("410 site_gone", () => {
     const { code, message } = wrap("sites promote", new ProxyError(410, "site_gone", ""));
     expect(code).toBe(10);
     expect(message).toMatch(/no longer registered/i);
+  });
+});
+
+describe("prefixing a proxy error", () => {
+  it("keeps the subclass, the deadline and the request id", () => {
+    const err = new SiteReservedError("reserved", "2026-08-31T09:00:00Z", "req-abc");
+    const prefixed = err.withMessage("deploy init failed (site_reserved): reserved");
+    expect(prefixed).toBeInstanceOf(SiteReservedError);
+    expect(prefixed.reservedUntil).toBe("2026-08-31T09:00:00Z");
+    expect(prefixed.requestId).toBe("req-abc");
+    expect(prefixed.message).toBe("deploy init failed (site_reserved): reserved");
+    expect(wrapProxyError("deploy", prefixed).message).toContain("2026-08-31T09:00:00Z");
+  });
+
+  it("keeps the alias drift pointer", () => {
+    const err = new AliasDriftError("drift", "20260801-090000-abc1234", "req-1");
+    const prefixed = err.withMessage("promote failed (alias_drift): drift");
+    expect(prefixed).toBeInstanceOf(AliasDriftError);
+    expect(prefixed.current).toBe("20260801-090000-abc1234");
+    expect(prefixed.requestId).toBe("req-1");
   });
 });
