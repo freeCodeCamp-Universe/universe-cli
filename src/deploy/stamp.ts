@@ -35,9 +35,14 @@ export function sentinelSourceOf(sha: string): SentinelSource | null {
   return SOURCE_BY_PREFIX.get(sha.slice(0, 3)) ?? null;
 }
 
-export function deployIdSentinelSource(deployId: string): SentinelSource | null {
+export function deployIdSha(deployId: string): string | null {
   const m = /^\d{8}-\d{6}-(\S+)$/.exec(deployId);
-  return m?.[1] === undefined ? null : sentinelSourceOf(m[1]);
+  return m?.[1] ?? null;
+}
+
+export function deployIdSentinelSource(deployId: string): SentinelSource | null {
+  const sha = deployIdSha(deployId);
+  return sha === null ? null : sentinelSourceOf(sha);
 }
 
 export function stampSha(git: GitState, dirOverride: boolean): ShaStamp {

@@ -162,6 +162,10 @@ export interface ListSitesQuery {
   state?: "active" | "reserved";
 }
 
+export function heldFilterUnanswered(rows: SiteRow[]): boolean {
+  return rows.some((r) => r.state !== "reserved");
+}
+
 export interface RegisterSiteRequest {
   slug: string;
   teams?: string[];

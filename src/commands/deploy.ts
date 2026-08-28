@@ -10,7 +10,7 @@ import {
   StorageError,
 } from "../errors.js";
 import { getGitState as defaultGetGitState, type GitState } from "../deploy/git.js";
-import { stampSha } from "../deploy/stamp.js";
+import { deployIdSha, stampSha } from "../deploy/stamp.js";
 import { hasRootIndex, missingRootIndexMessage } from "../deploy/index-check.js";
 import { walkFiles as defaultWalkFiles } from "../deploy/walk.js";
 import { runBuild as defaultRunBuild } from "../lib/build.js";
@@ -21,6 +21,7 @@ import { parsePlatformYaml, type PlatformYamlV2 } from "../lib/platform-yaml.js"
 import { suggest } from "../lib/similarity.js";
 import {
   createProxyClient as defaultCreateProxyClient,
+  heldFilterUnanswered,
   parseFetchTimeoutMs,
   ProxyError,
   SiteReservedError,
@@ -95,16 +96,6 @@ async function readAndParseConfig(
   return r.value;
 }
 
-function deployIdSha(deployId: string): string | null {
-  const m = /^\d{8}-\d{6}-(\S+)$/.exec(deployId);
-  return m?.[1] ?? null;
-}
-
-/**
- * Re-throws a proxy error with a prefixed message but preserves the
- * original status + code so the outer catch maps to the correct exit
- * code (401/403 → EXIT_CREDENTIALS, 422/5xx → EXIT_STORAGE).
- */
 type HoldProbe = { kind: "held"; row: SiteRow } | { kind: "free" } | { kind: "unknown" };
 
 async function heldReservation(client: ProxyClient, site: string): Promise<HoldProbe> {
@@ -114,7 +105,7 @@ async function heldReservation(client: ProxyClient, site: string): Promise<HoldP
   } catch {
     return { kind: "unknown" };
   }
-  if (rows.some((r) => r.state !== "reserved")) return { kind: "unknown" };
+  if (heldFilterUnanswered(rows)) return { kind: "unknown" };
   const row = rows.find((r) => r.slug === site);
   return row ? { kind: "held", row } : { kind: "free" };
 }
