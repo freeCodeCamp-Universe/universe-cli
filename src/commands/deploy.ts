@@ -95,11 +95,6 @@ async function readAndParseConfig(
   return r.value;
 }
 
-function deployIdSha(deployId: string): string | null {
-  const m = /^\d{8}-\d{6}-(\S+)$/.exec(deployId);
-  return m?.[1] ?? null;
-}
-
 type HoldProbe = { kind: "held"; row: SiteRow } | { kind: "free" } | { kind: "unknown" };
 
 async function heldReservation(client: ProxyClient, site: string): Promise<HoldProbe> {
