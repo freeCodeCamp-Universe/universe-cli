@@ -34,6 +34,17 @@ describe("sites release command", () => {
     expect(deps.exit).toHaveBeenCalledWith(18);
   });
 
+  it("rejects --json without --yes before it resolves an identity", async () => {
+    const deps = mkDeps({
+      resolveIdentity: vi.fn().mockRejectedValue(new Error("no token found")),
+    });
+    await expect(release({ json: true, slug: "blog", yes: false }, deps)).rejects.toThrow(
+      "__exit__",
+    );
+    expect(deps.exit).toHaveBeenCalledWith(18);
+    expect(deps.resolveIdentity).not.toHaveBeenCalled();
+  });
+
   it("releases when confirmed", async () => {
     const deps = mkDeps();
     await release({ json: false, slug: "blog", yes: false }, deps);

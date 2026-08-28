@@ -30,6 +30,9 @@ export async function release(options: ReleaseOptions, deps: SitesCommandDeps = 
     if (!options.slug || options.slug.trim().length === 0) {
       throw new UsageError("slug is required (positional argument)");
     }
+    if (options.json && !options.yes) {
+      throw new ConfirmError("--json cannot prompt: pass --yes to release without confirmation");
+    }
     const { client, identitySource } = await setupClient(deps);
 
     if (!options.json && !options.yes) {
@@ -45,10 +48,6 @@ export async function release(options: ReleaseOptions, deps: SitesCommandDeps = 
         throw new ConfirmError("sites release cancelled");
       }
     }
-    if (options.json && !options.yes) {
-      throw new ConfirmError("--json cannot prompt: pass --yes to release without confirmation");
-    }
-
     const result = await client.releaseSite({ slug: options.slug });
 
     if (options.json) {

@@ -187,6 +187,14 @@ describe("sites ls --held against a pre-1.10.2 artemis", () => {
     expect(deps.logSuccess).toHaveBeenCalledWith("No names are held by a delete.");
   });
 
+  it("rejects --held with --mine before it resolves an identity", async () => {
+    const { deps } = heldDeps([]);
+    deps.resolveIdentity = vi.fn().mockRejectedValue(new Error("no token found"));
+    await expect(ls({ json: false, held: true, mine: true }, deps)).rejects.toThrow("__exit__");
+    expect(deps.exit).toHaveBeenCalledWith(10);
+    expect(deps.resolveIdentity).not.toHaveBeenCalled();
+  });
+
   it("rejects --held with --mine, which the snapshot can never answer", async () => {
     const { deps } = heldDeps([]);
     await expect(ls({ json: false, held: true, mine: true }, deps)).rejects.toThrow("__exit__");
@@ -251,7 +259,13 @@ describe("sites ls --held against artemis 1.10.0 and 1.10.1", () => {
   });
 
   it("renders a plain ls of active sites byte-identically to a pre-1.10.0 server", async () => {
-    const base = { slug: "alpha", teams: ["staff"], createdAt: "t", updatedAt: "t", createdBy: "a" };
+    const base = {
+      slug: "alpha",
+      teams: ["staff"],
+      createdAt: "t",
+      updatedAt: "t",
+      createdBy: "a",
+    };
 
     const legacy = mk([base]);
     await ls({ json: false }, legacy.deps);

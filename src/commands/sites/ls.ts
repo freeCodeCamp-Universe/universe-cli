@@ -1,5 +1,5 @@
 import { log } from "@clack/prompts";
-import { wrapProxyError, type SiteRow } from "../../lib/proxy-client.js";
+import { heldFilterUnanswered, wrapProxyError, type SiteRow } from "../../lib/proxy-client.js";
 import { buildEnvelope } from "../../output/envelope.js";
 import { exitWithCode } from "../../output/exit-codes.js";
 import { emitJson, outputError } from "../../output/format.js";
@@ -36,17 +36,17 @@ export async function ls(options: SitesLsOptions, deps: SitesCommandDeps = {}): 
   const exit = deps.exit ?? exitWithCode;
 
   try {
-    const { client, identitySource } = await setupClient(deps);
     if (options.held && options.mine) {
       throw new UsageError(
         "--held cannot combine with --mine: the authorized-site cache never carries held names",
       );
     }
+    const { client, identitySource } = await setupClient(deps);
 
     let rows = await client.listSites(options.held ? { state: "reserved" } : undefined);
     let scope: "all" | "mine" | "held" = options.held ? "held" : "all";
 
-    if (options.held && rows.length > 0 && rows.some((r) => r.state !== "reserved")) {
+    if (options.held && rows.length > 0 && heldFilterUnanswered(rows)) {
       throw new UsageError(
         "this artemis did not filter the list, so --held cannot be answered; the ?state= filter needs 1.10.2 or newer",
       );
