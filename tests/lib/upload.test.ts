@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { uploadFiles } from "../../src/lib/upload.js";
+import { ProxyError } from "../../src/lib/proxy-client.js";
 import type { ProxyClient } from "../../src/lib/proxy-client.js";
 
 function mkClient(
@@ -226,5 +227,47 @@ describe("uploadFiles", () => {
     );
 
     expect(peak).toBeLessThanOrEqual(3);
+  });
+});
+
+describe("uploadFiles on an authentication failure", () => {
+  it("throws the proxy error instead of reporting a partial upload", async () => {
+    const authErr = new ProxyError(401, "user_unauthorized", "token expired", "req-77");
+    const { client } = mkClient(vi.fn().mockRejectedValue(authErr));
+    const readFile = vi.fn().mockResolvedValue(Buffer.from("x"));
+
+    await expect(
+      uploadFiles(
+        {
+          client,
+          deployId: "d1",
+          jwt: "jwt1",
+          files: [
+            { relPath: "index.html", absPath: "/abs/index.html" },
+            { relPath: "main.js", absPath: "/abs/main.js" },
+          ],
+          concurrency: 1,
+        },
+        { readFile },
+      ),
+    ).rejects.toMatchObject({ status: 401, code: "user_unauthorized", requestId: "req-77" });
+  });
+
+  it("still collects an ordinary per-file failure rather than throwing", async () => {
+    const { client } = mkClient(vi.fn().mockRejectedValue(new Error("socket hang up")));
+    const readFile = vi.fn().mockResolvedValue(Buffer.from("x"));
+
+    const r = await uploadFiles(
+      {
+        client,
+        deployId: "d1",
+        jwt: "jwt1",
+        files: [{ relPath: "index.html", absPath: "/abs/index.html" }],
+        concurrency: 1,
+      },
+      { readFile },
+    );
+    expect(r.errors).toHaveLength(1);
+    expect(r.errors[0]).toContain("socket hang up");
   });
 });

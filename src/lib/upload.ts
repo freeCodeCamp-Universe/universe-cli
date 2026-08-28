@@ -1,4 +1,5 @@
 import { readFile as defaultReadFile } from "node:fs/promises";
+import { ProxyError } from "./proxy-client.js";
 import type { ProxyClient } from "./proxy-client.js";
 
 /**
@@ -11,7 +12,9 @@ import type { ProxyClient } from "./proxy-client.js";
  * so the caller can decide whether to fail the whole deploy or surface
  * a partial-success report. The proxy will refuse to finalize a deploy
  * whose expected file list does not surface in R2 anyway, so the CLI
- * does not need to abort on the first error.
+ * does not need to abort on the first error. A 401 or 403 is the one
+ * exception: it fails every remaining file too, so it is rethrown
+ * rather than reported as a partial upload.
  */
 
 export interface UploadFileEntry {
@@ -141,6 +144,7 @@ export async function uploadFiles(
 
   const uploaded: string[] = [];
   const errors: string[] = [];
+  let fatal: ProxyError | undefined;
   let totalSize = 0;
   let done = 0;
 
@@ -158,6 +162,9 @@ export async function uploadFiles(
         uploaded.push(file.relPath);
         totalSize += body.byteLength;
       } catch (err) {
+        if (err instanceof ProxyError && (err.status === 401 || err.status === 403)) {
+          fatal ??= err;
+        }
         const message = err instanceof Error ? err.message : "unknown upload error";
         errors.push(`${file.relPath}: ${message}`);
       } finally {
@@ -174,6 +181,8 @@ export async function uploadFiles(
   );
 
   await Promise.all(tasks);
+
+  if (fatal) throw fatal;
 
   return {
     fileCount: uploaded.length,
