@@ -55,9 +55,7 @@ const buildDevcontainerComposeYaml = () => `services:
         target: /app/node_modules
 `;
 
-const buildDevcontainerJson = (
-  extras: Record<string, unknown> = {},
-) => {
+const buildDevcontainerJson = (extras: Record<string, unknown> = {}) => {
   const base = {
     $schema:
       "https://raw.githubusercontent.com/devcontainers/spec/main/schemas/devContainer.schema.json",

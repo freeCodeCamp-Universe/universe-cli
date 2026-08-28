@@ -576,7 +576,9 @@ describe("deploy command (proxy plane)", () => {
       const msg = deps.logError.mock.calls[0]?.[0] as string;
       expect(msg).toContain("deploy init failed");
       expect(msg.match(/site_unauthorized/g) ?? []).toHaveLength(1);
-      expect(msg).not.toMatch(/failed \(site_unauthorized\): deploy init failed \(site_unauthorized\)/);
+      expect(msg).not.toMatch(
+        /failed \(site_unauthorized\): deploy init failed \(site_unauthorized\)/,
+      );
     });
 
     it("says a hold cannot be ruled out when the server ignores the filter", async () => {
@@ -595,9 +597,9 @@ describe("deploy command (proxy plane)", () => {
       const deps = mkDeps({
         createProxyClient: vi.fn().mockReturnValue(proxy),
       });
-      await expect(
-        deploy({ json: false, dir: "", allowDirty: true }, deps),
-      ).rejects.toThrow("__exit__");
+      await expect(deploy({ json: false, dir: "", allowDirty: true }, deps)).rejects.toThrow(
+        "__exit__",
+      );
       expect(deps.exit).toHaveBeenCalledWith(11);
       expect(proxy.deployInit).not.toHaveBeenCalled();
       expect(deps.logError).toHaveBeenCalledWith(expect.stringMatching(/--dir/));
@@ -608,9 +610,9 @@ describe("deploy command (proxy plane)", () => {
       const deps = mkDeps({
         createProxyClient: vi.fn().mockReturnValue(proxy),
       });
-      await expect(
-        deploy({ json: false, dir: "   ", allowDirty: true }, deps),
-      ).rejects.toThrow("__exit__");
+      await expect(deploy({ json: false, dir: "   ", allowDirty: true }, deps)).rejects.toThrow(
+        "__exit__",
+      );
       expect(deps.exit).toHaveBeenCalledWith(11);
       expect(proxy.deployInit).not.toHaveBeenCalled();
     });
@@ -1032,9 +1034,7 @@ describe("deploy command (proxy plane)", () => {
       });
       const deps = mkDeps({
         createProxyClient: vi.fn().mockReturnValue(proxy),
-        getGitState: vi
-          .fn()
-          .mockReturnValue({ hash: null, dirty: false }),
+        getGitState: vi.fn().mockReturnValue({ hash: null, dirty: false }),
       });
 
       await deploy({ json: false, promote: true }, deps);

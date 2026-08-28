@@ -162,8 +162,7 @@ export const create = async (options: CreateOptions, deps: CreateDeps = {}): Pro
 
     let selections: CreateSelections;
 
-
-    if(!isDockerAvailable()) {   
+    if (!isDockerAvailable()) {
       logger.warn(
         "docker is the preferred tool for scaffolding projects.\nLocal alternatives will be used where possible, but docker should be used for predictable results.",
       );
@@ -259,7 +258,6 @@ export const create = async (options: CreateOptions, deps: CreateDeps = {}): Pro
         ...(pm !== undefined ? { packageManager: pm } : {}),
       };
     }
-
 
     spinner.start("Preparing your project");
 
