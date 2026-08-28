@@ -1,6 +1,6 @@
 import { log } from "@clack/prompts";
 import { ConfirmError } from "../../errors.js";
-import { type ProxyClient, wrapProxyError } from "../../lib/proxy-client.js";
+import { ProxyError, type ProxyClient } from "../../lib/proxy-client.js";
 import { buildEnvelope } from "../../output/envelope.js";
 import { exitWithCode } from "../../output/exit-codes.js";
 import { emitJson, outputError } from "../../output/format.js";
@@ -176,12 +176,26 @@ export async function create(
     }
 
     const activeClient = await ensureClient();
-    const row = await activeClient.createRepoRequest({
-      name: body.name,
-      visibility: body.visibility,
-      description: body.description,
-      template: body.template,
-    });
+    let row;
+    try {
+      row = await activeClient.createRepoRequest({
+        name: body.name,
+        visibility: body.visibility,
+        description: body.description,
+        template: body.template,
+      });
+    } catch (err) {
+      if (err instanceof ProxyError && err.code === "already_exists" && !options.json) {
+        throw new ProxyError(
+          err.status,
+          err.code,
+          `${err.message}\n  → run \`universe repo ls --status all\` to find the existing request (it may be active or failed)`,
+          err.requestId,
+          err.hint,
+        );
+      }
+      throw err;
+    }
 
     if (options.json) {
       emitJson(
@@ -209,17 +223,9 @@ export async function create(
       );
     }
   } catch (err) {
-    const { code, message, kind, requestId } = wrapProxyError(command, err);
-    const display =
-      kind === "already_exists" && !options.json
-        ? `${message}\n  → run \`universe repo ls --status all\` to find the existing request (it may be active or failed)`
-        : message;
-    outputError({ json: options.json, command }, code, display, {
+    exit(outputError({ json: options.json, command }, err, {
       logError: error,
-      kind,
-      requestId,
       extras: identitySource ? { identitySource } : undefined,
-    });
-    exit(code);
+    }));
   }
 }

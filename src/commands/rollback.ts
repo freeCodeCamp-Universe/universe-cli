@@ -9,7 +9,6 @@ import {
   AliasDriftError,
   createProxyClient as defaultCreateProxyClient,
   parseFetchTimeoutMs,
-  wrapProxyError,
   type ProxyClient,
   type ProxyClientConfig,
 } from "../lib/proxy-client.js";
@@ -146,14 +145,7 @@ export async function rollback(options: RollbackOptions, deps: RollbackDeps = {}
       );
     }
   } catch (err) {
-    const { code, message } = wrapProxyError("rollback", err);
-    // V3 additive: top-level `current` so scripted callers can branch +
-    // supply a fresh expectedCurrent on next attempt.
     const extras = err instanceof AliasDriftError ? { current: err.current } : undefined;
-    outputError({ json: options.json, command: "rollback" }, code, message, {
-      logError: error,
-      extras,
-    });
-    exit(code);
+    exit(outputError({ json: options.json, command: "rollback" }, err, { logError: error, extras }));
   }
 }

@@ -24,7 +24,6 @@ import {
   parseFetchTimeoutMs,
   ProxyError,
   SiteReservedError,
-  wrapProxyError,
   type ProxyClient,
   type ProxyClientConfig,
   type SiteRow,
@@ -489,12 +488,6 @@ export async function deploy(options: DeployOptions, deps: DeployDeps = {}): Pro
       );
     }
   } catch (err) {
-    const { code, message, kind, requestId } = wrapProxyError("deploy", err);
-    outputError({ json: options.json, command: "deploy" }, code, message, {
-      logError: error,
-      kind,
-      requestId,
-    });
-    exit(code);
+    exit(outputError({ json: options.json, command: "deploy" }, err, { logError: error }));
   }
 }

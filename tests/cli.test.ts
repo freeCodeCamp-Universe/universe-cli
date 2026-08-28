@@ -9,7 +9,7 @@ vi.mock("../src/output/format.js", async () => {
     await vi.importActual<typeof import("../src/output/format.js")>("../src/output/format.js");
   return {
     ...actual,
-    outputError: vi.fn(),
+    outputError: vi.fn(actual.outputError),
   };
 });
 vi.mock("../src/output/exit-codes.js", async () => {
@@ -180,15 +180,15 @@ describe("top-level error handling", () => {
   });
 
   it("catches errors from deploy action and routes through outputError", async () => {
-    mockDeploy.mockRejectedValue(new Error("config file not found"));
+    const err = new Error("config file not found");
+    mockDeploy.mockRejectedValue(err);
 
     run(["node", "universe", "static", "deploy"]);
     await new Promise((resolve) => setTimeout(resolve, 50));
 
     expect(mockOutputError).toHaveBeenCalledWith(
       expect.objectContaining({ command: "deploy" }),
-      expect.any(Number),
-      expect.stringContaining("config file not found"),
+      err,
     );
     expect(mockExitWithCode).toHaveBeenCalled();
   });
@@ -196,24 +196,24 @@ describe("top-level error handling", () => {
   it("maps CliError subclasses to their declared exit code", async () => {
     const { ConfigError } = await import("../src/errors.js");
     const { EXIT_CONFIG, EXIT_USAGE } = await import("../src/output/exit-codes.js");
-    mockDeploy.mockRejectedValue(new ConfigError("bad platform.yaml"));
+    const err = new ConfigError("bad platform.yaml");
+    mockDeploy.mockRejectedValue(err);
 
     run(["node", "universe", "static", "deploy"]);
     await new Promise((resolve) => setTimeout(resolve, 50));
 
     expect(mockExitWithCode).toHaveBeenCalledWith(EXIT_CONFIG);
     expect(mockExitWithCode).not.toHaveBeenCalledWith(EXIT_USAGE);
-    // outputError carries the user-facing message; exitWithCode just exits.
     expect(mockOutputError).toHaveBeenCalledWith(
       expect.objectContaining({ command: "deploy" }),
-      EXIT_CONFIG,
-      "bad platform.yaml",
+      err,
     );
   });
 
   it("falls back to EXIT_USAGE for raw Error instances", async () => {
     const { EXIT_USAGE } = await import("../src/output/exit-codes.js");
-    mockDeploy.mockRejectedValue(new Error("mystery failure"));
+    const err = new Error("mystery failure");
+    mockDeploy.mockRejectedValue(err);
 
     run(["node", "universe", "static", "deploy"]);
     await new Promise((resolve) => setTimeout(resolve, 50));
@@ -221,8 +221,7 @@ describe("top-level error handling", () => {
     expect(mockExitWithCode).toHaveBeenCalledWith(EXIT_USAGE);
     expect(mockOutputError).toHaveBeenCalledWith(
       expect.objectContaining({ command: "deploy" }),
-      EXIT_USAGE,
-      "mystery failure",
+      err,
     );
   });
 
@@ -257,7 +256,8 @@ describe("top-level error handling", () => {
   it("routes login errors through outputError + exit code map", async () => {
     const { ConfigError } = await import("../src/errors.js");
     const { EXIT_CONFIG } = await import("../src/output/exit-codes.js");
-    mockLogin.mockRejectedValue(new ConfigError("missing client id"));
+    const err = new ConfigError("missing client id");
+    mockLogin.mockRejectedValue(err);
 
     run(["node", "universe", "login"]);
     await new Promise((resolve) => setTimeout(resolve, 50));
@@ -265,8 +265,7 @@ describe("top-level error handling", () => {
     expect(mockExitWithCode).toHaveBeenCalledWith(EXIT_CONFIG);
     expect(mockOutputError).toHaveBeenCalledWith(
       expect.objectContaining({ command: "login" }),
-      EXIT_CONFIG,
-      "missing client id",
+      err,
     );
   });
 });
