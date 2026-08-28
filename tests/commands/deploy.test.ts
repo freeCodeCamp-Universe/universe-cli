@@ -52,6 +52,7 @@ function mkProxy(): {
   siteDeploys: ReturnType<typeof vi.fn>;
   sitePromote: ReturnType<typeof vi.fn>;
   siteRollback: ReturnType<typeof vi.fn>;
+  listSites: ReturnType<typeof vi.fn>;
   getAlias: ReturnType<typeof vi.fn>;
 } {
   return {
@@ -73,6 +74,7 @@ function mkProxy(): {
     siteDeploys: vi.fn(),
     sitePromote: vi.fn(),
     siteRollback: vi.fn(),
+    listSites: vi.fn().mockResolvedValue([]),
     getAlias: vi.fn().mockResolvedValue(null),
   };
 }
@@ -544,6 +546,34 @@ describe("deploy command (proxy plane)", () => {
       await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
       expect(deps.exit).toHaveBeenCalledWith(12);
       expect(deps.logError).toHaveBeenCalledWith(expect.stringContaining("no team"));
+    });
+
+    it("names the hold, not a permissions failure, when the site was deleted", async () => {
+      const proxy = mkProxy();
+      proxy.whoami.mockResolvedValue({ login: "raisedadead", authorizedSites: [] });
+      proxy.listSites.mockResolvedValue([
+        { slug: "my-site", state: "reserved", reservedUntil: "2026-08-31T09:00:00Z", teams: [] },
+      ]);
+      const deps = mkDeps({
+        createProxyClient: vi.fn().mockReturnValue(proxy),
+      });
+      await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
+      expect(deps.exit).toHaveBeenCalledWith(10);
+      const msg = deps.logError.mock.calls[0]?.[0] as string;
+      expect(msg).toContain("2026-08-31T09:00:00Z");
+      expect(msg).toMatch(/undelete/);
+      expect(msg).not.toMatch(/sites register/);
+    });
+
+    it("still reports a genuine authorization failure as exit 12", async () => {
+      const proxy = mkProxy();
+      proxy.whoami.mockResolvedValue({ login: "raisedadead", authorizedSites: [] });
+      proxy.listSites.mockResolvedValue([]);
+      const deps = mkDeps({
+        createProxyClient: vi.fn().mockReturnValue(proxy),
+      });
+      await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
+      expect(deps.exit).toHaveBeenCalledWith(12);
     });
 
     it("surfaces the hold deadline when the site name is held", async () => {

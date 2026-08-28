@@ -23,9 +23,11 @@ import {
   createProxyClient as defaultCreateProxyClient,
   parseFetchTimeoutMs,
   ProxyError,
+  SiteReservedError,
   wrapProxyError,
   type ProxyClient,
   type ProxyClientConfig,
+  type SiteRow,
 } from "../lib/proxy-client.js";
 import { uploadFiles as defaultUploadFiles } from "../lib/upload.js";
 import { buildEnvelope } from "../output/envelope.js";
@@ -103,6 +105,16 @@ function deployIdSha(deployId: string): string | null {
  * original status + code so the outer catch maps to the correct exit
  * code (401/403 → EXIT_CREDENTIALS, 422/5xx → EXIT_STORAGE).
  */
+async function heldReservation(client: ProxyClient, site: string): Promise<SiteRow | undefined> {
+  try {
+    const rows = await client.listSites({ state: "reserved" });
+    if (rows.length === 0 || rows.some((r) => r.state !== "reserved")) return undefined;
+    return rows.find((r) => r.slug === site);
+  } catch {
+    return undefined;
+  }
+}
+
 function rethrowProxy(prefix: string, err: unknown): never {
   if (err instanceof ProxyError) {
     throw err.withMessage(`${prefix} (${err.code}): ${err.message}`);
@@ -239,6 +251,13 @@ export async function deploy(options: DeployOptions, deps: DeployDeps = {}): Pro
       rethrowProxy("whoami preflight failed", err);
     }
     if (!me.authorizedSites.includes(config.site)) {
+      const held = await heldReservation(client, config.site);
+      if (held) {
+        throw new SiteReservedError(
+          `${config.site} was deleted and its name is held, so it cannot be deployed to.`,
+          held.reservedUntil,
+        );
+      }
       throw new CredentialError(
         formatUnauthorizedSiteError({
           attempted: config.site,
