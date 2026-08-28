@@ -4,6 +4,28 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.0](https://github.com/freeCodeCamp-Universe/universe-cli/compare/universe-cli-v0.19.0...universe-cli-v0.20.0) (2026-08-28)
+
+
+### Features
+
+* **deploy:** sha stamps + --allow-dirty gate ([#75](https://github.com/freeCodeCamp-Universe/universe-cli/issues/75)) ([cc075dc](https://github.com/freeCodeCamp-Universe/universe-cli/commit/cc075dcd2bf1fab8c93ed04b1efe0a220b2f560f))
+* **proxy:** add the site lifecycle endpoints ([1041268](https://github.com/freeCodeCamp-Universe/universe-cli/commit/1041268283c2aea1ab2e8ea24c5eb48d6510654c))
+* **sites:** add undelete, release and --held ([dc05cc6](https://github.com/freeCodeCamp-Universe/universe-cli/commit/dc05cc6ef6b77a78fd47afd78c14a4aca5ef10b6))
+
+
+### Bug Fixes
+
+* **deploy:** correct the proxy error output ([a5ff71e](https://github.com/freeCodeCamp-Universe/universe-cli/commit/a5ff71e0bd176003f68ceadd70ca8a4835f7f355))
+* **deploy:** keep the error subclass on rethrow ([b1fe297](https://github.com/freeCodeCamp-Universe/universe-cli/commit/b1fe29749ef67aa2131ebccb70b2c20bb618d68b))
+* **deploy:** name the hold on a deleted site ([5ac110c](https://github.com/freeCodeCamp-Universe/universe-cli/commit/5ac110cefa059f8ce1e8626342937c23e799a068))
+* **deploy:** refuse an empty --dir ([9d444a7](https://github.com/freeCodeCamp-Universe/universe-cli/commit/9d444a7009fdd6886936c5441d20a29d69e473a1))
+* **proxy:** keep requestId on an alias drift ([21f0f70](https://github.com/freeCodeCamp-Universe/universe-cli/commit/21f0f708da7318bb50bb18726c0ebad130596f66))
+* **sites:** check flags before identity ([f42277c](https://github.com/freeCodeCamp-Universe/universe-cli/commit/f42277cdea9f91cbb241cfc5f779a3ee40ce8486))
+* **sites:** reword the undelete 404 hint ([b44fd1d](https://github.com/freeCodeCamp-Universe/universe-cli/commit/b44fd1d12cb79d86909374a9a276d1928542eab1))
+* **upload:** rethrow an auth failure mid-upload ([928eb5d](https://github.com/freeCodeCamp-Universe/universe-cli/commit/928eb5dc2a2d1c63f01776d73320e2788bd143e1))
+* **upload:** stop uploads after an auth failure ([ec4210a](https://github.com/freeCodeCamp-Universe/universe-cli/commit/ec4210a98334a06d2dbd942155e29d68986e41ac))
+
 ## [0.19.0](https://github.com/freeCodeCamp-Universe/universe-cli/compare/universe-cli-v0.18.0...universe-cli-v0.19.0) (2026-08-19)
 
 
