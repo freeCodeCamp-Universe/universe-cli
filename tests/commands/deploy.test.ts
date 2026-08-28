@@ -548,6 +548,48 @@ describe("deploy command (proxy plane)", () => {
       expect(deps.logError).toHaveBeenCalledWith(expect.stringContaining("no team"));
     });
 
+    it("carries the request id into the JSON error envelope", async () => {
+      const proxy = mkProxy();
+      proxy.deployInit.mockRejectedValue(
+        new ProxyError(403, "site_unauthorized", "no team", "req-999"),
+      );
+      const stdout: string[] = [];
+      const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+        stdout.push(String(chunk));
+        return true;
+      });
+      const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
+      await expect(deploy({ json: true }, deps)).rejects.toThrow("__exit__");
+      writeSpy.mockRestore();
+      const env = JSON.parse(stdout.join(""));
+      expect(env.error.requestId).toBe("req-999");
+      expect(env.error.kind).toBe("site_unauthorized");
+    });
+
+    it("names the failing step once, not twice", async () => {
+      const proxy = mkProxy();
+      proxy.deployInit.mockRejectedValue(
+        new ProxyError(403, "site_unauthorized", "no team", "req-999"),
+      );
+      const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
+      await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
+      const msg = deps.logError.mock.calls[0]?.[0] as string;
+      expect(msg).toContain("deploy init failed");
+      expect(msg.match(/site_unauthorized/g) ?? []).toHaveLength(1);
+      expect(msg).not.toMatch(/failed \(site_unauthorized\): deploy init failed \(site_unauthorized\)/);
+    });
+
+    it("says a hold cannot be ruled out when the server ignores the filter", async () => {
+      const proxy = mkProxy();
+      proxy.whoami.mockResolvedValue({ login: "raisedadead", authorizedSites: [] });
+      proxy.listSites.mockResolvedValue([{ slug: "other", state: "active", teams: [] }]);
+      const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
+      await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
+      expect(deps.exit).toHaveBeenCalledWith(12);
+      const msg = deps.logError.mock.calls[0]?.[0] as string;
+      expect(msg).toMatch(/sites ls --held/);
+    });
+
     it("refuses an empty --dir instead of publishing the repo root", async () => {
       const proxy = mkProxy();
       const deps = mkDeps({

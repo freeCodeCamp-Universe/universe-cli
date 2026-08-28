@@ -105,19 +105,23 @@ function deployIdSha(deployId: string): string | null {
  * original status + code so the outer catch maps to the correct exit
  * code (401/403 → EXIT_CREDENTIALS, 422/5xx → EXIT_STORAGE).
  */
-async function heldReservation(client: ProxyClient, site: string): Promise<SiteRow | undefined> {
+type HoldProbe = { kind: "held"; row: SiteRow } | { kind: "free" } | { kind: "unknown" };
+
+async function heldReservation(client: ProxyClient, site: string): Promise<HoldProbe> {
+  let rows: SiteRow[];
   try {
-    const rows = await client.listSites({ state: "reserved" });
-    if (rows.length === 0 || rows.some((r) => r.state !== "reserved")) return undefined;
-    return rows.find((r) => r.slug === site);
+    rows = await client.listSites({ state: "reserved" });
   } catch {
-    return undefined;
+    return { kind: "unknown" };
   }
+  if (rows.some((r) => r.state !== "reserved")) return { kind: "unknown" };
+  const row = rows.find((r) => r.slug === site);
+  return row ? { kind: "held", row } : { kind: "free" };
 }
 
 function rethrowProxy(prefix: string, err: unknown): never {
   if (err instanceof ProxyError) {
-    throw err.withMessage(`${prefix} (${err.code}): ${err.message}`);
+    throw err.withMessage(`${prefix}: ${err.message}`);
   }
   if (err instanceof Error) throw new StorageError(`${prefix}: ${err.message}`);
   throw new StorageError(`${prefix}: ${String(err)}`);
@@ -255,19 +259,23 @@ export async function deploy(options: DeployOptions, deps: DeployDeps = {}): Pro
       rethrowProxy("whoami preflight failed", err);
     }
     if (!me.authorizedSites.includes(config.site)) {
-      const held = await heldReservation(client, config.site);
-      if (held) {
+      const probe = await heldReservation(client, config.site);
+      if (probe.kind === "held") {
         throw new SiteReservedError(
           `${config.site} was deleted and its name is held, so it cannot be deployed to.`,
-          held.reservedUntil,
+          probe.row.reservedUntil,
         );
       }
+      const unresolved =
+        probe.kind === "unknown"
+          ? "\n  note: this artemis did not answer the held-name filter, so a recent delete cannot be ruled out. Run `universe sites ls --held`."
+          : "";
       throw new CredentialError(
         formatUnauthorizedSiteError({
           attempted: config.site,
           login: me.login,
           authorized: me.authorizedSites,
-        }),
+        }) + unresolved,
       );
     }
 
@@ -493,8 +501,10 @@ export async function deploy(options: DeployOptions, deps: DeployDeps = {}): Pro
   } catch (err) {
     let code: number;
     let message: string;
+    let kind: string | undefined;
+    let requestId: string | undefined;
     if (err instanceof ProxyError) {
-      ({ code, message } = wrapProxyError("deploy", err));
+      ({ code, message, kind, requestId } = wrapProxyError("deploy", err));
     } else if (err instanceof CliError) {
       code = err.exitCode;
       message = err.message;
@@ -507,6 +517,8 @@ export async function deploy(options: DeployOptions, deps: DeployDeps = {}): Pro
     }
     outputError({ json: options.json, command: "deploy" }, code, message, {
       logError: error,
+      kind,
+      requestId,
     });
     exit(code);
   }
