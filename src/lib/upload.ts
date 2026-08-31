@@ -1,5 +1,5 @@
 import { readFile as defaultReadFile } from "node:fs/promises";
-import { ProxyError } from "./proxy-client.js";
+import { ProxyError } from "@freecodecamp/universe-core";
 import type { ProxyClient } from "./proxy-client.js";
 
 /**

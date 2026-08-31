@@ -2,7 +2,7 @@ import { existsSync, lstatSync, mkdtempSync, readFileSync, readlinkSync, rmSync 
 import { mkdir, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { UsageError } from "../../../../src/errors.js";
+import { UsageError } from "@freecodecamp/universe-core";
 import { LocalProjectWriter } from "../../../../src/commands/create/io/local-project-writer.js";
 import { afterEach, describe, expect, it } from "vitest";
 

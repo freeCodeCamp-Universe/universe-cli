@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { uploadFiles } from "../../src/lib/upload.js";
-import { ProxyError } from "../../src/lib/proxy-client.js";
+import { ProxyError } from "@freecodecamp/universe-core";
 import type { ProxyClient } from "../../src/lib/proxy-client.js";
 
 function mkClient(

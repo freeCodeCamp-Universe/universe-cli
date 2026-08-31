@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, type Mock } from "vitest";
 import { deploy } from "../../src/commands/deploy.js";
-import { ProxyError } from "../../src/lib/proxy-client.js";
+import { ProxyError } from "@freecodecamp/universe-core";
 
 interface FakeDeps {
   cwd: string;
@@ -646,7 +646,7 @@ describe("deploy command (proxy plane)", () => {
     });
 
     it("surfaces the hold deadline when the site name is held", async () => {
-      const { SiteReservedError } = await import("../../src/lib/proxy-client.js");
+      const { SiteReservedError } = await import("@freecodecamp/universe-core");
       const proxy = mkProxy();
       proxy.deployInit.mockRejectedValue(
         new SiteReservedError("site name is reserved", "2026-08-31T09:00:00Z", "req-xyz"),

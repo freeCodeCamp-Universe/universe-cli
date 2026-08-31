@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type { RepoInitialiser } from "./repo-initialiser.port.js";
-import { GitError } from "../../../errors.js";
+import { GitError } from "@freecodecamp/universe-core";
 
 type RunCommand = (command: string, args: string[], cwd: string) => Promise<void>;
 

@@ -104,7 +104,7 @@ describe("sites list command", () => {
   });
 
   it("maps proxy 502 registry_read_failed to EXIT_STORAGE", async () => {
-    const { ProxyError } = await import("../../../src/lib/proxy-client.js");
+    const { ProxyError } = await import("@freecodecamp/universe-core");
     const proxy = mkProxy();
     proxy.listSites = vi
       .fn()

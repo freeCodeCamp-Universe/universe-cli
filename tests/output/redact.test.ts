@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { redact, redactObject } from "../../src/output/redact.js";
+import { redact, redactObject } from "@freecodecamp/universe-core";
 
 describe("redact", () => {
   it("masks AWS access key IDs (AKIA prefix)", () => {

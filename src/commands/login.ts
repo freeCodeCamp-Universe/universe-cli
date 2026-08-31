@@ -1,5 +1,5 @@
 import { log } from "@clack/prompts";
-import { CredentialError } from "../errors.js";
+import { CredentialError } from "@freecodecamp/universe-core";
 import { DEFAULT_GH_CLIENT_ID } from "../lib/constants.js";
 import { runDeviceFlow as defaultRunDeviceFlow } from "../lib/device-flow.js";
 import {
@@ -12,9 +12,9 @@ import {
   loadToken as defaultLoadToken,
   saveToken as defaultSaveToken,
 } from "../lib/token-store.js";
-import { buildEnvelope } from "../output/envelope.js";
-import { EXIT_CONFIRM, exitWithCode } from "../output/exit-codes.js";
-import { emitJson, outputError } from "../output/format.js";
+import { buildEnvelope } from "@freecodecamp/universe-core";
+import { EXIT_CONFIRM, exitWithCode } from "@freecodecamp/universe-core";
+import { emitJson, outputError } from "@freecodecamp/universe-core";
 
 export interface LoginOptions {
   json: boolean;

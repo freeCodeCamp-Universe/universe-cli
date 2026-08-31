@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 
 import pkg from "../../package.json" with { type: "json" };
 import { templatesCache } from "../commands/create/layer-composition/template-cache.js";
-import { ConfigError } from "../errors.js";
+import { ConfigError } from "@freecodecamp/universe-core";
 import {
   type TemplateCacheShape,
   type UpdateNotice,

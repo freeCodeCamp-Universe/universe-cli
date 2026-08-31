@@ -21,7 +21,7 @@ import type {
 } from "../layer-composition/schemas/layers.js";
 import { getLabel } from "../layer-composition/labels.js";
 import type { LabelCategory } from "../layer-composition/labels.js";
-import { UsageError } from "../../../errors.js";
+import { UsageError } from "@freecodecamp/universe-core";
 
 interface ClackPromptApi {
   isCancel(value: unknown): value is symbol;

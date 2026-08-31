@@ -1,5 +1,4 @@
-import { CliError } from "../errors.js";
-import { EXIT_CREDENTIALS, EXIT_STORAGE, EXIT_USAGE } from "../output/exit-codes.js";
+import { AliasDriftError, ProxyError, SiteReservedError } from "@freecodecamp/universe-core";
 import { auditRowArraySchema } from "../commands/audit/schema.js";
 import { deploySummaryArraySchema } from "../commands/sites/schema.js";
 import {
@@ -280,74 +279,6 @@ export interface ProxyClient {
   rejectRepoRequest(req: { id: string; reason?: string }): Promise<RepoRow>;
   deleteRepoRequest(req: { id: string }): Promise<void>;
   listRepoTemplates(): Promise<string[]>;
-}
-
-/**
- * Error envelope returned by artemis on non-2xx. `code` is the
- * machine-readable label from `internal/handler/*.go` (`bad_request`,
- * `verify_failed`, `site_unauthorized`, `user_unauthorized`,
- * `r2_put_failed`, etc.).
- */
-export class ProxyError extends CliError {
-  readonly exitCode: number;
-  readonly status: number;
-  readonly code: string;
-  readonly requestId?: string;
-  readonly hint?: string;
-
-  constructor(status: number, code: string, message: string, requestId?: string, hint?: string) {
-    super(message);
-    this.status = status;
-    this.code = code;
-    this.exitCode = mapExitCode(status);
-    this.requestId = requestId;
-    this.hint = hint;
-  }
-
-  withMessage(message: string): ProxyError {
-    return new ProxyError(this.status, this.code, message, this.requestId, this.hint);
-  }
-}
-
-export class SiteReservedError extends ProxyError {
-  readonly reservedUntil?: string;
-
-  constructor(message: string, reservedUntil?: string, requestId?: string, hint?: string) {
-    super(409, "site_reserved", message, requestId, hint);
-    this.reservedUntil = reservedUntil;
-  }
-
-  override withMessage(message: string): SiteReservedError {
-    return new SiteReservedError(message, this.reservedUntil, this.requestId, this.hint);
-  }
-}
-
-/**
- * Thrown when artemis returns 409 `alias_drift` — the server's
- * observed alias state differs from the caller's `expectedCurrent`
- * CAS guard. Carries the server's authoritative `current` value so
- * callers can offer a one-shot retry with a fresh expectedCurrent.
- *
- * Wire shape: `{error:{code:"alias_drift", message}, site, current}`.
- * Maps to EXIT_USAGE (operator error: stale state).
- */
-export class AliasDriftError extends ProxyError {
-  readonly current: string;
-
-  constructor(message: string, current: string, requestId?: string, hint?: string) {
-    super(409, "alias_drift", message, requestId, hint);
-    this.current = current;
-  }
-
-  override withMessage(message: string): AliasDriftError {
-    return new AliasDriftError(message, this.current, this.requestId, this.hint);
-  }
-}
-
-function mapExitCode(status: number): number {
-  if (status === 401 || status === 403) return EXIT_CREDENTIALS;
-  if (status === 429 || status === 422 || status === 0 || status >= 500) return EXIT_STORAGE;
-  return EXIT_USAGE;
 }
 
 interface ProxyErrorEnvelope {

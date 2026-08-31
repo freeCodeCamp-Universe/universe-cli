@@ -1,6 +1,6 @@
 import { mkdir, rm, symlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { UsageError } from "../../../errors.js";
+import { UsageError } from "@freecodecamp/universe-core";
 import type { ProjectWriter } from "./project-writer.port.js";
 
 interface FilesystemApi {

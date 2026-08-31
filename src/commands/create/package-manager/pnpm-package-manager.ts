@@ -6,7 +6,7 @@ import { createPackageSpecifier } from "./package-json-specifier.js";
 import type { PackageSpecifier } from "./package-specifier.port.js";
 import { isDockerAvailable } from "../docker-check.js";
 import { runCmdForFiles, runCmdForStdout } from "./docker-runner.js";
-import { UsageError } from "../../../errors.js";
+import { UsageError } from "@freecodecamp/universe-core";
 
 const execFileAsync = promisify(execFile);
 

@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type { SkillInstaller } from "./skill-installer.port.js";
 import type { RunCommand } from "./git-repo-initialiser.js";
-import { ConfigError } from "../../../errors.js";
+import { ConfigError } from "@freecodecamp/universe-core";
 
 const execFileAsync = promisify(execFile);
 

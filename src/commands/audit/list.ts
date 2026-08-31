@@ -1,9 +1,9 @@
 import { log } from "@clack/prompts";
-import { UsageError } from "../../errors.js";
+import { UsageError } from "@freecodecamp/universe-core";
 import { type AuditRow } from "../../lib/proxy-client.js";
-import { buildEnvelope } from "../../output/envelope.js";
-import { exitWithCode } from "../../output/exit-codes.js";
-import { emitJson, outputError } from "../../output/format.js";
+import { buildEnvelope } from "@freecodecamp/universe-core";
+import { exitWithCode } from "@freecodecamp/universe-core";
+import { emitJson, outputError } from "@freecodecamp/universe-core";
 import { type AuditCommandDeps, setupClient } from "./_shared.js";
 
 export interface AuditListOptions {

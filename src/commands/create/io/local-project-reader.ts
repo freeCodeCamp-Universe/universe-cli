@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { UsageError } from "../../../errors.js";
+import { UsageError } from "@freecodecamp/universe-core";
 import type { ProjectReader } from "./project-reader.port.js";
 
 class LocalProjectReader implements ProjectReader {

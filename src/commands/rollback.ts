@@ -1,20 +1,24 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { confirm, isCancel, log } from "@clack/prompts";
-import { ConfigError, CredentialError, UsageError } from "../errors.js";
+import {
+  AliasDriftError,
+  ConfigError,
+  CredentialError,
+  UsageError,
+} from "@freecodecamp/universe-core";
 import { DEFAULT_PROXY_URL } from "../lib/constants.js";
 import { resolveIdentity as defaultResolveIdentity } from "../lib/identity.js";
 import { parsePlatformYaml, type PlatformYamlV2 } from "../lib/platform-yaml.js";
 import {
-  AliasDriftError,
   createProxyClient as defaultCreateProxyClient,
   parseFetchTimeoutMs,
   type ProxyClient,
   type ProxyClientConfig,
 } from "../lib/proxy-client.js";
-import { buildEnvelope } from "../output/envelope.js";
-import { exitWithCode } from "../output/exit-codes.js";
-import { emitJson, outputError } from "../output/format.js";
+import { buildEnvelope } from "@freecodecamp/universe-core";
+import { exitWithCode } from "@freecodecamp/universe-core";
+import { emitJson, outputError } from "@freecodecamp/universe-core";
 
 export interface RollbackOptions {
   json: boolean;

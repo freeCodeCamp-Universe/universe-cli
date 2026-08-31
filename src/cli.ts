@@ -21,8 +21,8 @@ import { reject as repoReject } from "./commands/repo/reject.js";
 import { remove as repoRemove } from "./commands/repo/remove.js";
 import { status as repoStatus } from "./commands/repo/status.js";
 import { list as auditList } from "./commands/audit/list.js";
-import { outputError } from "./output/format.js";
-import { EXIT_USAGE, exitWithCode } from "./output/exit-codes.js";
+import { outputError } from "@freecodecamp/universe-core";
+import { EXIT_USAGE, exitWithCode } from "@freecodecamp/universe-core";
 import { installExitNotice, refreshIfStale, spawnRefresh } from "./lib/update-notifier.js";
 
 import pkg from "../package.json" with { type: "json" };

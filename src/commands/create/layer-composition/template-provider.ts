@@ -1,7 +1,7 @@
 import { lstat, readdir, readFile, readlink } from "node:fs/promises";
 import { join } from "node:path";
 
-import { ConfigError } from "../../../errors.js";
+import { ConfigError } from "@freecodecamp/universe-core";
 import type { LayerData, LayerRegistry } from "./resolve-ordered-layers.js";
 import {
   AlwaysSchema,

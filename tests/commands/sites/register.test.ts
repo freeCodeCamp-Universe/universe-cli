@@ -110,7 +110,7 @@ describe("sites register command", () => {
       }),
     );
     // Use the actual ProxyError class so wrapProxyError detects it.
-    const { ProxyError } = await import("../../../src/lib/proxy-client.js");
+    const { ProxyError } = await import("@freecodecamp/universe-core");
     proxy.registerSite = vi
       .fn()
       .mockRejectedValue(new ProxyError(409, "already_exists", "site is already registered"));

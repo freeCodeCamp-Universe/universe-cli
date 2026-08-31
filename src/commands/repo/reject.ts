@@ -1,8 +1,8 @@
 import { log } from "@clack/prompts";
-import { ConfirmError } from "../../errors.js";
-import { buildEnvelope } from "../../output/envelope.js";
-import { exitWithCode } from "../../output/exit-codes.js";
-import { emitJson, outputError } from "../../output/format.js";
+import { ConfirmError } from "@freecodecamp/universe-core";
+import { buildEnvelope } from "@freecodecamp/universe-core";
+import { exitWithCode } from "@freecodecamp/universe-core";
+import { emitJson, outputError } from "@freecodecamp/universe-core";
 import { defaultRepoPrompts, type RepoCommandDeps, setupClient, UsageError } from "./_shared.js";
 
 export interface RepoRejectOptions {

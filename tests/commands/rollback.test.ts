@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, type Mock } from "vitest";
 import { rollback } from "../../src/commands/rollback.js";
-import { AliasDriftError, ProxyError } from "../../src/lib/proxy-client.js";
+import { AliasDriftError, ProxyError } from "@freecodecamp/universe-core";
 
 const VALID_YAML = "site: my-site\n";
 

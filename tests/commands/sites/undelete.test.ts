@@ -64,7 +64,7 @@ describe("sites undelete command", () => {
 
 describe("sites undelete on a 404", () => {
   it("names the causes that can actually occur and points at the list", async () => {
-    const { ProxyError } = await import("../../../src/lib/proxy-client.js");
+    const { ProxyError } = await import("@freecodecamp/universe-core");
     const proxy = {
       undeleteSite: vi.fn().mockRejectedValue(new ProxyError(404, "http_404", "Not Found")),
     };

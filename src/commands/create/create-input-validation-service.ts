@@ -1,4 +1,4 @@
-import { UsageError } from "../../errors.js";
+import { UsageError } from "@freecodecamp/universe-core";
 import {
   databaseOptions,
   frameworkOptions,
