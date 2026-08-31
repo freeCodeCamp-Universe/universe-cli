@@ -6,7 +6,7 @@ import { exitWithCode } from "../../output/exit-codes.js";
 import { emitJson, outputError } from "../../output/format.js";
 import { type AuditCommandDeps, setupClient } from "./_shared.js";
 
-export interface AuditLsOptions {
+export interface AuditListOptions {
   json: boolean;
   site?: string;
   actor?: string;
@@ -42,8 +42,8 @@ function targetOf(r: AuditRow): string {
   return r.site || r.deployId || targetFromDetail(r);
 }
 
-export async function ls(options: AuditLsOptions, deps: AuditCommandDeps = {}): Promise<void> {
-  const command = "audit ls";
+export async function list(options: AuditListOptions, deps: AuditCommandDeps = {}): Promise<void> {
+  const command = "audit list";
   const message = deps.logMessage ?? ((s: string) => log.message(s));
   const error = deps.logError ?? ((s: string) => log.error(s));
   const exit = deps.exit ?? exitWithCode;
@@ -75,9 +75,11 @@ export async function ls(options: AuditLsOptions, deps: AuditCommandDeps = {}): 
       message(formatTable(rows));
     }
   } catch (err) {
-    exit(outputError({ json: options.json, command }, err, {
-      logError: error,
-      extras: identitySource ? { identitySource } : undefined,
-    }));
+    exit(
+      outputError({ json: options.json, command }, err, {
+        logError: error,
+        extras: identitySource ? { identitySource } : undefined,
+      }),
+    );
   }
 }

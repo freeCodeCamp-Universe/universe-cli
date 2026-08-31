@@ -139,9 +139,7 @@ describe(resolveTemplateVersions, () => {
     // so .slice(15) yields valid semver "0.9.0" — the prefix check
     // must reject this before slicing.
     stubFetch(
-      jsonResponse(200, [
-        { tag_name: "wrong-templates0.9.0", draft: false, prerelease: false },
-      ]),
+      jsonResponse(200, [{ tag_name: "wrong-templates0.9.0", draft: false, prerelease: false }]),
     );
 
     await expect(resolveTemplateVersions(RANGE)).rejects.toThrow("No template releases found");
@@ -217,7 +215,7 @@ describe(resolveTemplateVersions, () => {
   });
 
   it("re-fetches when CLI version changes", async () => {
-    await seedCache("1.0.0", "0.3.0", NOW - 60_000, "0.0.1" ); // default cliVersion is 0.0.0
+    await seedCache("1.0.0", "0.3.0", NOW - 60_000, "0.0.1"); // default cliVersion is 0.0.0
     const fetchMock = stubFetch(jsonResponse(200, [release("0.3.0"), release("1.0.0")]));
 
     await resolveTemplateVersions(RANGE, NOW);

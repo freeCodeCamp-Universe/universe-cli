@@ -170,7 +170,7 @@ describe("outputError", () => {
 
   it("includes kind and requestId in the JSON error envelope", () => {
     const stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
-    const ctx: OutputContext = { json: true, command: "repo ls" };
+    const ctx: OutputContext = { json: true, command: "repo list" };
     outputError(ctx, 12, "denied", {
       kind: "user_unauthorized",
       requestId: "req-1",
@@ -213,10 +213,7 @@ describe("outputError", () => {
     it("auto-merges kind and requestId into JSON envelope", () => {
       const stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
       const ctx: OutputContext = { json: true, command: "repo approve" };
-      const code = outputError(
-        ctx,
-        new ProxyError(500, "r2_put_failed", "timeout", "req-42"),
-      );
+      const code = outputError(ctx, new ProxyError(500, "r2_put_failed", "timeout", "req-42"));
       expect(code).toBe(13);
       const parsed = JSON.parse(stdoutSpy.mock.calls[0][0] as string);
       expect(parsed.error.kind).toBe("r2_put_failed");
@@ -266,11 +263,9 @@ describe("outputError", () => {
     it("does not add the hint for unrelated proxy errors", () => {
       const logFn = vi.fn();
       const ctx: OutputContext = { json: false, command: "repo create" };
-      outputError(
-        ctx,
-        new ProxyError(409, "already_exists", "a request already exists"),
-        { logError: logFn },
-      );
+      outputError(ctx, new ProxyError(409, "already_exists", "a request already exists"), {
+        logError: logFn,
+      });
       const msg = logFn.mock.calls[0][0] as string;
       expect(msg).not.toMatch(/read:org/);
     });

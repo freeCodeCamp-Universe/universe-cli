@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { ls } from "../../../src/commands/sites/ls.js";
+import { list } from "../../../src/commands/sites/list.js";
 
 const ROWS = [
   {
@@ -51,10 +51,10 @@ function mkDeps(overrides: Record<string, unknown> = {}) {
   };
 }
 
-describe("sites ls command", () => {
+describe("sites list command", () => {
   it("calls listSites and emits text table", async () => {
     const deps = mkDeps();
-    await ls({ json: false }, deps);
+    await list({ json: false }, deps);
     const proxy = deps.createProxyClient.mock.results[0]?.value;
     expect(proxy.listSites).toHaveBeenCalledOnce();
     expect(deps.logSuccess).toHaveBeenCalledOnce();
@@ -69,7 +69,7 @@ describe("sites ls command", () => {
     const deps = mkDeps({
       createProxyClient: vi.fn().mockReturnValue(mkProxy([])),
     });
-    await ls({ json: false }, deps);
+    await list({ json: false }, deps);
     expect(deps.logSuccess).toHaveBeenCalledWith("No registered sites.");
   });
 
@@ -81,11 +81,11 @@ describe("sites ls command", () => {
     });
 
     const deps = mkDeps();
-    await ls({ json: true }, deps);
+    await list({ json: true }, deps);
     writeSpy.mockRestore();
 
     const env = JSON.parse(stdout.join("").trim());
-    expect(env.command).toBe("sites ls");
+    expect(env.command).toBe("sites list");
     expect(env.success).toBe(true);
     expect(env.count).toBe(2);
     expect(env.sites).toEqual(ROWS);
@@ -98,7 +98,7 @@ describe("sites ls command", () => {
     const deps = mkDeps({
       resolveIdentity: vi.fn().mockResolvedValue(null),
     });
-    await expect(ls({ json: false }, deps)).rejects.toThrow("__exit__");
+    await expect(list({ json: false }, deps)).rejects.toThrow("__exit__");
     expect(deps.exit).toHaveBeenCalledWith(12);
     expect(deps.logError).toHaveBeenCalledWith(expect.stringMatching(/login|identity/i));
   });
@@ -112,13 +112,13 @@ describe("sites ls command", () => {
     const deps = mkDeps({
       createProxyClient: vi.fn().mockReturnValue(proxy),
     });
-    await expect(ls({ json: false }, deps)).rejects.toThrow("__exit__");
+    await expect(list({ json: false }, deps)).rejects.toThrow("__exit__");
     expect(deps.exit).toHaveBeenCalledWith(13);
     expect(deps.logError).toHaveBeenCalledWith(expect.stringContaining("registry_read_failed"));
   });
 });
 
-describe("sites ls --held", () => {
+describe("sites list --held", () => {
   it("asks the server for reserved rows", async () => {
     const proxy = {
       listSites: vi.fn().mockResolvedValue([]),
@@ -133,7 +133,7 @@ describe("sites ls --held", () => {
         throw new Error("__exit__");
       }),
     };
-    await ls({ json: false, held: true }, deps);
+    await list({ json: false, held: true }, deps);
     expect(proxy.listSites).toHaveBeenCalledWith({ state: "reserved" });
   });
 
@@ -149,12 +149,12 @@ describe("sites ls --held", () => {
         throw new Error("__exit__");
       }),
     };
-    await ls({ json: false }, deps);
+    await list({ json: false }, deps);
     expect(proxy.listSites).toHaveBeenCalledWith(undefined);
   });
 });
 
-describe("sites ls --held against a pre-1.10.2 artemis", () => {
+describe("sites list --held against a pre-1.10.2 artemis", () => {
   function heldDeps(rows: unknown[]) {
     const proxy = { listSites: vi.fn().mockResolvedValue(rows), whoami: vi.fn() };
     return {
@@ -176,13 +176,13 @@ describe("sites ls --held against a pre-1.10.2 artemis", () => {
     const { deps } = heldDeps([
       { slug: "alpha", teams: ["staff"], createdAt: "t", updatedAt: "t", createdBy: "alice" },
     ]);
-    await expect(ls({ json: false, held: true }, deps)).rejects.toThrow("__exit__");
+    await expect(list({ json: false, held: true }, deps)).rejects.toThrow("__exit__");
     expect(deps.logError).toHaveBeenCalledWith(expect.stringMatching(/1\.10\.2|does not support/i));
   });
 
   it("an empty answer is unambiguous on every version, because none can answer empty while withholding held names", async () => {
     const { deps } = heldDeps([]);
-    await ls({ json: false, held: true }, deps);
+    await list({ json: false, held: true }, deps);
     expect(deps.exit).not.toHaveBeenCalled();
     expect(deps.logSuccess).toHaveBeenCalledWith("No names are held by a delete.");
   });
@@ -190,19 +190,19 @@ describe("sites ls --held against a pre-1.10.2 artemis", () => {
   it("rejects --held with --mine before it resolves an identity", async () => {
     const { deps } = heldDeps([]);
     deps.resolveIdentity = vi.fn().mockRejectedValue(new Error("no token found"));
-    await expect(ls({ json: false, held: true, mine: true }, deps)).rejects.toThrow("__exit__");
+    await expect(list({ json: false, held: true, mine: true }, deps)).rejects.toThrow("__exit__");
     expect(deps.exit).toHaveBeenCalledWith(10);
     expect(deps.resolveIdentity).not.toHaveBeenCalled();
   });
 
   it("rejects --held with --mine, which the snapshot can never answer", async () => {
     const { deps } = heldDeps([]);
-    await expect(ls({ json: false, held: true, mine: true }, deps)).rejects.toThrow("__exit__");
+    await expect(list({ json: false, held: true, mine: true }, deps)).rejects.toThrow("__exit__");
     expect(deps.exit).toHaveBeenCalledWith(10);
   });
 });
 
-describe("sites ls --held against artemis 1.10.0 and 1.10.1", () => {
+describe("sites list --held against artemis 1.10.0 and 1.10.1", () => {
   function mk(rows: unknown[]) {
     const proxy = { listSites: vi.fn().mockResolvedValue(rows), whoami: vi.fn() };
     return {
@@ -239,7 +239,7 @@ describe("sites ls --held against artemis 1.10.0 and 1.10.1", () => {
         state: "reserved",
       },
     ]);
-    await expect(ls({ json: false, held: true }, deps)).rejects.toThrow("__exit__");
+    await expect(list({ json: false, held: true }, deps)).rejects.toThrow("__exit__");
     expect(deps.logError).toHaveBeenCalledWith(expect.stringMatching(/did not filter|1\.10\.2/i));
   });
 
@@ -254,11 +254,11 @@ describe("sites ls --held against artemis 1.10.0 and 1.10.1", () => {
         state: "reserved",
       },
     ]);
-    await ls({ json: false, held: true }, deps);
+    await list({ json: false, held: true }, deps);
     expect(deps.exit).not.toHaveBeenCalled();
   });
 
-  it("renders a plain ls of active sites byte-identically to a pre-1.10.0 server", async () => {
+  it("renders a plain list of active sites byte-identically to a pre-1.10.0 server", async () => {
     const base = {
       slug: "alpha",
       teams: ["staff"],
@@ -268,13 +268,13 @@ describe("sites ls --held against artemis 1.10.0 and 1.10.1", () => {
     };
 
     const legacy = mk([base]);
-    await ls({ json: false }, legacy.deps);
+    await list({ json: false }, legacy.deps);
     const legacyOut = legacy.deps.logSuccess.mock.calls
       .map((c: unknown[]) => String(c[0]))
       .join("\n");
 
     const modern = mk([{ ...base, state: "active" }]);
-    await ls({ json: false }, modern.deps);
+    await list({ json: false }, modern.deps);
     const modernOut = modern.deps.logSuccess.mock.calls
       .map((c: unknown[]) => String(c[0]))
       .join("\n");

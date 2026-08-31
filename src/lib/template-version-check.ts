@@ -72,11 +72,7 @@ export async function resolveTemplateVersions(
   now: number = Date.now(),
 ): Promise<TemplateVersions> {
   const cache = await readTemplateCacheFile();
-  if (
-    cache !== null &&
-    now - cache.lastCheck < ttlMs() &&
-    cache.cliVersion === cliVersion
-  ) {
+  if (cache !== null && now - cache.lastCheck < ttlMs() && cache.cliVersion === cliVersion) {
     return { latest: cache.latest, latestCompatible: cache.latestCompatible };
   }
 

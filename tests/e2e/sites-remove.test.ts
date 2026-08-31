@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { rm as sitesRm } from "../../src/commands/sites/rm.js";
+import { remove as sitesRemove } from "../../src/commands/sites/remove.js";
 import { type CliEnv, makeCliEnv } from "./_helpers/cli-env.js";
 import { type FakeArtemis, startFakeArtemis } from "./_helpers/fake-artemis.js";
 
@@ -25,7 +25,7 @@ interface RunResult {
   envelope: Record<string, unknown> | undefined;
 }
 
-async function runRm(
+async function runRemove(
   env: NodeJS.ProcessEnv,
   options: { json: true; slug: string },
 ): Promise<RunResult> {
@@ -36,7 +36,7 @@ async function runRm(
   });
   const captured: CapturedExit = {};
   try {
-    await sitesRm(options, {
+    await sitesRemove(options, {
       env,
       exit: makeExit(captured),
       logSuccess: vi.fn(),
@@ -51,7 +51,7 @@ async function runRm(
   return { captured, envelope };
 }
 
-describe("sites rm E2E (real proxy-client + real identity chain)", () => {
+describe("sites remove E2E (real proxy-client + real identity chain)", () => {
   let server: FakeArtemis;
   let env: CliEnv;
   const token = "ghp_e2e_rm";
@@ -79,10 +79,10 @@ describe("sites rm E2E (real proxy-client + real identity chain)", () => {
     });
     env = await makeCliEnv({ proxyUrl: server.url, githubToken: token });
 
-    const r = await runRm(env.env, { json: true, slug: "blog" });
+    const r = await runRemove(env.env, { json: true, slug: "blog" });
 
     expect(r.captured.code).toBeUndefined();
-    expect(r.envelope!["command"]).toBe("sites rm");
+    expect(r.envelope!["command"]).toBe("sites remove");
     expect(r.envelope!["success"]).toBe(true);
     expect(r.envelope!["slug"]).toBe("blog");
     expect(r.envelope!["deleted"]).toBe(true);
@@ -109,7 +109,7 @@ describe("sites rm E2E (real proxy-client + real identity chain)", () => {
     server.state.aliases.preview.set("blog", "20260102-090000-prev222");
     env = await makeCliEnv({ proxyUrl: server.url, githubToken: token });
 
-    const r = await runRm(env.env, { json: true, slug: "blog" });
+    const r = await runRemove(env.env, { json: true, slug: "blog" });
 
     expect(r.captured.code).toBeUndefined();
     expect(server.state.reservations.get("blog")).toEqual({
@@ -121,7 +121,7 @@ describe("sites rm E2E (real proxy-client + real identity chain)", () => {
     expect(server.state.aliases.preview.has("blog")).toBe(false);
   });
 
-  it("is idempotent: a second rm keeps the deadline and the saved pointers", async () => {
+  it("is idempotent: a second remove keeps the deadline and the saved pointers", async () => {
     server.state.registry.set("blog", {
       slug: "blog",
       teams: ["staff"],
@@ -132,11 +132,11 @@ describe("sites rm E2E (real proxy-client + real identity chain)", () => {
     server.state.aliases.production.set("blog", "20260101-090000-prod111");
     env = await makeCliEnv({ proxyUrl: server.url, githubToken: token });
 
-    await runRm(env.env, { json: true, slug: "blog" });
+    await runRemove(env.env, { json: true, slug: "blog" });
     const firstHold = { ...server.state.registry.get("blog")! };
     const firstPins = { ...server.state.reservations.get("blog")! };
 
-    const second = await runRm(env.env, { json: true, slug: "blog" });
+    const second = await runRemove(env.env, { json: true, slug: "blog" });
 
     expect(second.captured.code).toBeUndefined();
     expect(server.callLog.at(-1)!.status).toBe(204);
@@ -148,7 +148,7 @@ describe("sites rm E2E (real proxy-client + real identity chain)", () => {
   it("exits EXIT_USAGE on 404 not_registered", async () => {
     env = await makeCliEnv({ proxyUrl: server.url, githubToken: token });
 
-    const r = await runRm(env.env, { json: true, slug: "ghost" });
+    const r = await runRemove(env.env, { json: true, slug: "ghost" });
 
     expect(r.captured.code).toBe(10);
     const errorBlock = r.envelope!["error"] as {
@@ -178,7 +178,7 @@ describe("sites rm E2E (real proxy-client + real identity chain)", () => {
     });
     env = await makeCliEnv({ proxyUrl: server.url, githubToken: token });
 
-    const r = await runRm(env.env, { json: true, slug: "blog" });
+    const r = await runRemove(env.env, { json: true, slug: "blog" });
 
     expect(r.captured.code).toBe(12);
     const errorBlock = r.envelope!["error"] as {

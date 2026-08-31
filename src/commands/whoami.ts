@@ -67,7 +67,7 @@ export async function whoami(options: WhoAmIOptions, deps: WhoAmIDeps = {}): Pro
       const sitesLine =
         count === 0
           ? "Authorized for 0 sites."
-          : `Authorized for ${count} site${count === 1 ? "" : "s"} — run \`universe sites ls --mine\``;
+          : `Authorized for ${count} site${count === 1 ? "" : "s"} — run \`universe sites list --mine\``;
       success(
         [
           `Logged in as: ${result.login}`,

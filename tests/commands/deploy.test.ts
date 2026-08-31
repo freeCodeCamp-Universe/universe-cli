@@ -283,7 +283,7 @@ describe("deploy command (proxy plane)", () => {
       expect(errMsg).toContain("Your authorized sites (2)");
       expect(errMsg).toContain("- another-site");
       expect(errMsg).toContain("- other-site");
-      expect(errMsg).not.toContain("universe sites ls --mine");
+      expect(errMsg).not.toContain("universe sites list --mine");
       // Registry-CLI remediation shown inline (replaces sites.yaml PR flow).
       expect(errMsg).toContain("universe sites register my-site");
       // Self-contained — no runbook URL, no reference to the retired yaml.
@@ -356,7 +356,7 @@ describe("deploy command (proxy plane)", () => {
       const errMsg = (deps.logError.mock.calls[0]?.[0] as string) ?? "";
       // Count + redirect surfaced; no individual entries dumped.
       expect(errMsg).toContain("25 authorized sites");
-      expect(errMsg).toContain("universe sites ls --mine");
+      expect(errMsg).toContain("universe sites list --mine");
       expect(errMsg).not.toContain("- site-0");
       expect(errMsg).not.toContain("- site-24");
     });
@@ -377,7 +377,7 @@ describe("deploy command (proxy plane)", () => {
       await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
       const errMsg = (deps.logError.mock.calls[0]?.[0] as string) ?? "";
       expect(errMsg).toContain("Did you mean: hello-universe?");
-      expect(errMsg).toContain("universe sites ls --mine");
+      expect(errMsg).toContain("universe sites list --mine");
       expect(errMsg).not.toContain("- noise-0");
     });
 
@@ -576,7 +576,9 @@ describe("deploy command (proxy plane)", () => {
       const msg = deps.logError.mock.calls[0]?.[0] as string;
       expect(msg).toContain("deploy init failed");
       expect(msg.match(/site_unauthorized/g) ?? []).toHaveLength(1);
-      expect(msg).not.toMatch(/failed \(site_unauthorized\): deploy init failed \(site_unauthorized\)/);
+      expect(msg).not.toMatch(
+        /failed \(site_unauthorized\): deploy init failed \(site_unauthorized\)/,
+      );
     });
 
     it("says a hold cannot be ruled out when the server ignores the filter", async () => {
@@ -587,7 +589,7 @@ describe("deploy command (proxy plane)", () => {
       await expect(deploy({ json: false }, deps)).rejects.toThrow("__exit__");
       expect(deps.exit).toHaveBeenCalledWith(12);
       const msg = deps.logError.mock.calls[0]?.[0] as string;
-      expect(msg).toMatch(/sites ls --held/);
+      expect(msg).toMatch(/sites list --held/);
     });
 
     it("refuses an empty --dir instead of publishing the repo root", async () => {
@@ -595,9 +597,9 @@ describe("deploy command (proxy plane)", () => {
       const deps = mkDeps({
         createProxyClient: vi.fn().mockReturnValue(proxy),
       });
-      await expect(
-        deploy({ json: false, dir: "", allowDirty: true }, deps),
-      ).rejects.toThrow("__exit__");
+      await expect(deploy({ json: false, dir: "", allowDirty: true }, deps)).rejects.toThrow(
+        "__exit__",
+      );
       expect(deps.exit).toHaveBeenCalledWith(11);
       expect(proxy.deployInit).not.toHaveBeenCalled();
       expect(deps.logError).toHaveBeenCalledWith(expect.stringMatching(/--dir/));
@@ -608,9 +610,9 @@ describe("deploy command (proxy plane)", () => {
       const deps = mkDeps({
         createProxyClient: vi.fn().mockReturnValue(proxy),
       });
-      await expect(
-        deploy({ json: false, dir: "   ", allowDirty: true }, deps),
-      ).rejects.toThrow("__exit__");
+      await expect(deploy({ json: false, dir: "   ", allowDirty: true }, deps)).rejects.toThrow(
+        "__exit__",
+      );
       expect(deps.exit).toHaveBeenCalledWith(11);
       expect(proxy.deployInit).not.toHaveBeenCalled();
     });
@@ -669,11 +671,17 @@ describe("deploy command (proxy plane)", () => {
       expect(deps.exit).toHaveBeenCalledWith(13);
       expect(deps.logError).toHaveBeenCalledWith(expect.stringContaining("missing"));
     });
-    
+
     it("surfaces user_unauthorized hint", async () => {
       const proxy = mkProxy();
       proxy.deployInit.mockRejectedValue(
-        new ProxyError(403, "user_unauthorized", "caller is not on the required team", "req-42", "check SSO"),
+        new ProxyError(
+          403,
+          "user_unauthorized",
+          "caller is not on the required team",
+          "req-42",
+          "check SSO",
+        ),
       );
       const deps = mkDeps({
         createProxyClient: vi.fn().mockReturnValue(proxy),
@@ -1048,9 +1056,7 @@ describe("deploy command (proxy plane)", () => {
       });
       const deps = mkDeps({
         createProxyClient: vi.fn().mockReturnValue(proxy),
-        getGitState: vi
-          .fn()
-          .mockReturnValue({ hash: null, dirty: false }),
+        getGitState: vi.fn().mockReturnValue({ hash: null, dirty: false }),
       });
 
       await deploy({ json: false, promote: true }, deps);

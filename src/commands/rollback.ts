@@ -75,7 +75,7 @@ export async function rollback(options: RollbackOptions, deps: RollbackDeps = {}
   try {
     if (!options.to || options.to.trim().length === 0) {
       throw new UsageError(
-        "rollback requires --to <deployId>. Run `universe static ls` to list past deploys.",
+        "rollback requires --to <deployId>. Run `universe static list` to list past deploys.",
       );
     }
 
@@ -146,6 +146,8 @@ export async function rollback(options: RollbackOptions, deps: RollbackDeps = {}
     }
   } catch (err) {
     const extras = err instanceof AliasDriftError ? { current: err.current } : undefined;
-    exit(outputError({ json: options.json, command: "rollback" }, err, { logError: error, extras }));
+    exit(
+      outputError({ json: options.json, command: "rollback" }, err, { logError: error, extras }),
+    );
   }
 }

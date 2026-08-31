@@ -119,7 +119,7 @@ function rethrowProxy(prefix: string, err: unknown): never {
 /**
  * Cap on how many authorized slugs to render inline in the preflight
  * error body. Above this, the message shows the count + a one-line
- * `sites ls --mine` redirect — staff in broad teams (e.g. `staff` on
+ * `sites list --mine` redirect — staff in broad teams (e.g. `staff` on
  * a registry with hundreds of slugs) would otherwise see a wall of
  * text. Did-you-mean stays inline regardless of size; it's the
  * primary typo-recovery surface.
@@ -136,7 +136,7 @@ const PREFLIGHT_INLINE_LIST_CAP = 10;
  *   - Three likely-cause lines naming the registry-CLI remediation
  *     (`universe sites register/update …`), staff-gated.
  *   - Authorized set: inline list when count ≤ `PREFLIGHT_INLINE_LIST_CAP`,
- *     otherwise count + `universe sites ls --mine` redirect.
+ *     otherwise count + `universe sites list --mine` redirect.
  *
  * No external runbook redirect. Empty `authorized` collapses to a
  * shorter "no sites yet" body — suggesting a typo is misleading
@@ -190,7 +190,7 @@ function formatUnauthorizedSiteError(a: {
   } else {
     lines.push(
       `  You have ${a.authorized.length} authorized sites — too many to inline.`,
-      `  Run \`universe sites ls --mine\` to inspect the full list.`,
+      `  Run \`universe sites list --mine\` to inspect the full list.`,
     );
   }
 
@@ -257,7 +257,7 @@ export async function deploy(options: DeployOptions, deps: DeployDeps = {}): Pro
       }
       const unresolved =
         probe.kind === "unknown"
-          ? "\n  note: this artemis did not answer the held-name filter, so a recent delete cannot be ruled out. Run `universe sites ls --held`."
+          ? "\n  note: this artemis did not answer the held-name filter, so a recent delete cannot be ruled out. Run `universe sites list --held`."
           : "";
       throw new CredentialError(
         formatUnauthorizedSiteError({

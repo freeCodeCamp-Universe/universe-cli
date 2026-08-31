@@ -411,9 +411,9 @@ describe("promote --allow-dirty gate", () => {
     const proxy = mkProxy();
     const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
 
-    await expect(
-      promote({ json: false, from: "20260512-090000-dov9z8y" }, deps),
-    ).rejects.toThrow("__exit__");
+    await expect(promote({ json: false, from: "20260512-090000-dov9z8y" }, deps)).rejects.toThrow(
+      "__exit__",
+    );
 
     expect(deps.exit).toHaveBeenCalledWith(15);
     expect(proxy.siteRollback).not.toHaveBeenCalled();

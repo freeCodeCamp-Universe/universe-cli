@@ -209,7 +209,7 @@ describe("static deploy preflight E2E (build never runs on auth failure)", () =>
     expect(r.captured.code).toBe(12);
     const errorBlock = r.envelope!["error"] as { code: number; message: string };
     expect(errorBlock.message).toContain("did not answer the held-name filter");
-    expect(errorBlock.message).toContain("universe sites ls --held");
+    expect(errorBlock.message).toContain("universe sites list --held");
     expect(r.buildCalls).toBe(0);
   });
 

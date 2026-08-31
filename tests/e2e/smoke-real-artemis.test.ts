@@ -3,9 +3,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { deploy } from "../../src/commands/deploy.js";
-import { ls as staticLs } from "../../src/commands/ls.js";
-import { ls as sitesLs } from "../../src/commands/sites/ls.js";
-import { rm as sitesRm } from "../../src/commands/sites/rm.js";
+import { list as staticList } from "../../src/commands/list.js";
+import { list as sitesList } from "../../src/commands/sites/list.js";
+import { remove as sitesRemove } from "../../src/commands/sites/remove.js";
 import { undelete as sitesUndelete } from "../../src/commands/sites/undelete.js";
 import { whoami } from "../../src/commands/whoami.js";
 
@@ -25,7 +25,7 @@ import { whoami } from "../../src/commands/whoami.js";
  *                         `freeCodeCamp-Universe/test-universe`). Must
  *                         already exist in the artemis registry. Case 5
  *                         deletes and restores this site: it serves 404
- *                         for the whole rm → undelete window.
+ *                         for the whole remove → undelete window.
  *
  * Optional env:
  *   UNIVERSE_REAL_TOKEN     — GitHub token authorized for the test site.
@@ -38,9 +38,9 @@ import { whoami } from "../../src/commands/whoami.js";
  *
  * What the smoke asserts:
  *   1. whoami       — token resolves; authorizedSites includes the test site.
- *   2. static ls    — deploys list returns as an array shape.
- *   3. deploy preview  — the new deployId lands on top of `ls`.
- *   4. deploy --promote — the new deployId lands on top of `ls` AND
+ *   2. static list    — deploys list returns as an array shape.
+ *   3. deploy preview  — the new deployId lands on top of `list`.
+ *   4. deploy --promote — the new deployId lands on top of `list` AND
  *                         the public URL serves a freshly-deployed
  *                         marker byte sequence (cache-busted fetch).
  *                         This is the closed-loop test for the
@@ -48,10 +48,10 @@ import { whoami } from "../../src/commands/whoami.js";
  *                         alias fails to flip on the artemis side, or
  *                         the CDN serves stale content past the deploy,
  *                         this test goes RED.
- *   5. sites rm → ls --held → undelete — the reservation lifecycle
+ *   5. sites remove → list --held → undelete — the reservation lifecycle
  *      round-trips against the real registry, and the restored
- *      prevProduction must equal the pre-rm production deployId.
- *      afterAll owns the restore: whenever the rm succeeded and the
+ *      prevProduction must equal the pre-remove production deployId.
+ *      afterAll owns the restore: whenever the remove succeeded and the
  *      undelete has not, teardown re-runs the undelete. If even that
  *      is lost (SIGKILL), recover with `universe sites undelete <slug>`.
  *
@@ -166,10 +166,10 @@ describe.skipIf(!REAL_E2E)("real-artemis smoke (opt-in)", () => {
     expect(r.envelope!["authorizedSitesCount"]).toBeGreaterThan(0);
   }, 30_000);
 
-  it("static ls returns an array shape for the test site", async () => {
+  it("static list returns an array shape for the test site", async () => {
     const env = makeEnv();
     const r = await captureJsonRun((exit) =>
-      staticLs(
+      staticList(
         { json: true, site: REAL_SITE! },
         {
           env,
@@ -185,7 +185,7 @@ describe.skipIf(!REAL_E2E)("real-artemis smoke (opt-in)", () => {
     expect(Array.isArray(r.envelope!["deploys"])).toBe(true);
   }, 30_000);
 
-  it("deploy (preview) — new deployId lands on top of `ls`", async () => {
+  it("deploy (preview) — new deployId lands on top of `list`", async () => {
     const projectDir = await mkdtemp(join(tmpdir(), "universe-cli-smoke-prev-"));
     projectDirs.push(projectDir);
     const distDir = join(projectDir, "dist");
@@ -217,8 +217,8 @@ describe.skipIf(!REAL_E2E)("real-artemis smoke (opt-in)", () => {
     const newDeployId = r.envelope!["deployId"] as string;
     expect(newDeployId).toMatch(/^\d{8}-\d{6}-\S+$/);
 
-    const lsResult = await captureJsonRun((exit) =>
-      staticLs(
+    const listResult = await captureJsonRun((exit) =>
+      staticList(
         { json: true, site: REAL_SITE! },
         {
           env,
@@ -229,7 +229,7 @@ describe.skipIf(!REAL_E2E)("real-artemis smoke (opt-in)", () => {
         },
       ),
     );
-    const deploys = lsResult.envelope!["deploys"] as Array<{
+    const deploys = listResult.envelope!["deploys"] as Array<{
       deployId: string;
     }>;
     expect(deploys[0]?.deployId).toBe(newDeployId);
@@ -270,8 +270,8 @@ describe.skipIf(!REAL_E2E)("real-artemis smoke (opt-in)", () => {
     expect(newDeployId).toMatch(/^\d{8}-\d{6}-\S+$/);
     expect(publicUrl).toMatch(/^https:\/\//);
 
-    const lsResult = await captureJsonRun((exit) =>
-      staticLs(
+    const listResult = await captureJsonRun((exit) =>
+      staticList(
         { json: true, site: REAL_SITE! },
         {
           env,
@@ -282,7 +282,7 @@ describe.skipIf(!REAL_E2E)("real-artemis smoke (opt-in)", () => {
         },
       ),
     );
-    const deploys = lsResult.envelope!["deploys"] as Array<{
+    const deploys = listResult.envelope!["deploys"] as Array<{
       deployId: string;
     }>;
     expect(deploys[0]?.deployId).toBe(newDeployId);
@@ -296,7 +296,7 @@ describe.skipIf(!REAL_E2E)("real-artemis smoke (opt-in)", () => {
     }
   }, 300_000);
 
-  it("sites rm → ls --held → undelete round-trip on the test site", async () => {
+  it("sites remove → list --held → undelete round-trip on the test site", async () => {
     const env = makeEnv();
     const deps = (exit: (code: number) => never) => ({
       env,
@@ -306,7 +306,7 @@ describe.skipIf(!REAL_E2E)("real-artemis smoke (opt-in)", () => {
     });
 
     const before = await captureJsonRun((exit) =>
-      staticLs(
+      staticList(
         { json: true, site: REAL_SITE! },
         { env, exit, logSuccess: vi.fn(), logInfo: vi.fn(), logError: vi.fn() },
       ),
@@ -318,13 +318,13 @@ describe.skipIf(!REAL_E2E)("real-artemis smoke (opt-in)", () => {
     const prodBefore = beforeDeploys.find((d) => d.state?.includes("production"))?.deployId ?? "";
 
     const removed = await captureJsonRun((exit) =>
-      sitesRm({ json: true, slug: REAL_SITE! }, deps(exit)),
+      sitesRemove({ json: true, slug: REAL_SITE! }, deps(exit)),
     );
     expect(removed.captured.code).toBeUndefined();
     expect(removed.envelope!["success"]).toBe(true);
     heldSlug = REAL_SITE;
 
-    const held = await captureJsonRun((exit) => sitesLs({ json: true, held: true }, deps(exit)));
+    const held = await captureJsonRun((exit) => sitesList({ json: true, held: true }, deps(exit)));
     expect(held.captured.code).toBeUndefined();
     const rows = held.envelope!["sites"] as Array<{ slug: string; reservedUntil?: string }>;
     expect(rows.map((r) => r.slug)).toContain(REAL_SITE);

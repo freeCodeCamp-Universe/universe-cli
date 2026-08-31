@@ -7,9 +7,9 @@ import { formatRepoTable, type RepoCommandDeps, setupClient } from "./_shared.js
 import { repoStatusSchema } from "./schema.js";
 
 /** Closed set accepted by `--status`: the row statuses plus `all`. */
-const LS_STATUSES = [...repoStatusSchema.options, "all"] as const;
+const LIST_STATUSES = [...repoStatusSchema.options, "all"] as const;
 
-export interface RepoLsOptions {
+export interface RepoListOptions {
   json: boolean;
   /** pending (default) | approved | active | rejected | failed | all */
   status?: string;
@@ -18,8 +18,8 @@ export interface RepoLsOptions {
   all?: boolean;
 }
 
-export async function ls(options: RepoLsOptions, deps: RepoCommandDeps = {}): Promise<void> {
-  const command = "repo ls";
+export async function list(options: RepoListOptions, deps: RepoCommandDeps = {}): Promise<void> {
+  const command = "repo list";
   const message = deps.logMessage ?? ((s: string) => log.message(s));
   const error = deps.logError ?? ((s: string) => log.error(s));
   const exit = deps.exit ?? exitWithCode;
@@ -29,10 +29,10 @@ export async function ls(options: RepoLsOptions, deps: RepoCommandDeps = {}): Pr
     const requestedStatus = options.all ? "all" : options.status;
     if (
       requestedStatus !== undefined &&
-      !(LS_STATUSES as readonly string[]).includes(requestedStatus)
+      !(LIST_STATUSES as readonly string[]).includes(requestedStatus)
     ) {
       throw new UsageError(
-        `invalid --status "${requestedStatus}": must be one of ${LS_STATUSES.join(", ")}`,
+        `invalid --status "${requestedStatus}": must be one of ${LIST_STATUSES.join(", ")}`,
       );
     }
     const setup = await setupClient(deps);
@@ -59,9 +59,11 @@ export async function ls(options: RepoLsOptions, deps: RepoCommandDeps = {}): Pr
       message(formatRepoTable(rows, empty));
     }
   } catch (err) {
-    exit(outputError({ json: options.json, command }, err, {
-      logError: error,
-      extras: identitySource ? { identitySource } : undefined,
-    }));
+    exit(
+      outputError({ json: options.json, command }, err, {
+        logError: error,
+        extras: identitySource ? { identitySource } : undefined,
+      }),
+    );
   }
 }

@@ -8,7 +8,12 @@ describe(composeLayerFiles, () => {
     it("throws UsageError for a cross-stage non-config file collision", () => {
       const layers: ResolvedLayer[] = [
         { files: { "setup.sh": "#!/bin/sh\n" }, layerType: "always", name: "always", symlinks: {} },
-        { files: { "setup.sh": "#!/bin/bash\n" }, layerType: "runtime", name: "runtime/node", symlinks: {} },
+        {
+          files: { "setup.sh": "#!/bin/bash\n" },
+          layerType: "runtime",
+          name: "runtime/node",
+          symlinks: {},
+        },
       ];
 
       expect(() => composeLayerFiles(layers)).toThrow(UsageError);
@@ -103,7 +108,12 @@ describe(composeLayerFiles, () => {
     it("later layer replaces README.md from earlier layer", () => {
       const layers: ResolvedLayer[] = [
         { files: { "README.md": "# Hello\n" }, layerType: "always", name: "always", symlinks: {} },
-        { files: { "README.md": "# Node\n" }, layerType: "runtime", name: "runtime/node", symlinks: {} },
+        {
+          files: { "README.md": "# Node\n" },
+          layerType: "runtime",
+          name: "runtime/node",
+          symlinks: {},
+        },
       ];
 
       expect(composeLayerFiles(layers).files["README.md"]).toBe("# Node\n");
@@ -111,8 +121,18 @@ describe(composeLayerFiles, () => {
 
     it("README.md in nested path is also overwritable", () => {
       const layers: ResolvedLayer[] = [
-        { files: { "docs/README.md": "# Base docs\n" }, layerType: "always", name: "always", symlinks: {} },
-        { files: { "docs/README.md": "# Node docs\n" }, layerType: "runtime", name: "runtime/node", symlinks: {} },
+        {
+          files: { "docs/README.md": "# Base docs\n" },
+          layerType: "always",
+          name: "always",
+          symlinks: {},
+        },
+        {
+          files: { "docs/README.md": "# Node docs\n" },
+          layerType: "runtime",
+          name: "runtime/node",
+          symlinks: {},
+        },
       ];
 
       expect(composeLayerFiles(layers).files["docs/README.md"]).toBe("# Node docs\n");

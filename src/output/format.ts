@@ -57,11 +57,7 @@ export function outputError(
   message: string,
   optsOrIssues?: OutputErrorOptions | string[],
 ): number;
-export function outputError(
-  ctx: OutputContext,
-  err: unknown,
-  opts?: OutputErrorOptions,
-): number;
+export function outputError(ctx: OutputContext, err: unknown, opts?: OutputErrorOptions): number;
 export function outputError(
   ctx: OutputContext,
   exitCodeOrErr: number | unknown,

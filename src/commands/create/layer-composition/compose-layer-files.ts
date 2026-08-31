@@ -96,10 +96,7 @@ interface ComposedLayers {
   symlinks: Record<string, string>;
 }
 
-const composeLayerFiles = (
-  layers: ResolvedLayer[],
-  pmPreinstall?: string,
-): ComposedLayers => {
+const composeLayerFiles = (layers: ResolvedLayer[], pmPreinstall?: string): ComposedLayers => {
   const composedFiles: Record<string, string> = {};
   const composedSymlinks: Record<string, string> = {};
   const owners = new Map<string, FileOwner>();

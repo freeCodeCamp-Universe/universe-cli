@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, type Mock } from "vitest";
-import { ls } from "../../src/commands/ls.js";
+import { list } from "../../src/commands/list.js";
 
 const VALID_YAML = "site: my-site\n";
 
@@ -62,17 +62,17 @@ function mkDeps(overrides: Partial<FakeDeps> = {}): FakeDeps {
   };
 }
 
-describe("ls command", () => {
+describe("list command", () => {
   it("calls siteDeploys with site from platform.yaml", async () => {
     const deps = mkDeps();
-    await ls({ json: false }, deps);
+    await list({ json: false }, deps);
     const proxy = deps.createProxyClient.mock.results[0]?.value as ReturnType<typeof mkProxy>;
     expect(proxy.siteDeploys).toHaveBeenCalledWith({ site: "my-site" });
   });
 
   it("--site flag overrides platform.yaml site", async () => {
     const deps = mkDeps();
-    await ls({ json: false, site: "other-site" }, deps);
+    await list({ json: false, site: "other-site" }, deps);
     const proxy = deps.createProxyClient.mock.results[0]?.value as ReturnType<typeof mkProxy>;
     expect(proxy.siteDeploys).toHaveBeenCalledWith({ site: "other-site" });
   });
@@ -83,7 +83,7 @@ describe("ls command", () => {
     const deps = mkDeps({
       readPlatformYaml: vi.fn().mockRejectedValue(err),
     });
-    await ls({ json: false, site: "explicit-site" }, deps);
+    await list({ json: false, site: "explicit-site" }, deps);
     const proxy = deps.createProxyClient.mock.results[0]?.value as ReturnType<typeof mkProxy>;
     expect(proxy.siteDeploys).toHaveBeenCalledWith({ site: "explicit-site" });
   });
@@ -96,11 +96,11 @@ describe("ls command", () => {
     });
 
     const deps = mkDeps();
-    await ls({ json: true }, deps);
+    await list({ json: true }, deps);
     writeSpy.mockRestore();
 
     const env = JSON.parse(stdout.join("").trim());
-    expect(env.command).toBe("ls");
+    expect(env.command).toBe("list");
     expect(env.success).toBe(true);
     expect(env.site).toBe("my-site");
     expect(env.deploys).toEqual([
@@ -140,7 +140,7 @@ describe("ls command", () => {
       stdout.push(String(chunk));
       return true;
     });
-    await ls({ json: true }, deps);
+    await list({ json: true }, deps);
     writeSpy.mockRestore();
 
     const env = JSON.parse(stdout.join("").trim());
@@ -165,7 +165,7 @@ describe("ls command", () => {
       stdout.push(String(chunk));
       return true;
     });
-    await ls({ json: true }, deps);
+    await list({ json: true }, deps);
     writeSpy.mockRestore();
 
     const env = JSON.parse(stdout.join("").trim());
@@ -174,7 +174,7 @@ describe("ls command", () => {
 
   it("prints table header + rows in text mode", async () => {
     const deps = mkDeps();
-    await ls({ json: false }, deps);
+    await list({ json: false }, deps);
     const msg = deps.logSuccess.mock.calls[0]?.[0] ?? "";
     expect(msg).toContain("DEPLOY ID");
     expect(msg).toContain("TIMESTAMP");
@@ -195,7 +195,7 @@ describe("ls command", () => {
         : null,
     );
     const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
-    await ls({ json: false }, deps);
+    await list({ json: false }, deps);
     const msg = deps.logSuccess.mock.calls[0]?.[0] ?? "";
     expect(msg).toContain("preview");
   });
@@ -204,7 +204,7 @@ describe("ls command", () => {
     const proxy = mkProxy();
     proxy.siteDeploys.mockResolvedValue([{ deployId: "20260427-141522-abc1234", actor: "alice" }]);
     const deps = mkDeps({ createProxyClient: vi.fn().mockReturnValue(proxy) });
-    await ls({ json: false }, deps);
+    await list({ json: false }, deps);
     const msg = deps.logSuccess.mock.calls[0]?.[0] ?? "";
     expect(msg).toContain("ACTOR");
     expect(msg).toContain("alice");
@@ -216,7 +216,7 @@ describe("ls command", () => {
     const deps = mkDeps({
       createProxyClient: vi.fn().mockReturnValue(proxy),
     });
-    await ls({ json: false }, deps);
+    await list({ json: false }, deps);
     const all = [
       ...deps.logInfo.mock.calls.map((c) => c[0]),
       ...deps.logSuccess.mock.calls.map((c) => c[0]),
@@ -228,7 +228,7 @@ describe("ls command", () => {
     const deps = mkDeps({
       resolveIdentity: vi.fn().mockResolvedValue(null),
     });
-    await expect(ls({ json: false }, deps)).rejects.toThrow("__exit__");
+    await expect(list({ json: false }, deps)).rejects.toThrow("__exit__");
     expect(deps.exit).toHaveBeenCalledWith(12);
     expect(deps.logError).toHaveBeenCalledWith(expect.stringMatching(/login|identity/i));
   });
@@ -239,7 +239,7 @@ describe("ls command", () => {
     const deps = mkDeps({
       readPlatformYaml: vi.fn().mockRejectedValue(err),
     });
-    await expect(ls({ json: false }, deps)).rejects.toThrow("__exit__");
+    await expect(list({ json: false }, deps)).rejects.toThrow("__exit__");
     expect(deps.exit).toHaveBeenCalledWith(11);
     expect(deps.logError).toHaveBeenCalledWith(expect.stringMatching(/site|platform\.yaml/i));
   });
@@ -260,7 +260,7 @@ describe("ls command", () => {
       stdout.push(String(chunk));
       return true;
     });
-    await ls({ json: true }, deps);
+    await list({ json: true }, deps);
     writeSpy.mockRestore();
 
     const env = JSON.parse(stdout.join("").trim());
@@ -289,7 +289,7 @@ describe("ls command", () => {
       stdout.push(String(chunk));
       return true;
     });
-    await ls({ json: true }, deps);
+    await list({ json: true }, deps);
     writeSpy.mockRestore();
 
     const env = JSON.parse(stdout.join("").trim());
@@ -321,7 +321,7 @@ describe("ls command", () => {
       stdout.push(String(chunk));
       return true;
     });
-    await ls({ json: true }, deps);
+    await list({ json: true }, deps);
     writeSpy.mockRestore();
 
     const env = JSON.parse(stdout.join("").trim());

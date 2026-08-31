@@ -134,12 +134,12 @@ describe("binary smoke matrix — CLI verbs against the built binary", () => {
     expect((JSON.parse(r.stdout.trim()) as { command: string }).command).toBe("init");
   }, 60_000);
 
-  it("static ls --json --site <site>", async () => {
+  it("static list --json --site <site>", async () => {
     resetState(server);
     server.state.registry.set(SITE, row(SITE));
-    const r = await runBinary(["static", "ls", "--json", "--site", SITE], env.env);
+    const r = await runBinary(["static", "list", "--json", "--site", SITE], env.env);
     expect(r.exitCode, `stderr=${r.stderr}\nstdout=${r.stdout}`).toBe(0);
-    expect((JSON.parse(r.stdout.trim()) as { command: string }).command).toBe("ls");
+    expect((JSON.parse(r.stdout.trim()) as { command: string }).command).toBe("list");
   }, 60_000);
 
   it("static deploy --json (preview)", async () => {
@@ -187,12 +187,20 @@ describe("binary smoke matrix — CLI verbs against the built binary", () => {
     expect((JSON.parse(r.stdout.trim()) as { command: string }).command).toBe("sites register");
   }, 60_000);
 
-  it("sites ls --json", async () => {
+  it("sites list --json", async () => {
+    resetState(server);
+    server.state.registry.set(SITE, row(SITE));
+    const r = await runBinary(["sites", "list", "--json"], env.env);
+    expect(r.exitCode, `stderr=${r.stderr}\nstdout=${r.stdout}`).toBe(0);
+    expect((JSON.parse(r.stdout.trim()) as { command: string }).command).toBe("sites list");
+  }, 60_000);
+
+  it("sites ls --json routes through the alias and still reports `sites list`", async () => {
     resetState(server);
     server.state.registry.set(SITE, row(SITE));
     const r = await runBinary(["sites", "ls", "--json"], env.env);
     expect(r.exitCode, `stderr=${r.stderr}\nstdout=${r.stdout}`).toBe(0);
-    expect((JSON.parse(r.stdout.trim()) as { command: string }).command).toBe("sites ls");
+    expect((JSON.parse(r.stdout.trim()) as { command: string }).command).toBe("sites list");
   }, 60_000);
 
   it("sites update --json <slug> --team <team>", async () => {
@@ -206,12 +214,20 @@ describe("binary smoke matrix — CLI verbs against the built binary", () => {
     expect((JSON.parse(r.stdout.trim()) as { command: string }).command).toBe("sites update");
   }, 60_000);
 
-  it("sites rm --json <slug>", async () => {
+  it("sites remove --json <slug>", async () => {
+    resetState(server);
+    server.state.registry.set(SITE, row(SITE));
+    const r = await runBinary(["sites", "remove", SITE, "--json"], env.env);
+    expect(r.exitCode, `stderr=${r.stderr}\nstdout=${r.stdout}`).toBe(0);
+    expect((JSON.parse(r.stdout.trim()) as { command: string }).command).toBe("sites remove");
+  }, 60_000);
+
+  it("sites rm --json routes through the alias and still reports `sites remove`", async () => {
     resetState(server);
     server.state.registry.set(SITE, row(SITE));
     const r = await runBinary(["sites", "rm", SITE, "--json"], env.env);
     expect(r.exitCode, `stderr=${r.stderr}\nstdout=${r.stdout}`).toBe(0);
-    expect((JSON.parse(r.stdout.trim()) as { command: string }).command).toBe("sites rm");
+    expect((JSON.parse(r.stdout.trim()) as { command: string }).command).toBe("sites remove");
   }, 60_000);
 
   it("static deploy --json --allow-dirty (preview)", async () => {
@@ -228,27 +244,27 @@ describe("binary smoke matrix — CLI verbs against the built binary", () => {
     expect((JSON.parse(r.stdout.trim()) as { command: string }).command).toBe("deploy");
   }, 60_000);
 
-  it("sites rm → ls --held → undelete round-trip", async () => {
+  it("sites remove → list --held → undelete round-trip", async () => {
     resetState(server);
     server.state.registry.set(SITE, row(SITE));
     server.state.aliases.production.set(SITE, "20260101-090000-prod111");
 
-    const removed = await runBinary(["sites", "rm", SITE, "--json"], env.env);
+    const removed = await runBinary(["sites", "remove", SITE, "--json"], env.env);
     expect(removed.exitCode, `stderr=${removed.stderr}`).toBe(0);
 
-    const held = await runBinary(["sites", "ls", "--held", "--json"], env.env);
+    const held = await runBinary(["sites", "list", "--held", "--json"], env.env);
     expect(held.exitCode, `stderr=${held.stderr}\nstdout=${held.stdout}`).toBe(0);
     const heldEnvelope = JSON.parse(held.stdout.trim()) as {
       command: string;
       scope: string;
       sites: Array<{ slug: string; reservedUntil?: string }>;
     };
-    expect(heldEnvelope.command).toBe("sites ls");
+    expect(heldEnvelope.command).toBe("sites list");
     expect(heldEnvelope.scope).toBe("held");
     expect(heldEnvelope.sites.map((siteRow) => siteRow.slug)).toEqual([SITE]);
     expect(heldEnvelope.sites[0]!.reservedUntil).toBeTruthy();
 
-    const active = await runBinary(["sites", "ls", "--json"], env.env);
+    const active = await runBinary(["sites", "list", "--json"], env.env);
     expect((JSON.parse(active.stdout.trim()) as { count: number }).count).toBe(0);
 
     const restored = await runBinary(["sites", "undelete", SITE, "--json"], env.env);
@@ -265,7 +281,7 @@ describe("binary smoke matrix — CLI verbs against the built binary", () => {
   it("sites release --json --yes <slug>", async () => {
     resetState(server);
     server.state.registry.set(SITE, row(SITE));
-    const removed = await runBinary(["sites", "rm", SITE, "--json"], env.env);
+    const removed = await runBinary(["sites", "remove", SITE, "--json"], env.env);
     expect(removed.exitCode, `stderr=${removed.stderr}`).toBe(0);
 
     const r = await runBinary(["sites", "release", SITE, "--json", "--yes"], env.env);
@@ -281,7 +297,7 @@ describe("binary smoke matrix — CLI verbs against the built binary", () => {
     server.state.registry.set(SITE, row(SITE));
     const project = await makeProject(SITE, { "index.html": "<html></html>" });
     projects.push(project);
-    const removed = await runBinary(["sites", "rm", SITE, "--json"], env.env);
+    const removed = await runBinary(["sites", "remove", SITE, "--json"], env.env);
     expect(removed.exitCode, `stderr=${removed.stderr}`).toBe(0);
 
     const r = await runBinary(["static", "deploy", "--json"], env.env, project.dir);
@@ -297,12 +313,12 @@ describe("binary smoke matrix — CLI verbs against the built binary", () => {
     expect((JSON.parse(r.stdout.trim()) as { command: string }).command).toBe("repo create");
   }, 60_000);
 
-  it("repo ls --json", async () => {
+  it("repo list --json", async () => {
     resetState(server);
     seedRepoRequest("req_1");
-    const r = await runBinary(["repo", "ls", "--json"], env.env);
+    const r = await runBinary(["repo", "list", "--json"], env.env);
     expect(r.exitCode, `stderr=${r.stderr}\nstdout=${r.stdout}`).toBe(0);
-    expect((JSON.parse(r.stdout.trim()) as { command: string }).command).toBe("repo ls");
+    expect((JSON.parse(r.stdout.trim()) as { command: string }).command).toBe("repo list");
   }, 60_000);
 
   it("repo status --json <id>", async () => {
@@ -334,16 +350,16 @@ describe("binary smoke matrix — CLI verbs against the built binary", () => {
     expect(server.state.repoRequests.get("req_1")!.status).toBe("rejected");
   }, 60_000);
 
-  it("repo rm --json --yes <id>", async () => {
+  it("repo remove --json --yes <id>", async () => {
     resetState(server);
     seedRepoRequest("req_1");
-    const r = await runBinary(["repo", "rm", "req_1", "--json", "--yes"], env.env);
+    const r = await runBinary(["repo", "remove", "req_1", "--json", "--yes"], env.env);
     expect(r.exitCode, `stderr=${r.stderr}\nstdout=${r.stdout}`).toBe(0);
-    expect((JSON.parse(r.stdout.trim()) as { command: string }).command).toBe("repo rm");
+    expect((JSON.parse(r.stdout.trim()) as { command: string }).command).toBe("repo remove");
     expect(server.state.repoRequests.has("req_1")).toBe(false);
   }, 60_000);
 
-  it("audit ls --json", async () => {
+  it("audit list --json", async () => {
     resetState(server);
     server.state.auditEvents.push({
       id: 1,
@@ -354,10 +370,10 @@ describe("binary smoke matrix — CLI verbs against the built binary", () => {
       deployId: "20260101-090000-aaa1111",
       outcome: "ok",
     });
-    const r = await runBinary(["audit", "ls", "--json"], env.env);
+    const r = await runBinary(["audit", "list", "--json"], env.env);
     expect(r.exitCode, `stderr=${r.stderr}\nstdout=${r.stdout}`).toBe(0);
     const envelope = JSON.parse(r.stdout.trim()) as { command: string; count: number };
-    expect(envelope.command).toBe("audit ls");
+    expect(envelope.command).toBe("audit list");
     expect(envelope.count).toBe(1);
   }, 60_000);
 

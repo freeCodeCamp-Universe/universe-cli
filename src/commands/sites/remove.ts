@@ -4,13 +4,13 @@ import { exitWithCode } from "../../output/exit-codes.js";
 import { emitJson, outputError } from "../../output/format.js";
 import { setupClient, UsageError, type SitesCommandDeps } from "./_shared.js";
 
-export interface RmOptions {
+export interface RemoveOptions {
   json: boolean;
   slug: string;
 }
 
-export async function rm(options: RmOptions, deps: SitesCommandDeps = {}): Promise<void> {
-  const command = "sites rm";
+export async function remove(options: RemoveOptions, deps: SitesCommandDeps = {}): Promise<void> {
+  const command = "sites remove";
   const success = deps.logSuccess ?? ((s: string) => log.success(s));
   const error = deps.logError ?? ((s: string) => log.error(s));
   const exit = deps.exit ?? exitWithCode;

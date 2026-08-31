@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { AliasDriftError, SiteReservedError, ProxyError } from "../../src/lib/proxy-client.js";
-import { parseError } from '../../src/output/format.js'
+import { parseError } from "../../src/output/format.js";
 
 describe("409 site_reserved", () => {
   it("does not read as a credentials failure and names the recovery verb", () => {

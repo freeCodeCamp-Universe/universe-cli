@@ -189,7 +189,7 @@ export async function create(
         throw new ProxyError(
           err.status,
           err.code,
-          `${err.message}\n  → run \`universe repo ls --status all\` to find the existing request (it may be active or failed)`,
+          `${err.message}\n  → run \`universe repo list --status all\` to find the existing request (it may be active or failed)`,
           err.requestId,
           err.hint,
         );
@@ -218,14 +218,16 @@ export async function create(
           `  Repository:  ${row.owner}/${row.name}`,
           `  Visibility:  ${row.visibility}`,
           ...(row.template ? [`  Template:    ${row.template}`] : []),
-          `  Status:      ${row.status} — run \`universe repo ls\` to review`,
+          `  Status:      ${row.status} — run \`universe repo list\` to review`,
         ].join("\n"),
       );
     }
   } catch (err) {
-    exit(outputError({ json: options.json, command }, err, {
-      logError: error,
-      extras: identitySource ? { identitySource } : undefined,
-    }));
+    exit(
+      outputError({ json: options.json, command }, err, {
+        logError: error,
+        extras: identitySource ? { identitySource } : undefined,
+      }),
+    );
   }
 }
