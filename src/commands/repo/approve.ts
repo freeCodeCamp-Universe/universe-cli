@@ -89,9 +89,11 @@ export async function approve(
       );
     }
   } catch (err) {
-    exit(outputError({ json: options.json, command }, err, {
-      logError: error,
-      extras: creationFailure ?? (identitySource ? { identitySource } : undefined),
-    }));
+    exit(
+      outputError({ json: options.json, command }, err, {
+        logError: error,
+        extras: creationFailure ?? (identitySource ? { identitySource } : undefined),
+      }),
+    );
   }
 }

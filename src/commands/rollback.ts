@@ -146,6 +146,8 @@ export async function rollback(options: RollbackOptions, deps: RollbackDeps = {}
     }
   } catch (err) {
     const extras = err instanceof AliasDriftError ? { current: err.current } : undefined;
-    exit(outputError({ json: options.json, command: "rollback" }, err, { logError: error, extras }));
+    exit(
+      outputError({ json: options.json, command: "rollback" }, err, { logError: error, extras }),
+    );
   }
 }

@@ -111,7 +111,10 @@ export async function login(options: LoginOptions, deps: LoginDeps = {}): Promis
       },
     });
   } catch (err) {
-    const credErr = err instanceof CredentialError ? err : new CredentialError(err instanceof Error ? err.message : String(err));
+    const credErr =
+      err instanceof CredentialError
+        ? err
+        : new CredentialError(err instanceof Error ? err.message : String(err));
     exit(outputError({ json: options.json, command: "login" }, credErr, { logError: error }));
     return;
   }

@@ -1205,7 +1205,6 @@ describe("createProxyClient — repo requests", () => {
   });
 });
 
-
 describe("repo response validation (H2)", () => {
   it("rejects a createRepoRequest body missing required fields with exit 13", async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, {}));

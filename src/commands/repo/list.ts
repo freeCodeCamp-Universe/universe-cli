@@ -59,9 +59,11 @@ export async function list(options: RepoListOptions, deps: RepoCommandDeps = {})
       message(formatRepoTable(rows, empty));
     }
   } catch (err) {
-    exit(outputError({ json: options.json, command }, err, {
-      logError: error,
-      extras: identitySource ? { identitySource } : undefined,
-    }));
+    exit(
+      outputError({ json: options.json, command }, err, {
+        logError: error,
+        extras: identitySource ? { identitySource } : undefined,
+      }),
+    );
   }
 }
