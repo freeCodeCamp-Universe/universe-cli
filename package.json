@@ -45,11 +45,11 @@
   },
   "dependencies": {
     "@clack/prompts": "^1.5.0",
+    "@freecodecamp/universe-core": "workspace:*",
     "commander": "14.0.3",
     "semver": "^7.8.5",
     "yaml": "^2.9.0",
-    "zod": "^4.4.3",
-    "@freecodecamp/universe-core": "workspace:*"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^24.12.2",
