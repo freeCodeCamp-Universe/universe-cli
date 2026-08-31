@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { buildEnvelope, buildErrorEnvelope } from "@freecodecamp/universe-core";
+import { buildEnvelope, buildErrorEnvelope } from "../../src/output/envelope.js";
 
 describe("buildEnvelope", () => {
   beforeEach(() => {

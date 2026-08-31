@@ -6,14 +6,14 @@ import {
   CredentialError,
   GitError,
   StorageError,
-} from "@freecodecamp/universe-core";
+} from "../src/errors.js";
 import {
   EXIT_CONFIG,
   EXIT_CONFIRM,
   EXIT_CREDENTIALS,
   EXIT_GIT,
   EXIT_STORAGE,
-} from "@freecodecamp/universe-core";
+} from "../src/output/exit-codes.js";
 
 describe("CliError hierarchy (post-pivot)", () => {
   it("ConfigError extends CliError with exitCode EXIT_CONFIG", () => {

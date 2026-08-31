@@ -12,7 +12,7 @@ import {
   EXIT_CONFIRM,
   EXIT_PARTIAL,
   exitWithCode,
-} from "@freecodecamp/universe-core";
+} from "../../src/output/exit-codes.js";
 
 describe("exit code constants", () => {
   it("EXIT_SUCCESS is 0", () => {

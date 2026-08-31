@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import type { OutputContext } from "@freecodecamp/universe-core";
-import { ConfigError, outputError, outputSuccess, ProxyError } from "@freecodecamp/universe-core";
+import { ConfigError, ProxyError } from "../../src/errors.js";
+import { outputError, outputSuccess } from "../../src/output/format.js";
+import type { OutputContext } from "../../src/output/format.js";
 
 describe("outputSuccess", () => {
   afterEach(() => {
