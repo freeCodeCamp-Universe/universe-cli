@@ -3,11 +3,11 @@ import { readFile, stat, writeFile } from "node:fs/promises";
 import { basename, resolve } from "node:path";
 import { confirm, isCancel, log, text } from "@clack/prompts";
 import { stringify as stringifyYaml } from "yaml";
-import { CliError, ConfigError, ConfirmError } from "../errors.js";
+import { ConfigError, ConfirmError } from "../errors.js";
 import { parsePlatformYaml } from "../lib/platform-yaml.js";
 import { SITE_NAME_PATTERN } from "../lib/platform-yaml.schema.js";
 import { buildEnvelope } from "../output/envelope.js";
-import { EXIT_USAGE, exitWithCode } from "../output/exit-codes.js";
+import { exitWithCode } from "../output/exit-codes.js";
 import { emitJson, outputError } from "../output/format.js";
 
 export interface InitOptions {
@@ -279,11 +279,6 @@ export async function init(options: InitOptions, deps: InitDeps = {}): Promise<v
     lines.push(``, `Next: universe static deploy`);
     success(lines.join("\n"));
   } catch (err) {
-    const code = err instanceof CliError ? err.exitCode : EXIT_USAGE;
-    const message = err instanceof Error ? err.message : String(err);
-    outputError({ json: options.json, command: "init" }, code, message, {
-      logError: error,
-    });
-    exit(code);
+    exit(outputError({ json: options.json, command: "init" }, err, { logError: error }));
   }
 }

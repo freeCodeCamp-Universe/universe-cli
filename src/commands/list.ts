@@ -8,7 +8,6 @@ import { parsePlatformYaml, type PlatformYamlV2 } from "../lib/platform-yaml.js"
 import {
   createProxyClient as defaultCreateProxyClient,
   parseFetchTimeoutMs,
-  wrapProxyError,
   type ProxyClient,
   type ProxyClientConfig,
 } from "../lib/proxy-client.js";
@@ -199,10 +198,6 @@ export async function list(options: ListOptions, deps: ListDeps = {}): Promise<v
     }
     success(formatTable(deploys));
   } catch (err) {
-    const { code, message } = wrapProxyError("list", err);
-    outputError({ json: options.json, command: "list" }, code, message, {
-      logError: error,
-    });
-    exit(code);
+    exit(outputError({ json: options.json, command: "list" }, err, { logError: error }));
   }
 }

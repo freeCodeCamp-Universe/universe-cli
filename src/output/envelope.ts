@@ -36,14 +36,14 @@ export function buildEnvelope(
 
 export function buildErrorEnvelope(
   command: string,
-  code: number,
+  exitCode: number,
   message: string,
   issues?: string[],
   kind?: string,
   requestId?: string,
 ): ErrorEnvelope {
   const error: ErrorEnvelope["error"] = {
-    code,
+    code: exitCode,
     message,
   };
   if (kind !== undefined) {

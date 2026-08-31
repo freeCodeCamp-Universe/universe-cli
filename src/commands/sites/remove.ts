@@ -1,5 +1,4 @@
 import { log } from "@clack/prompts";
-import { wrapProxyError } from "../../lib/proxy-client.js";
 import { buildEnvelope } from "../../output/envelope.js";
 import { exitWithCode } from "../../output/exit-codes.js";
 import { emitJson, outputError } from "../../output/format.js";
@@ -46,10 +45,6 @@ export async function remove(options: RemoveOptions, deps: SitesCommandDeps = {}
       );
     }
   } catch (err) {
-    const { code, message } = wrapProxyError(command, err);
-    outputError({ json: options.json, command }, code, message, {
-      logError: error,
-    });
-    exit(code);
+    exit(outputError({ json: options.json, command }, err, { logError: error }));
   }
 }

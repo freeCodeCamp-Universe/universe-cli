@@ -1,6 +1,6 @@
 {
   "name": "@freecodecamp/universe-cli",
-  "version": "0.19.0",
+  "version": "0.20.1",
   "description": "Static site deployment CLI for the freeCodeCamp Universe platform",
   "keywords": [
     "cli",

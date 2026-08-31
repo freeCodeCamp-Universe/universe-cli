@@ -1,5 +1,5 @@
 import { log } from "@clack/prompts";
-import { ProxyError, wrapProxyError } from "../../lib/proxy-client.js";
+import { ProxyError } from "../../lib/proxy-client.js";
 import { buildEnvelope } from "../../output/envelope.js";
 import { exitWithCode } from "../../output/exit-codes.js";
 import { emitJson, outputError } from "../../output/format.js";
@@ -51,14 +51,17 @@ export async function undelete(
       );
     }
   } catch (err) {
-    const { code, message } = wrapProxyError(command, err);
-    const hinted =
+    const enrichedError =
       err instanceof ProxyError && err.status === 404
-        ? `${message}\n  hint: the hold may have expired, or the slug may be wrong. Run \`universe sites list --held\` to see the names still recoverable.`
-        : message;
-    outputError({ json: options.json, command }, code, hinted, {
-      logError: error,
-    });
-    exit(code);
+        ? err.withMessage(
+            `${err.message}\n  hint: the hold may have expired, or the slug may be wrong. Run \`universe sites list --held\` to see the names still recoverable.`,
+          )
+        : err;
+
+    exit(
+      outputError({ json: options.json, command }, enrichedError, {
+        logError: error,
+      }),
+    );
   }
 }
