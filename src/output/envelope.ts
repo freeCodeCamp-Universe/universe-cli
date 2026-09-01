@@ -38,7 +38,6 @@ export function buildErrorEnvelope(
   command: string,
   exitCode: number,
   message: string,
-  issues?: string[],
   kind?: string,
   requestId?: string,
 ): ErrorEnvelope {
@@ -51,9 +50,6 @@ export function buildErrorEnvelope(
   }
   if (requestId !== undefined) {
     error.requestId = requestId;
-  }
-  if (issues !== undefined) {
-    error.issues = issues;
   }
   return {
     schemaVersion: "1",

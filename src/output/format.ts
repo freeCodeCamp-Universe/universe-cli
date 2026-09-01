@@ -10,14 +10,7 @@ export type OutputContext = {
   command: string;
 };
 
-/**
- * Options passed as 4th positional to `outputError`. The 4th arg also
- * still accepts a bare `string[]` issues array for back-compat with the
- * pre-T28 signature.
- */
 export interface OutputErrorOptions {
-  /** Sub-errors / hints rendered into envelope.error.issues. */
-  issues?: string[];
   /**
    * Extra top-level keys spliced into the JSON envelope. Used by
    * promote/rollback drift to carry `current` so scripted callers can
@@ -64,32 +57,27 @@ function renderError(
   ctx: OutputContext,
   exitCode: number,
   message: string,
-  optsOrIssues?: OutputErrorOptions | string[],
+  opts?: OutputErrorOptions,
 ): number {
-  const opts: OutputErrorOptions = Array.isArray(optsOrIssues)
-    ? { issues: optsOrIssues }
-    : (optsOrIssues ?? {});
   const redactedMessage = redact(message);
-  const redactedIssues = opts.issues?.map(redact);
 
   if (ctx.json) {
     const envelope = buildErrorEnvelope(
       ctx.command,
       exitCode,
       redactedMessage,
-      redactedIssues,
-      opts.kind,
-      opts.requestId,
+      opts?.kind,
+      opts?.requestId
     );
     // opts.extras passes through redactObject so a future caller who
     // stuffs a token / credential into the extras map doesn't leak it.
     // Today's only callers (promote / rollback drift) pass `{ current:
     // <deployId> }`; redact() is a no-op on a deploy id, so the
     // observable behaviour is unchanged.
-    const payload = opts.extras ? { ...envelope, ...redactObject(opts.extras) } : envelope;
+    const payload = opts?.extras ? { ...envelope, ...redactObject(opts.extras) } : envelope;
     process.stdout.write(JSON.stringify(payload) + "\n");
   } else {
-    (opts.logError ?? ((m: string) => log.error(m, { output: process.stderr })))(redactedMessage);
+    (opts?.logError ?? ((m: string) => log.error(m, { output: process.stderr })))(redactedMessage);
   }
   return exitCode;
 }

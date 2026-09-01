@@ -52,7 +52,7 @@ describe("outputError", () => {
   it("writes JSON error envelope to stdout in json mode", () => {
     const stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
     const ctx: OutputContext = { json: true, command: "deploy" };
-    outputError(ctx, new ConfigError("config not found"), { issues: ["missing bucket"] });
+    outputError(ctx, new ConfigError("config not found"));
 
     const output = stdoutSpy.mock.calls[0][0] as string;
     const parsed = JSON.parse(output);
@@ -60,7 +60,6 @@ describe("outputError", () => {
     expect(parsed.success).toBe(false);
     expect(parsed.error.code).toBe(11);
     expect(parsed.error.message).toBe("config not found");
-    expect(parsed.error.issues).toEqual(["missing bucket"]);
   });
 
   it("uses @clack/prompts log.error in human mode", async () => {
@@ -94,18 +93,6 @@ describe("outputError", () => {
     const msg = logSpy.mock.calls[0][0] as string;
     expect(msg).toContain("****");
     expect(msg).not.toContain("AKIAIOSFODNN7EXAMPLE");
-  });
-
-  it("redacts credentials in issues array", () => {
-    const stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
-    const ctx: OutputContext = { json: true, command: "deploy" };
-    outputError(ctx, new CredentialError("error"), {
-      issues: ["key: AKIAIOSFODNN7EXAMPLE"],
-    });
-
-    const output = stdoutSpy.mock.calls[0][0] as string;
-    const parsed = JSON.parse(output);
-    expect(parsed.error.issues[0]).toContain("****");
   });
 
   // promote/rollback drift envelopes need to carry a top-level `current`
@@ -158,15 +145,6 @@ describe("outputError", () => {
     const msg = logFn.mock.calls[0][0] as string;
     expect(msg).toContain("****");
     expect(msg).not.toContain(secret);
-  });
-
-  it("includes issues supplied through options", () => {
-    const stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
-    const ctx: OutputContext = { json: true, command: "deploy" };
-    outputError(ctx, new ConfigError("broken"), { issues: ["one", "two"] });
-
-    const parsed = JSON.parse(stdoutSpy.mock.calls[0][0] as string);
-    expect(parsed.error.issues).toEqual(["one", "two"]);
   });
 
   it("includes kind and requestId in the JSON error envelope", () => {
