@@ -64,11 +64,17 @@ const setPackageManagerHint = async (cwd: string): Promise<void> => {
 const hostRunnerFactory: PnpmRunnerFactory = (pmVersion) => ({
   async installLockfileOnly(cwd) {
     await setPackageManagerHint(cwd);
-    await execFileAsync(
-      "sh",
-      ["-c", `corepack use pnpm@${pmVersion} && pnpm install --lockfile-only`],
-      { cwd, encoding: "utf8" },
-    );
+    try {
+      await execFileAsync(
+        "sh",
+        ["-c", `corepack use pnpm@${pmVersion} && pnpm install --lockfile-only`],
+        { cwd, encoding: "utf8" },
+      );
+    } catch (err) {
+      const error = err as Error & { stdout: string; stderr: string };
+      error.message = error.message + error.stdout + error.stderr;
+      throw error;
+    }
   },
   async list(cwd) {
     try {
@@ -78,11 +84,11 @@ const hostRunnerFactory: PnpmRunnerFactory = (pmVersion) => ({
         { cwd, encoding: "utf8" },
       );
       return stdout;
-    } catch (error) {
+    } catch (err) {
       if (
-        error instanceof Error &&
-        error.message.includes("Unknown option") &&
-        error.message.includes("lockfile-only")
+        err instanceof Error &&
+        err.message.includes("Unknown option") &&
+        err.message.includes("lockfile-only")
       ) {
         const { stdout } = await execFileAsync("pnpm", ["-v"]);
 
@@ -90,6 +96,8 @@ const hostRunnerFactory: PnpmRunnerFactory = (pmVersion) => ({
           `pnpm version ${stdout.trim()} does not support \`ls --lockfile-only\`, please use pnpm >= 10.23.0`,
         );
       }
+      const error = err as Error & { stdout: string; stderr: string };
+      error.message = error.message + error.stdout + error.stderr;
       throw error;
     }
   },

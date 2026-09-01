@@ -51,9 +51,9 @@ const runCmdForFiles = async (
       ),
     );
   } catch (err) {
-    const error = err as Error & { stdout: string, stderr: string};
+    const error = err as Error & { stdout: string; stderr: string };
     error.message = error.message + error.stdout + error.stderr;
-    throw error
+    throw error;
   } finally {
     await execFileAsync("docker", ["rm", id], { encoding: "utf8" });
   }
@@ -81,7 +81,7 @@ const runCmdForStdout = async (cwd: string, cmd: string[], inputs: string[]): Pr
     const { stdout } = await execFileAsync("docker", ["start", "-a", id], { encoding: "utf8" });
     return stdout;
   } catch (err) {
-    const error = err as Error & { stdout: string, stderr: string};
+    const error = err as Error & { stdout: string; stderr: string };
     error.message = error.message + error.stdout + error.stderr;
     throw error;
   } finally {
