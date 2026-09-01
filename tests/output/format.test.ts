@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import type { OutputContext } from "../../src/output/format.js";
 import { outputSuccess, outputError } from "../../src/output/format.js";
 import { ProxyError } from "../../src/lib/proxy-client.js";
-import { ConfigError } from "../../src/errors.js";
+import { ConfigError, CredentialError, PartialUploadError } from "../../src/errors.js";
 
 describe("outputSuccess", () => {
   afterEach(() => {
@@ -52,7 +52,7 @@ describe("outputError", () => {
   it("writes JSON error envelope to stdout in json mode", () => {
     const stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
     const ctx: OutputContext = { json: true, command: "deploy" };
-    outputError(ctx, 11, "config not found", ["missing bucket"]);
+    outputError(ctx, new ConfigError("config not found"), { issues: ["missing bucket"] });
 
     const output = stdoutSpy.mock.calls[0][0] as string;
     const parsed = JSON.parse(output);
@@ -67,7 +67,7 @@ describe("outputError", () => {
     const clack = await import("@clack/prompts");
     const logSpy = vi.spyOn(clack.log, "error").mockImplementation(() => {});
     const ctx: OutputContext = { json: false, command: "deploy" };
-    outputError(ctx, 11, "config not found");
+    outputError(ctx, new ConfigError("config not found"));
 
     expect(logSpy).toHaveBeenCalledWith("config not found", {
       output: process.stderr,
@@ -77,7 +77,7 @@ describe("outputError", () => {
   it("redacts credentials in error messages (json mode)", () => {
     const stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
     const ctx: OutputContext = { json: true, command: "deploy" };
-    outputError(ctx, 12, "Bad key: AKIAIOSFODNN7EXAMPLE");
+    outputError(ctx, new CredentialError("Bad key: AKIAIOSFODNN7EXAMPLE"));
 
     const output = stdoutSpy.mock.calls[0][0] as string;
     const parsed = JSON.parse(output);
@@ -89,7 +89,7 @@ describe("outputError", () => {
     const clack = await import("@clack/prompts");
     const logSpy = vi.spyOn(clack.log, "error").mockImplementation(() => {});
     const ctx: OutputContext = { json: false, command: "deploy" };
-    outputError(ctx, 12, "Bad key: AKIAIOSFODNN7EXAMPLE");
+    outputError(ctx, new CredentialError("Bad key: AKIAIOSFODNN7EXAMPLE"));
 
     const msg = logSpy.mock.calls[0][0] as string;
     expect(msg).toContain("****");
@@ -99,7 +99,9 @@ describe("outputError", () => {
   it("redacts credentials in issues array", () => {
     const stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
     const ctx: OutputContext = { json: true, command: "deploy" };
-    outputError(ctx, 12, "error", ["key: AKIAIOSFODNN7EXAMPLE"]);
+    outputError(ctx, new CredentialError("error"), {
+      issues: ["key: AKIAIOSFODNN7EXAMPLE"],
+    });
 
     const output = stdoutSpy.mock.calls[0][0] as string;
     const parsed = JSON.parse(output);
@@ -113,7 +115,7 @@ describe("outputError", () => {
   it("merges opts.extras into the JSON envelope at the top level", () => {
     const stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
     const ctx: OutputContext = { json: true, command: "promote" };
-    outputError(ctx, 30, "drift detected", {
+    outputError(ctx, new PartialUploadError("drift detected"), {
       extras: { current: "20260427-abc1234" },
     });
 
@@ -130,7 +132,7 @@ describe("outputError", () => {
     const stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
     const ctx: OutputContext = { json: true, command: "promote" };
     const secret = "abcdef1234567890abcdef1234567890";
-    outputError(ctx, 30, "drift detected", {
+    outputError(ctx, new PartialUploadError("drift detected"), {
       extras: {
         current: "20260427-abc1234",
         token: `Bearer ${secret}`,
@@ -150,7 +152,7 @@ describe("outputError", () => {
     const logFn = vi.fn();
     const ctx: OutputContext = { json: false, command: "deploy" };
     const secret = "abcdef1234567890abcdef1234567890";
-    outputError(ctx, 12, `Bearer ${secret}`, { logError: logFn });
+    outputError(ctx, new CredentialError(`Bearer ${secret}`), { logError: logFn });
 
     expect(logFn).toHaveBeenCalledTimes(1);
     const msg = logFn.mock.calls[0][0] as string;
@@ -158,11 +160,10 @@ describe("outputError", () => {
     expect(msg).not.toContain(secret);
   });
 
-  // Back-compat: third positional may still be a bare issues array.
-  it("accepts issues[] as third positional for back-compat", () => {
+  it("includes issues supplied through options", () => {
     const stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
     const ctx: OutputContext = { json: true, command: "deploy" };
-    outputError(ctx, 11, "broken", ["one", "two"]);
+    outputError(ctx, new ConfigError("broken"), { issues: ["one", "two"] });
 
     const parsed = JSON.parse(stdoutSpy.mock.calls[0][0] as string);
     expect(parsed.error.issues).toEqual(["one", "two"]);
@@ -171,7 +172,7 @@ describe("outputError", () => {
   it("includes kind and requestId in the JSON error envelope", () => {
     const stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
     const ctx: OutputContext = { json: true, command: "repo list" };
-    outputError(ctx, 12, "denied", {
+    outputError(ctx, new CredentialError("denied"), {
       kind: "user_unauthorized",
       requestId: "req-1",
     });

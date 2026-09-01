@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, type Mock } from "vitest";
 import { whoami } from "../../src/commands/whoami.js";
+import { CredentialError } from "../../src/errors.js";
 import { ProxyError } from "../../src/lib/proxy-client.js";
 
 interface FakeDeps {
@@ -108,14 +109,14 @@ describe("whoami command", () => {
     expect(msg).not.toContain("certifications");
   });
 
-  it("errors with EXIT_CREDENTIALS when identity chain returns null", async () => {
+  it("throws a CredentialError when identity chain returns null", async () => {
     const deps = mkDeps({
       resolveIdentity: vi.fn().mockResolvedValue(null),
     });
-    await expect(whoami({ json: false }, deps)).rejects.toThrow("__exit__");
+    await expect(whoami({ json: false }, deps)).rejects.toThrow(CredentialError);
     expect(deps.createProxyClient).not.toHaveBeenCalled();
-    expect(deps.exit).toHaveBeenCalledWith(12);
-    expect(deps.logError).toHaveBeenCalledWith(expect.stringMatching(/login|identity/i));
+    expect(deps.exit).not.toHaveBeenCalled();
+    expect(deps.logError).not.toHaveBeenCalled();
   });
 
   it("propagates proxy 401 as EXIT_CREDENTIALS", async () => {

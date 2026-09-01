@@ -51,29 +51,12 @@ export function outputSuccess(
   }
 }
 
-export function outputError(
-  ctx: OutputContext,
-  exitCode: number,
-  message: string,
-  optsOrIssues?: OutputErrorOptions | string[],
-): number;
-export function outputError(ctx: OutputContext, err: unknown, opts?: OutputErrorOptions): number;
-export function outputError(
-  ctx: OutputContext,
-  exitCodeOrErr: number | unknown,
-  messageOrOpts?: string | OutputErrorOptions | string[],
-  maybeOpts?: OutputErrorOptions | string[],
-): number {
-  // A raw number as `err` would match this branch — callers must pass Error objects.
-  if (typeof exitCodeOrErr === "number") {
-    return renderError(ctx, exitCodeOrErr, messageOrOpts as string, maybeOpts);
-  }
-  const { exitCode, message, kind, requestId } = parseError(ctx.command, exitCodeOrErr);
-  const opts = (messageOrOpts ?? {}) as OutputErrorOptions;
+export function outputError(ctx: OutputContext, err: unknown, opts?: OutputErrorOptions): number{
+  const { exitCode, message, kind, requestId } = parseError(ctx.command, err);
   return renderError(ctx, exitCode, message, {
     ...opts,
-    kind: opts.kind ?? kind,
-    requestId: opts.requestId ?? requestId,
+    kind: opts?.kind ?? kind,
+    requestId: opts?.requestId ?? requestId,
   });
 }
 

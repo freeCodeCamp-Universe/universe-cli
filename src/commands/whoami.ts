@@ -8,7 +8,8 @@ import {
 } from "../lib/proxy-client.js";
 import { buildEnvelope } from "../output/envelope.js";
 import { emitJson, outputError } from "../output/format.js";
-import { EXIT_CREDENTIALS, exitWithCode } from "../output/exit-codes.js";
+import { exitWithCode } from "../output/exit-codes.js";
+import { CredentialError } from "../errors.js";
 
 export interface WhoAmIOptions {
   json: boolean;
@@ -35,13 +36,7 @@ export async function whoami(options: WhoAmIOptions, deps: WhoAmIDeps = {}): Pro
 
   const identity = await resolve({ env });
   if (!identity) {
-    const msg =
-      "No GitHub identity available. Run `universe login`, set $GITHUB_TOKEN, or install the gh CLI.";
-    outputError({ json: options.json, command: "whoami" }, EXIT_CREDENTIALS, msg, {
-      logError: error,
-    });
-    exit(EXIT_CREDENTIALS);
-    return;
+    throw new CredentialError("No GitHub identity available. Run `universe login`, set $GITHUB_TOKEN, or install the gh CLI.")
   }
 
   const baseUrl = env["UNIVERSE_PROXY_URL"] ?? DEFAULT_PROXY_URL;
