@@ -72,7 +72,7 @@ const hostRunnerFactory: PnpmRunnerFactory = (pmVersion) => ({
       );
     } catch (err) {
       const error = err as Error & { stdout: string; stderr: string };
-      error.message = error.message + error.stdout + error.stderr;
+      error.message = `${error.message}\nstdout: ${error.stdout}\nstderr: ${error.stderr}`;
       throw error;
     }
   },
@@ -97,7 +97,7 @@ const hostRunnerFactory: PnpmRunnerFactory = (pmVersion) => ({
         );
       }
       const error = err as Error & { stdout: string; stderr: string };
-      error.message = error.message + error.stdout + error.stderr;
+      error.message = `${error.message}\nstdout: ${error.stdout}\nstderr: ${error.stderr}`;
       throw error;
     }
   },
