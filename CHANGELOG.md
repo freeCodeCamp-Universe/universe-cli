@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.21.0](https://github.com/freeCodeCamp-Universe/universe-cli/compare/universe-cli-v0.20.1...universe-cli-v0.21.0) (2026-09-02)
+
+
+### Features
+
+* full word verbs ([#82](https://github.com/freeCodeCamp-Universe/universe-cli/issues/82)) ([da2f24a](https://github.com/freeCodeCamp-Universe/universe-cli/commit/da2f24a4f5f48619132b7b8a0494fed50e7a0d73))
+* surface execFile errors (create command) ([#91](https://github.com/freeCodeCamp-Universe/universe-cli/issues/91)) ([b8e01fa](https://github.com/freeCodeCamp-Universe/universe-cli/commit/b8e01fa0b6d3ea9658e38e3febbdfe11e8f28290))
+
 ## [0.20.1](https://github.com/freeCodeCamp-Universe/universe-cli/compare/universe-cli-v0.20.0...universe-cli-v0.20.1) (2026-08-28)
 
 
