@@ -1,8 +1,15 @@
 import { describe, expect, it, vi, type Mock } from "vitest";
 import { init, repoNameFromRemote, sanitizeSite } from "../../src/commands/init.js";
+import type { DonationConfigManager } from "../../src/lib/donation-config-manager.port.js";
+
+interface FakeDonationConfigManager extends DonationConfigManager {
+  exists: Mock<DonationConfigManager["exists"]>;
+  write: Mock<DonationConfigManager["write"]>;
+}
 
 interface FakeDeps {
   cwd: string;
+  donationConfigManager: FakeDonationConfigManager;
   readFileText: ReturnType<typeof vi.fn>;
   writeFileText: ReturnType<typeof vi.fn>;
   pathExists: ReturnType<typeof vi.fn>;
@@ -21,6 +28,10 @@ function mkDeps(overrides: Partial<FakeDeps> = {}): FakeDeps {
   enoent.code = "ENOENT";
   return {
     cwd: "/proj/my-cool-site",
+    donationConfigManager: {
+      exists: vi.fn().mockReturnValue(false),
+      write: vi.fn().mockResolvedValue(undefined),
+    },
     readFileText: vi.fn().mockRejectedValue(enoent),
     writeFileText: vi.fn().mockResolvedValue(undefined),
     pathExists: vi.fn().mockResolvedValue(false),
@@ -162,6 +173,43 @@ describe("init command", () => {
     await init({ json: false }, deps);
     expect(deps.promptText).toHaveBeenCalled();
     expect(writtenContent(deps)).toContain("site: prompted-site");
+  });
+
+  it("creates a donation config", async () => {
+    const deps = mkDeps();
+
+    await init({ json: false, yes: true }, deps);
+
+    expect(deps.donationConfigManager.write).toHaveBeenCalledWith(deps.cwd);
+  });
+
+  it("refuses to overwrite an existing donation config without --force", async () => {
+    const donationConfigManager: FakeDonationConfigManager = {
+      exists: vi.fn().mockReturnValue(true),
+      write: vi.fn().mockResolvedValue(undefined),
+    };
+    const deps = mkDeps({ donationConfigManager });
+
+    await expect(init({ json: false, yes: true }, deps)).rejects.toThrow("__exit__");
+
+    expect(deps.exit).toHaveBeenCalledWith(11);
+    expect(deps.writeFileText).not.toHaveBeenCalled();
+    expect(donationConfigManager.write).not.toHaveBeenCalled();
+    expect(deps.logError).toHaveBeenCalledWith(
+      "donation-config.json already exists in /proj/my-cool-site. Pass --force to overwrite.",
+    );
+  });
+
+  it("overwrites an existing donation config with --force", async () => {
+    const donationConfigManager: FakeDonationConfigManager = {
+      exists: vi.fn().mockReturnValue(true),
+      write: vi.fn().mockResolvedValue(undefined),
+    };
+    const deps = mkDeps({ donationConfigManager });
+
+    await init({ force: true, json: false, yes: true }, deps);
+
+    expect(donationConfigManager.write).toHaveBeenCalledWith(deps.cwd);
   });
 
   it("captures the build command from interactive prompts", async () => {

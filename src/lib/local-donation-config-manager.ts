@@ -1,9 +1,14 @@
 import { randomUUID } from "node:crypto";
+import { existsSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { DonationConfigWriter } from "./donation-config-writer.port.js";
+import type { DonationConfigManager } from "./donation-config-manager.port.js";
 
-class LocalDonationConfigWriter implements DonationConfigWriter {
+class LocalDonationConfigManager implements DonationConfigManager {
+  exists(projectDirectory: string): boolean {
+    return existsSync(join(projectDirectory, "donation-config.json"));
+  }
+
   async write(projectDirectory: string): Promise<void> {
     const config = { donationId: randomUUID() };
     await writeFile(
@@ -13,4 +18,4 @@ class LocalDonationConfigWriter implements DonationConfigWriter {
   }
 }
 
-export { LocalDonationConfigWriter };
+export { LocalDonationConfigManager };
