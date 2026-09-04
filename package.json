@@ -33,13 +33,18 @@
     "access": "public"
   },
   "scripts": {
-    "test": "pnpm -F=@freecodecamp/universe-core build && vitest run && pnpm -F=@freecodecamp/universe-core test",
-    "test:smoke": "pnpm -F=@freecodecamp/universe-core build && UNIVERSE_E2E_REAL=1 vitest run tests/e2e/smoke-real-artemis.test.ts",
-    "build": "pnpm -F=@freecodecamp/universe-core build && tsdown",
+    "test": "turbo test:root test",
+    "test:root": "vitest run",
+    "test:smoke": "turbo test:smoke:root",
+    "test:smoke:root": "UNIVERSE_E2E_REAL=1 vitest run tests/e2e/smoke-real-artemis.test.ts",
+    "build": "turbo build:root build",
+    "build:root": "tsdown",
     "lint": "oxlint src tests",
-    "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json --noEmit && tsc -p packages/core/tsconfig.json",
+    "typecheck": "turbo typecheck:root typecheck",
+    "typecheck:root": "tsc --noEmit && tsc -p tsconfig.test.json --noEmit",
     "prepare": "husky",
-    "dev": "tsx src/index.ts",
+    "dev": "turbo dev:root",
+    "dev:root": "tsx src/index.ts",
     "fmt": "oxfmt",
     "fmt:check": "oxfmt --check"
   },
@@ -60,6 +65,7 @@
     "postject": "1.0.0-alpha.6",
     "tsdown": "0.22.1",
     "tsx": "4.22.4",
+    "turbo": "^2.10.12",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4"
   },
