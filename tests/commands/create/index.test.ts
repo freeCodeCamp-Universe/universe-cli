@@ -17,7 +17,7 @@ import type {
 } from "../../../src/commands/create/package-manager/package-manager.service.js";
 import { CreateInputValidationService } from "../../../src/commands/create/create-input-validation-service.js";
 import type { CreateSelections, Prompt } from "../../../src/commands/create/prompt/prompt.port.js";
-import type { DonationConfigWriter } from "../../../src/lib/donation-config-writer.port.js";
+import type { DonationConfigManager } from "../../../src/lib/donation-config-manager.port.js";
 import type { RepoInitialiser } from "../../../src/commands/create/io/repo-initialiser.port.js";
 import type { SkillInstaller } from "../../../src/commands/create/io/skill-installer.port.js";
 import type { ResolvedLayerSet } from "../../../src/commands/create/layer-composition/layer-composition-service.js";
@@ -52,7 +52,10 @@ vi.mock(
 const FIXTURES_DIR = resolve("tests/fixtures/templates");
 const runtimeData = RuntimeSchema.parse(runtimeFixture);
 
-class StubDonationConfigWriter implements DonationConfigWriter {
+class StubDonationConfigManager implements DonationConfigManager {
+  exists(_projectDirectory: string) {
+    return false;
+  }
   async write(_projectDirectory: string): Promise<void> {
     // No-op
   }
@@ -160,7 +163,7 @@ const makeDeps = (cwd: string, prompt: Prompt, options: MakeDepsOptions = {}) =>
   } = options;
   return {
     cwd,
-    donationConfigWriter: new StubDonationConfigWriter(),
+    donationConfigManager: new StubDonationConfigManager(),
     exit: vi.fn(),
     isTTY: true,
     logger: { error: vi.fn(), info: vi.fn(), success: vi.fn(), warn: vi.fn() },
@@ -421,7 +424,7 @@ describe("create", () => {
     }[] = [];
     const deps = {
       ...makeDeps("/workspace", createPromptPort(createPromptResult)),
-      donationConfigWriter: new StubDonationConfigWriter(),
+      donationConfigManager: new StubDonationConfigManager(),
       filesystemWriter: {
         createSymlinks() {
           return Promise.resolve();
@@ -492,7 +495,7 @@ describe("create", () => {
     const message = (target: string) => `Failed to write files to ${target}`;
     const deps = {
       ...makeDeps("/workspace", createPromptPort(createPromptResult)),
-      donationConfigWriter: new StubDonationConfigWriter(),
+      donationConfigManager: new StubDonationConfigManager(),
       filesystemWriter: {
         createSymlinks() {
           return Promise.resolve();

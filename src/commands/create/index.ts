@@ -16,8 +16,8 @@ import {
 } from "./platform-manifest-service.js";
 import type { CreateSelections, Prompt } from "./prompt/prompt.port.js";
 import { ClackPrompt } from "./prompt/clack-prompt.js";
-import type { DonationConfigWriter } from "../../lib/donation-config-writer.port.js";
-import { LocalDonationConfigWriter } from "../../lib/local-donation-config-writer.js";
+import type { DonationConfigManager } from "../../lib/donation-config-manager.port.js";
+import { LocalDonationConfigManager } from "../../lib/local-donation-config-manager.js";
 import type { RepoInitialiser } from "./io/repo-initialiser.port.js";
 import { GitRepoInitialiser } from "./io/git-repo-initialiser.js";
 import type { SkillInstaller } from "./io/skill-installer.port.js";
@@ -73,7 +73,7 @@ export interface CreateOptions {
 
 export interface CreateDeps {
   cwd?: string;
-  donationConfigWriter?: DonationConfigWriter;
+  donationConfigManager?: DonationConfigManager;
   exit?: (code: number) => void;
   filesystemWriter?: ProjectWriter;
   isTTY?: boolean;
@@ -101,7 +101,7 @@ export const create = async (options: CreateOptions, deps: CreateDeps = {}): Pro
       bun: new BunPackageManager(),
     });
   const platformManifestGenerator = deps.platformManifestGenerator ?? new PlatformManifestService();
-  const donationConfigWriter = deps.donationConfigWriter ?? new LocalDonationConfigWriter();
+  const donationConfigManager = deps.donationConfigManager ?? new LocalDonationConfigManager();
   const repoInitialiser = deps.repoInitialiser ?? new GitRepoInitialiser();
   const skillInstaller = deps.skillInstaller ?? new NpxSkillInstaller();
   const isTTY = process.stdin.isTTY;
@@ -310,7 +310,7 @@ export const create = async (options: CreateOptions, deps: CreateDeps = {}): Pro
     }
 
     spinner.message("Writing donation config");
-    await donationConfigWriter.write(targetDirectory);
+    await donationConfigManager.write(targetDirectory);
 
     spinner.message("Initialising git repository");
     await repoInitialiser.initialise(targetDirectory);
