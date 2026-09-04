@@ -206,7 +206,7 @@ describe("repo create command", () => {
   });
 
   it("maps proxy 409 already_exists to EXIT_USAGE", async () => {
-    const { ProxyError } = await import("../../../src/lib/proxy-client.js");
+    const { ProxyError } = await import("@freecodecamp/universe-core");
     const proxy = mkProxy();
     proxy.createRepoRequest = vi
       .fn()
@@ -238,7 +238,7 @@ describe("repo create command", () => {
   });
 
   it("hints at `repo list --status all` on already_exists (human mode)", async () => {
-    const { ProxyError } = await import("../../../src/lib/proxy-client.js");
+    const { ProxyError } = await import("@freecodecamp/universe-core");
     const proxy = mkProxy();
     proxy.createRepoRequest = vi
       .fn()
@@ -255,7 +255,7 @@ describe("repo create command", () => {
       stdout.push(String(c));
       return true;
     });
-    const { ProxyError } = await import("../../../src/lib/proxy-client.js");
+    const { ProxyError } = await import("@freecodecamp/universe-core");
     const proxy = mkProxy();
     proxy.createRepoRequest = vi
       .fn()
@@ -269,7 +269,7 @@ describe("repo create command", () => {
   });
 
   it("surfaces already_exists after the full interactive flow", async () => {
-    const { ProxyError } = await import("../../../src/lib/proxy-client.js");
+    const { ProxyError } = await import("@freecodecamp/universe-core");
     const proxy = mkProxy();
     proxy.listRepoTemplates = vi.fn().mockResolvedValue([]);
     proxy.createRepoRequest = vi

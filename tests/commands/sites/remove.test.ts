@@ -71,7 +71,7 @@ describe("sites remove command", () => {
   });
 
   it("maps proxy 404 not_found to surfaced code", async () => {
-    const { ProxyError } = await import("../../../src/lib/proxy-client.js");
+    const { ProxyError } = await import("@freecodecamp/universe-core");
     const proxy = mkProxy();
     proxy.deleteSite = vi
       .fn()
@@ -85,7 +85,7 @@ describe("sites remove command", () => {
   });
 
   it("maps proxy 403 user_unauthorized to EXIT_CREDENTIALS", async () => {
-    const { ProxyError } = await import("../../../src/lib/proxy-client.js");
+    const { ProxyError } = await import("@freecodecamp/universe-core");
     const proxy = mkProxy();
     proxy.deleteSite = vi
       .fn()

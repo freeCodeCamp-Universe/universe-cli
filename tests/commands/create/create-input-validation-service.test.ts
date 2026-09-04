@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { UsageError } from "../../../src/errors.js";
+import { UsageError } from "@freecodecamp/universe-core";
 import type {
   CreateSelections,
   PackageManagerOption,

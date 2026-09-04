@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { ConfigError } from "../../../../src/errors.js";
+import { ConfigError } from "@freecodecamp/universe-core";
 import { NpxSkillInstaller } from "../../../../src/commands/create/io/npx-skill-installer.js";
 
 describe(NpxSkillInstaller, () => {

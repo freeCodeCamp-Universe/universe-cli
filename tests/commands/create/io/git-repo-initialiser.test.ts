@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { GitError } from "../../../../src/errors.js";
+import { GitError } from "@freecodecamp/universe-core";
 import { GitRepoInitialiser } from "../../../../src/commands/create/io/git-repo-initialiser.js";
 
 describe(GitRepoInitialiser, () => {

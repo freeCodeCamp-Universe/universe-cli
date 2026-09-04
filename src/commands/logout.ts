@@ -3,8 +3,8 @@ import {
   deleteToken as defaultDeleteToken,
   loadToken as defaultLoadToken,
 } from "../lib/token-store.js";
-import { buildEnvelope } from "../output/envelope.js";
-import { emitJson } from "../output/format.js";
+import { buildEnvelope } from "@freecodecamp/universe-core";
+import { emitJson } from "@freecodecamp/universe-core";
 
 export interface LogoutOptions {
   json: boolean;

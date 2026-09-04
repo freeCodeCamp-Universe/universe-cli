@@ -108,7 +108,7 @@ describe("repo reject command", () => {
   });
 
   it("surfaces a getRepoRequest 404 before the confirm prompt", async () => {
-    const { ProxyError } = await import("../../../src/lib/proxy-client.js");
+    const { ProxyError } = await import("@freecodecamp/universe-core");
     const proxy = mkProxy();
     proxy.getRepoRequest = vi
       .fn()

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { UsageError } from "../../../../src/errors.js";
+import { UsageError } from "@freecodecamp/universe-core";
 import { composeLayerFiles } from "../../../../src/commands/create/layer-composition/compose-layer-files.js";
 import type { ResolvedLayer } from "../../../../src/commands/create/layer-composition/resolve-ordered-layers.js";
 

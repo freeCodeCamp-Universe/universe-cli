@@ -3,7 +3,7 @@ import { mkdir, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { promisify } from "node:util";
 
-import { ConfigError } from "../../../errors.js";
+import { ConfigError } from "@freecodecamp/universe-core";
 import { resolveTemplateUrl } from "./assets.js";
 import { templatesCache } from "./template-cache.js";
 

@@ -6,8 +6,10 @@ import {
   CredentialError,
   GitError,
   PartialUploadError,
+  ProxyError,
+  SiteReservedError,
   StorageError,
-} from "../errors.js";
+} from "@freecodecamp/universe-core";
 import { getGitState as defaultGetGitState, type GitState } from "../deploy/git.js";
 import { deployIdSha, stampSha } from "../deploy/stamp.js";
 import { hasRootIndex, missingRootIndexMessage } from "../deploy/index-check.js";
@@ -22,16 +24,14 @@ import {
   createProxyClient as defaultCreateProxyClient,
   heldFilterUnanswered,
   parseFetchTimeoutMs,
-  ProxyError,
-  SiteReservedError,
   type ProxyClient,
   type ProxyClientConfig,
   type SiteRow,
 } from "../lib/proxy-client.js";
 import { uploadFiles as defaultUploadFiles } from "../lib/upload.js";
-import { buildEnvelope } from "../output/envelope.js";
-import { exitWithCode } from "../output/exit-codes.js";
-import { emitJson, outputError } from "../output/format.js";
+import { buildEnvelope } from "@freecodecamp/universe-core";
+import { exitWithCode } from "@freecodecamp/universe-core";
+import { emitJson, outputError } from "@freecodecamp/universe-core";
 
 export interface DeployOptions {
   json: boolean;

@@ -21,7 +21,7 @@ import type { DonationConfigWriter } from "../../../src/commands/create/io/donat
 import type { RepoInitialiser } from "../../../src/commands/create/io/repo-initialiser.port.js";
 import type { SkillInstaller } from "../../../src/commands/create/io/skill-installer.port.js";
 import type { ResolvedLayerSet } from "../../../src/commands/create/layer-composition/layer-composition-service.js";
-import { UsageError } from "../../../src/errors.js";
+import { UsageError } from "@freecodecamp/universe-core";
 import { loadFromDir } from "../../../src/commands/create/layer-composition/template-provider.js";
 import { RuntimeSchema } from "../../../src/commands/create/layer-composition/schemas/layers.js";
 import { resolveTemplateVersions } from "../../../src/lib/template-version-check.js";

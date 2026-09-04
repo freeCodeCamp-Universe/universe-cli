@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { UsageError } from "../../../../src/errors.js";
+import { UsageError } from "@freecodecamp/universe-core";
 import { LocalProjectReader } from "../../../../src/commands/create/io/local-project-reader.js";
 import { afterEach, describe, expect, it } from "vitest";
 

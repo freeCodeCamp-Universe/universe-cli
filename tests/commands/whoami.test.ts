@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, type Mock } from "vitest";
 import { whoami } from "../../src/commands/whoami.js";
-import { ProxyError } from "../../src/lib/proxy-client.js";
+import { ProxyError } from "@freecodecamp/universe-core";
 
 interface FakeDeps {
   resolveIdentity: ReturnType<typeof vi.fn>;

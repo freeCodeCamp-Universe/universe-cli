@@ -132,7 +132,7 @@ describe("repo list command", () => {
   });
 
   it("maps a proxy error to its exit code", async () => {
-    const { ProxyError } = await import("../../../src/lib/proxy-client.js");
+    const { ProxyError } = await import("@freecodecamp/universe-core");
     const proxy = mkProxy();
     proxy.listRepoRequests = vi
       .fn()

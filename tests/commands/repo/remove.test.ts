@@ -129,7 +129,7 @@ describe("repo remove command", () => {
   });
 
   it("surfaces a getRepoRequest 404 before the confirm prompt", async () => {
-    const { ProxyError } = await import("../../../src/lib/proxy-client.js");
+    const { ProxyError } = await import("@freecodecamp/universe-core");
     const proxy = mkProxy();
     proxy.getRepoRequest = vi
       .fn()
@@ -157,7 +157,7 @@ describe("repo remove command", () => {
       stdout.push(String(c));
       return true;
     });
-    const { ProxyError } = await import("../../../src/lib/proxy-client.js");
+    const { ProxyError } = await import("@freecodecamp/universe-core");
     const proxy = mkProxy();
     proxy.deleteRepoRequest = vi
       .fn()
@@ -174,7 +174,7 @@ describe("repo remove command", () => {
   });
 
   it("maps a 403 delete error to EXIT_CREDENTIALS", async () => {
-    const { ProxyError } = await import("../../../src/lib/proxy-client.js");
+    const { ProxyError } = await import("@freecodecamp/universe-core");
     const proxy = mkProxy();
     proxy.deleteRepoRequest = vi
       .fn()
@@ -185,7 +185,7 @@ describe("repo remove command", () => {
   });
 
   it("maps a 5xx delete error to EXIT_STORAGE", async () => {
-    const { ProxyError } = await import("../../../src/lib/proxy-client.js");
+    const { ProxyError } = await import("@freecodecamp/universe-core");
     const proxy = mkProxy();
     proxy.deleteRepoRequest = vi
       .fn()

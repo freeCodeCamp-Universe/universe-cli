@@ -37,12 +37,12 @@ import type {
   ServiceOption,
 } from "./layer-composition/schemas/layers.js";
 import { getLabel } from "./layer-composition/labels.js";
-import { clackLogger, silentLogger, type Logger } from "../../output/logger.js";
-import { clackSpinner, silentSpinner, type Spinner } from "../../output/spinner.js";
-import { exitWithCode } from "../../output/exit-codes.js";
-import { UsageError } from "../../errors.js";
-import { buildEnvelope } from "../../output/envelope.js";
-import { emitJson, outputError } from "../../output/format.js";
+import { clackLogger, silentLogger, type Logger } from "@freecodecamp/universe-core";
+import { clackSpinner, silentSpinner, type Spinner } from "@freecodecamp/universe-core";
+import { exitWithCode } from "@freecodecamp/universe-core";
+import { UsageError } from "@freecodecamp/universe-core";
+import { buildEnvelope } from "@freecodecamp/universe-core";
+import { emitJson, outputError } from "@freecodecamp/universe-core";
 import { LocalProjectWriter } from "./io/local-project-writer.js";
 import { loadFromDir, type TemplateData } from "./layer-composition/template-provider.js";
 import { bsd3ClauseLicense } from "./layer-composition/licenses/bsd-3-clause.js";

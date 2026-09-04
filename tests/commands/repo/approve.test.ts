@@ -107,7 +107,7 @@ describe("repo approve command", () => {
   });
 
   it("maps 409 already_resolved to EXIT_USAGE", async () => {
-    const { ProxyError } = await import("../../../src/lib/proxy-client.js");
+    const { ProxyError } = await import("@freecodecamp/universe-core");
     const proxy = mkProxy();
     proxy.approveRepoRequest = vi
       .fn()
@@ -155,7 +155,7 @@ describe("repo approve command", () => {
   });
 
   it("surfaces a getRepoRequest 404 before the confirm prompt", async () => {
-    const { ProxyError } = await import("../../../src/lib/proxy-client.js");
+    const { ProxyError } = await import("@freecodecamp/universe-core");
     const proxy = mkProxy();
     proxy.getRepoRequest = vi
       .fn()

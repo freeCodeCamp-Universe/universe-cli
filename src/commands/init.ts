@@ -3,12 +3,12 @@ import { readFile, stat, writeFile } from "node:fs/promises";
 import { basename, resolve } from "node:path";
 import { confirm, isCancel, log, text } from "@clack/prompts";
 import { stringify as stringifyYaml } from "yaml";
-import { ConfigError, ConfirmError } from "../errors.js";
+import { ConfigError, ConfirmError } from "@freecodecamp/universe-core";
 import { parsePlatformYaml } from "../lib/platform-yaml.js";
 import { SITE_NAME_PATTERN } from "../lib/platform-yaml.schema.js";
-import { buildEnvelope } from "../output/envelope.js";
-import { exitWithCode } from "../output/exit-codes.js";
-import { emitJson, outputError } from "../output/format.js";
+import { buildEnvelope } from "@freecodecamp/universe-core";
+import { exitWithCode } from "@freecodecamp/universe-core";
+import { emitJson, outputError } from "@freecodecamp/universe-core";
 
 export interface InitOptions {
   json: boolean;

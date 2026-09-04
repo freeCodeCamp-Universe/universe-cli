@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { UsageError } from "../../../../src/errors.js";
+import { UsageError } from "@freecodecamp/universe-core";
 import { createPackageSpecifier } from "../../../../src/commands/create/package-manager/package-json-specifier.js";
 import type { Runner } from "../../../../src/commands/create/package-manager/package-json-specifier.js";
 

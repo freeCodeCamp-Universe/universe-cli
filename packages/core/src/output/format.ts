@@ -1,6 +1,5 @@
 import { log } from "@clack/prompts";
-import { CliError } from "../errors.js";
-import { ProxyError, SiteReservedError } from "../lib/proxy-client.js";
+import { CliError, ProxyError, SiteReservedError } from "../errors.js";
 import { buildEnvelope, buildErrorEnvelope } from "./envelope.js";
 import { EXIT_USAGE } from "./exit-codes.js";
 import { redact, redactObject } from "./redact.js";

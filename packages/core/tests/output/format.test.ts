@@ -1,8 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
+import { ConfigError, ProxyError } from "../../src/errors.js";
+import { outputError, outputSuccess } from "../../src/output/format.js";
 import type { OutputContext } from "../../src/output/format.js";
-import { outputSuccess, outputError } from "../../src/output/format.js";
-import { ProxyError } from "../../src/lib/proxy-client.js";
-import { ConfigError } from "../../src/errors.js";
 
 describe("outputSuccess", () => {
   afterEach(() => {

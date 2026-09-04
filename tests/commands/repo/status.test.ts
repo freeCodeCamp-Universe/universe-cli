@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { status } from "../../../src/commands/repo/status.js";
-import { ProxyError } from "../../../src/lib/proxy-client.js";
+import { ProxyError } from "@freecodecamp/universe-core";
 
 function repoRow(over: Record<string, unknown> = {}) {
   return {

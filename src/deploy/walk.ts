@@ -1,6 +1,6 @@
 import { readdirSync, realpathSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
-import { StorageError } from "../errors.js";
+import { StorageError } from "@freecodecamp/universe-core";
 
 export interface WalkedFile {
   relPath: string;

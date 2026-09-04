@@ -1,13 +1,17 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  AliasDriftError,
   createProxyClient,
   DEFAULT_FETCH_TIMEOUT_MS,
   parseFetchTimeoutMs,
-  ProxyError,
 } from "../../src/lib/proxy-client.js";
-import { EXIT_CREDENTIALS, EXIT_STORAGE, EXIT_USAGE } from "../../src/output/exit-codes.js";
-import { parseError } from "../../src/output/format.js";
+import {
+  AliasDriftError,
+  EXIT_CREDENTIALS,
+  EXIT_STORAGE,
+  EXIT_USAGE,
+  parseError,
+  ProxyError,
+} from "@freecodecamp/universe-core";
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {

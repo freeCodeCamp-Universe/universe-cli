@@ -1,6 +1,6 @@
 import { access, readFile, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { UsageError } from "../../../errors.js";
+import { UsageError } from "@freecodecamp/universe-core";
 
 interface FilesystemApi {
   deleteFile(path: string): Promise<void>;

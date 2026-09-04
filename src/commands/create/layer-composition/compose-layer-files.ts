@@ -1,5 +1,5 @@
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
-import { UsageError } from "../../../errors.js";
+import { UsageError } from "@freecodecamp/universe-core";
 import type { LayerType, ResolvedLayer } from "./resolve-ordered-layers.js";
 
 type JsonValue = boolean | JsonObject | JsonValue[] | null | number | string;
