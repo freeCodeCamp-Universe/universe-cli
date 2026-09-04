@@ -16,8 +16,8 @@ import {
 } from "./platform-manifest-service.js";
 import type { CreateSelections, Prompt } from "./prompt/prompt.port.js";
 import { ClackPrompt } from "./prompt/clack-prompt.js";
-import type { DonationConfigWriter } from "./io/donation-config-writer.port.js";
-import { LocalDonationConfigWriter } from "./io/local-donation-config-writer.js";
+import type { DonationConfigWriter } from "../../lib/donation-config-writer.port.js";
+import { LocalDonationConfigWriter } from "../../lib/local-donation-config-writer.js";
 import type { RepoInitialiser } from "./io/repo-initialiser.port.js";
 import { GitRepoInitialiser } from "./io/git-repo-initialiser.js";
 import type { SkillInstaller } from "./io/skill-installer.port.js";
