@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { run, isVersionRequest } from "../src/cli.js";
+import { UsageError } from "../src/errors.js";
 
 vi.mock("../src/output/format.js", async () => {
   const actual =
@@ -235,6 +236,22 @@ describe("top-level error handling", () => {
       expect.objectContaining({ command: "deploy" }),
       err,
     );
+  });
+
+  it("renders and exits for a missing whoami identity", async () => {
+    const { CredentialError } = await import("../src/errors.js");
+    const { EXIT_CREDENTIALS } = await import("../src/output/exit-codes.js");
+    const err = new CredentialError("No GitHub identity available");
+    mockWhoami.mockRejectedValue(err);
+
+    run(["node", "universe", "whoami", "--json"]);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(mockOutputError).toHaveBeenCalledWith(
+      expect.objectContaining({ command: "whoami", json: true }),
+      err,
+    );
+    expect(mockExitWithCode).toHaveBeenCalledWith(EXIT_CREDENTIALS);
   });
 
   it("invokes login command when 'universe login' runs", async () => {
@@ -534,8 +551,7 @@ describe("universe repo namespace", () => {
     expect(mockExitWithCode).toHaveBeenCalledWith(EXIT_USAGE);
     expect(mockOutputError).toHaveBeenCalledWith(
       expect.objectContaining({ command: "repo" }),
-      EXIT_USAGE,
-      expect.any(String),
+      expect.any(UsageError),
     );
   });
 
@@ -547,8 +563,7 @@ describe("universe repo namespace", () => {
     expect(mockExitWithCode).toHaveBeenCalledWith(EXIT_USAGE);
     expect(mockOutputError).toHaveBeenCalledWith(
       expect.objectContaining({ command: "repo", json: false }),
-      EXIT_USAGE,
-      expect.any(String),
+      expect.any(UsageError),
     );
   });
 
@@ -557,8 +572,7 @@ describe("universe repo namespace", () => {
     run(["node", "universe", "repo", "--json"]);
     expect(mockOutputError).toHaveBeenCalledWith(
       expect.objectContaining({ command: "repo", json: true }),
-      EXIT_USAGE,
-      expect.any(String),
+      expect.any(UsageError),
     );
     expect(mockExitWithCode).toHaveBeenCalledWith(EXIT_USAGE);
   });

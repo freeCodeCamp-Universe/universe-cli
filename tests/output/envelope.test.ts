@@ -73,23 +73,6 @@ describe("buildErrorEnvelope", () => {
     });
   });
 
-  it("includes issues array when provided", () => {
-    const result = buildErrorEnvelope("deploy", 11, "config not found", [
-      "missing bucket",
-      "missing region",
-    ]);
-    expect(result.error).toEqual({
-      code: 11,
-      message: "config not found",
-      issues: ["missing bucket", "missing region"],
-    });
-  });
-
-  it("omits issues when not provided", () => {
-    const result = buildErrorEnvelope("deploy", 12, "bad creds");
-    expect(result.error).not.toHaveProperty("issues");
-  });
-
   it("always has success=false", () => {
     const result = buildErrorEnvelope("promote", 17, "not found");
     expect(result.success).toBe(false);

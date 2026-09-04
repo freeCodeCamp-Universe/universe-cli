@@ -26,6 +26,7 @@ import { EXIT_USAGE, exitWithCode } from "./output/exit-codes.js";
 import { installExitNotice, refreshIfStale, spawnRefresh } from "./lib/update-notifier.js";
 
 import pkg from "../package.json" with { type: "json" };
+import { UsageError } from "./errors.js";
 
 const version = pkg.version;
 
@@ -52,8 +53,7 @@ function namespaceGroup(name: string, description: string): Command {
       if (json) {
         outputError(
           { json: true, command: name },
-          EXIT_USAGE,
-          `missing ${name} subcommand — run \`universe ${name} --help\``,
+         new UsageError(`missing ${name} subcommand — run \`universe ${name} --help\``),
         );
       } else {
         cmd.outputHelp();
@@ -558,7 +558,7 @@ export async function run(argv = process.argv): Promise<void> {
       const json = args.includes("--json");
       const command = firstPositional(args);
       const message = err instanceof Error ? err.message : "unknown error";
-      outputError({ json, command }, EXIT_USAGE, message);
+      outputError({ json, command }, new UsageError(message) );
       exitWithCode(EXIT_USAGE);
     }
   }
