@@ -81,7 +81,7 @@ const defaultPromptText = async (opts: PromptTextOptions): Promise<string> => {
     ...(validate ? { validate: (v: string | undefined) => validate(v ?? "") } : {}),
   });
   if (isCancel(r)) throw new ConfirmError("init cancelled");
-  return r.trim().length > 0 ? r.trim() : opts.defaultValue;
+  return r.trim();
 };
 
 const defaultPromptConfirm = async (message: string, initial: boolean): Promise<boolean> => {
@@ -155,8 +155,9 @@ async function detectBuildCommand(
 }
 
 function siteValidator(value: string): string | undefined {
+  if (!value) return undefined;
   const v = value.trim();
-  if (v.length === 0) return "site is required";
+  if (!v) return "either enter your desired site name or leave it blank for the default";
   if (v.length > 63) return "site must be at most 63 characters";
   if (!SITE_NAME_PATTERN.test(v)) {
     return "lowercase letters, digits, single hyphens; no leading/trailing/consecutive hyphens";
@@ -165,7 +166,8 @@ function siteValidator(value: string): string | undefined {
 }
 
 function nonEmptyValidator(value: string): string | undefined {
-  return value.trim().length === 0 ? "required" : undefined;
+  if (!value) return undefined;
+  return value.trim().length === 0 ? "please enter something or leave it blank for the default" : undefined;
 }
 
 function renderYaml(site: string, build: BuildBlock | null): string {
