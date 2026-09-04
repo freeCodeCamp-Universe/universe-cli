@@ -4,6 +4,8 @@ import { basename, resolve } from "node:path";
 import { confirm, isCancel, log, text } from "@clack/prompts";
 import { stringify as stringifyYaml } from "yaml";
 import { ConfigError, ConfirmError } from "../errors.js";
+import type { DonationConfigManager } from "../lib/donation-config-manager.port.js";
+import { LocalDonationConfigManager } from "../lib/local-donation-config-manager.js";
 import { parsePlatformYaml } from "../lib/platform-yaml.js";
 import { SITE_NAME_PATTERN } from "../lib/platform-yaml.schema.js";
 import { buildEnvelope } from "../output/envelope.js";
@@ -26,6 +28,7 @@ export interface PromptTextOptions {
 
 export interface InitDeps {
   cwd?: string;
+  donationConfigManager?: DonationConfigManager;
   readFileText?: (path: string) => Promise<string>;
   writeFileText?: (path: string, data: string) => Promise<void>;
   pathExists?: (path: string) => Promise<boolean>;
@@ -183,6 +186,7 @@ function renderYaml(site: string, build: BuildBlock | null): string {
 
 export async function init(options: InitOptions, deps: InitDeps = {}): Promise<void> {
   const cwd = deps.cwd ?? process.cwd();
+  const donationConfigManager = deps.donationConfigManager ?? new LocalDonationConfigManager();
   const readFileText = deps.readFileText ?? defaultReadFileText;
   const writeFileText = deps.writeFileText ?? defaultWriteFileText;
   const pathExists = deps.pathExists ?? defaultPathExists;
@@ -201,6 +205,11 @@ export async function init(options: InitOptions, deps: InitDeps = {}): Promise<v
     const target = resolve(cwd, "platform.yaml");
     if ((await pathExists(target)) && !options.force) {
       throw new ConfigError(`platform.yaml already exists in ${cwd}. Pass --force to overwrite.`);
+    }
+    if (donationConfigManager.exists(cwd) && !options.force) {
+      throw new ConfigError(
+        `donation-config.json already exists in ${cwd}. Pass --force to overwrite.`,
+      );
     }
 
     const derivedSite = deriveSite(cwd, detectGitRemote(cwd));
@@ -258,6 +267,7 @@ export async function init(options: InitOptions, deps: InitDeps = {}): Promise<v
     }
 
     await writeFileText(target, content);
+    await donationConfigManager.write(cwd);
 
     if (options.json) {
       emitJson(
